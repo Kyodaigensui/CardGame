@@ -222,6 +222,24 @@ function netHost(){   // 部屋を作る：設定の全ブローカーで待ち�
   c.on('connect',()=>c.subscribe(T.tIn,{qos:1},err=>{
    if(err||NET.conn)return;
    ready++;NET.status='待機中です。相手にコード（または招待リンク）を伝えてください。';render();
+   console.log('[guest] MQTT接続成功', url);
+
+   c.subscribe(T.tIn, { qos: 1 }, err => {
+     console.log('[guest] 購読結果', { url, err });
+
+     if (err) {
+      giveUp();
+      return;
+     }
+
+     console.log('[guest] join送信', url);
+     L.send({
+       t: 'join',
+       v: netVer(),
+       deck: NET.myDeck,
+       name: PF.name
+     });
+   });
   }));
   c.on('message',(topic,payload)=>{
    const raw=String(payload);
@@ -250,15 +268,17 @@ function netJoin(){   // 部屋に入る：設定のブローカーを順に試�
   let c;try{c=mqtt.connect(url,{clientId:cid(),clean:true,connectTimeout:6000,reconnectPeriod:0})}catch(e){attempt();return}
   NET.clients=[c];let paired=false,over=false,timer=0;
   const L=relayLink(c,T.tIn,T.tOut,m=>{if(!paired){paired=true;clearTimeout(timer);c.options.reconnectPeriod=1000;NET.conn=L;NET.send=L.send}netRecv(m)},netClosed);
-  const giveUp=()=>{
-    if(over||paired||NET.role!=='guest')return;
-    console.warn('[MQTT guest] 接続を終了して次へ進みます', {
-     url,
-     paired,
-     connected: c.connected,
-     role: NET.role
+  const giveUp = () => {
+   if (over || paired || NET.role !== 'guest') return;
+    console.warn('[guest] giveUp実行', {
+      url,
+      connected: c.connected,
+      disconnecting: c.disconnecting,
+      paired,
+      over,
+      role: NET.role
     });
-    over=true;
+    over = true;
     clearTimeout(timer);
     L.close();
     attempt();
