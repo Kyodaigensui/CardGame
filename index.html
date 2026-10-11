@@ -9,14 +9,15 @@
 <body>
 <header><h1>カードゲーム 試作版</h1><div id="stat"></div></header>
 <main id="app"></main>
-<!-- オンライン対戦の通信ライブラリ（PeerJS）。読み込めなくてもホットシート対戦は遊べる -->
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<!-- オンライン対戦の通信ライブラリ（MQTT.js）。読み込めなくても、1台での対戦は遊べる -->
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
 <script src="js/00-core.js"></script>
 <script src="js/10-cards.js"></script>
 <script src="js/20-passives.js"></script>
 <script src="js/30-characters.js"></script>
 <script src="js/35-helpers.js"></script>
 <script src="js/40-game.js"></script>
+<script src="js/50-config.js"></script>
 <script src="js/60-net.js"></script>
 <script src="js/99-main.js"></script>
 </body>
