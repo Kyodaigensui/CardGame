@@ -199,8 +199,9 @@ function coin(pi,n){
 // noSpeed:true にすると、その属性限定のカードは戦闘時に速度を無視して最初に発動する
 const ATTR={
  ranged:{n:'遠距離',t:'遠距離系スキルを使える。遠距離系スキルは速度を無視して、戦闘の最初に発動する',noSpeed:true},
+ Shi:{n:'シ協会南部支部:部長',t:"暗殺専門の協会。少数精鋭、効率的動作、情報判断能力が要求される"},
  RedMist:{n:'赤い霧',t:'耳を立てて、よく澄ませな！あれが例の赤い霧だ！'},
- Shi:{n:'シ協会南部支部:部長',t:"暗殺専門の協会。少数精鋭、効率的動作、情報判断能力が要求される"}
+ blue:{n:'青い残響',t:'始めよう。世界を変える俺らの序曲を'}
 };
 Object.keys(PAS).forEach(id=>{const a=PAS[id].at;if(a&&!ATTR[a])throw new Error(`パッシブ「${id}」の属性 at:'${a}' は ATTR にありません`)});   // 属性名の書き間違い検出
 const noSpd=c=>!!(c&&c.req&&ATTR[c.req]&&ATTR[c.req].noSpeed);
@@ -280,7 +281,7 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
  L(`　${STN[kind].i}${B.name}は${STN[kind].n}で${dmg}ダメージ`);
  if(B.hp<=0){B.alive=false;L(`　${B.name}は倒れた`);coin(pb,2)}
 }
-function vibex(B){   // 振動爆発：振動÷3枚の手札を山札に戻し、振動を消す
+function vibex(B){   // 振動爆発：振動÷2枚の手札を山札に戻し、振動を消す
  if(!B||!B.st.vib)return;
  const pb=S.p.findIndex(p=>p.chars.includes(B)),P=S.p[pb],n=Math.min(Math.floor(B.st.vib/2),P.hand.length),back=[];
  for(let i=0;i<n;i++)back.push(P.hand.splice(R(0,P.hand.length-1),1)[0]);
@@ -292,6 +293,9 @@ function bleed(pi,ch){if(ch.alive&&ch.st.bleed){direct(pi,ch,ch.st.bleed,'bleed'
 function hit(pa,pb,B,dmg,A,die){
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
+ if(A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
+  dmg=Math.floor(dmg/2);
+  L(`　${B.name}の遠距離耐性：ダメージ半減`);}
  const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
  if(dmg<=0)return;
