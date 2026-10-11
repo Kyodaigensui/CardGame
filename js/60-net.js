@@ -153,7 +153,33 @@ const cid=()=>'cg_'+Math.random().toString(36).slice(2,10);
 const relayTopics=(code,role)=>{const b=`${RELAY.prefix}${code}/`;return role==='host'?{tIn:b+'h',tOut:b+'g'}:{tIn:b+'g',tOut:b+'h'}};
 function relayLink(client,tIn,tOut,onMsg,onDead){
  const L={client,tx:0,rx:1,buf:{},last:Date.now(),dead:false};
- L.send=o=>{try{client.publish(tOut,JSON.stringify({n:++L.tx,m:o}),{qos:1})}catch(e){}};
+ L.send = o => {
+  if (L.dead || !client.connected || client.disconnecting) {
+    console.warn('[MQTT] 送信を中止：接続が利用できません', {
+      connected: client.connected,
+      disconnecting: client.disconnecting,
+      dead: L.dead
+    });
+    return false;
+  }
+
+  try {
+    client.publish(
+      tOut,
+      JSON.stringify({ n: ++L.tx, m: o }),
+      { qos: 1 },
+      err => {
+        if (err) {
+          console.error('[MQTT] 送信失敗', err);
+        }
+      }
+    );
+    return true;
+  } catch (e) {
+    console.error('[MQTT] 送信時の例外', e);
+    return false;
+  }
+};
  L.feed=raw=>{   // 届いたものを、通し番号の順に1回ずつ処理する
   let e;try{e=JSON.parse(raw)}catch(_){return}
   if(!e||typeof e!=='object')return;
@@ -168,7 +194,22 @@ function relayLink(client,tIn,tOut,onMsg,onDead){
   try{client.publish(tOut,JSON.stringify({p:1}),{qos:0})}catch(_){}
   if(Date.now()-L.last>25000){L.close();onDead()}
  },5000);
- L.close=()=>{L.dead=true;clearInterval(L.timer);try{client.end(false)}catch(_){}};
+ L.close = () => {
+  if (L.dead) return;
+
+  L.dead = true;
+  clearInterval(L.timer);
+
+  // この接続に対応する参照だけを解除する
+  if (NET.conn === L) NET.conn = null;
+  if (NET.send === L.send) NET.send = null;
+
+  try {
+    client.end(false);
+  } catch (e) {
+    console.warn('[MQTT] 切断処理の例外', e);
+  }
+ };
  return L;
 }
 function netHost(){   // 部屋を作る：設定の全ブローカーで待ち受け、最初に入ってきた相手の接続を使う
