@@ -6,7 +6,7 @@
 const vm=require('vm'),fs=require('fs'),path=require('path');
 const ROOT=path.join(__dirname,'..');
 const GAMES=+process.env.GAMES||60;
-// index.html の <script src="js/…"> を読み込み順どおりに集める（外部URLのPeerJSは除く）
+// index.html の <script src="js/…"> を読み込み順どおりに集める（外部URLのMQTT.jsは除く）
 const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
 const FILES=[...html.matchAll(/<script src="(?!https?:)([^"]+)"/g)].map(m=>path.join(ROOT,m[1]));
 
@@ -69,15 +69,11 @@ function connect(p,dA,dB){
  ev(p.A,'NET.role="host";NET.slot=0');ev(p.B,'NET.role="guest";NET.slot=1;NET.myDeck=DK.d[1]');
  ev(p.B,'netSend({t:"join",v:netVer(),deck:NET.myDeck,name:PF.name})');p.pump();
 }
-{let errs={},turns=0,mism=0,early=0,over=0;
- for(let g=0;g<GAMES;g++){
-  try{
-   const p=pair(),{A,B,pump}=p;connect(p,mkDeck(),mkDeck());
-   if(!ev(A,'NET.on')||!ev(B,'NET.on'))throw new Error('接続の握手に失敗');
+function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で、1試合を最後まで遊ばせる（毎ターン状態の一致を確認）
    const setup=c=>{ev(c,'S.pick=[]');const n=ev(c,'S.p[NET.me].pool.length');for(const i of [...Array(n).keys()].sort(()=>Math.random()-.5))ev(c,`pickCh(${i})`);if(!ev(c,'S.pick.length'))ev(c,'pickCh(0)');ev(c,'confirmSetup()')};
    const od=Math.random()<.5?[A,B]:[B,A];setup(od[0]);if(Math.random()<.5)pump();setup(od[1]);pump();
    const snap=c=>ev(c,'JSON.stringify({p:S.p,turn:S.turn,phase:S.phase,stage:S.stage,order:S.order,over:S.over,log:S.log,s:NET.s})');
-   const same=w=>{if(snap(A)!==snap(B)){mism++;throw new Error('状態が一致しません：'+w)}};
+   const same=w=>{if(snap(A)!==snap(B)){st.mism++;throw new Error('状態が一致しません：'+w)}};
    const decisions=c=>{
     const me=ev(c,'NET.me'),nch=ev(c,'S.p[NET.me].chars.length');
     const enemy=()=>J(ev(c,'S.p[1-NET.me].chars.map((x,i)=>x.alive?i:-1).filter(i=>i>=0)'));
@@ -100,17 +96,24 @@ function connect(p,dA,dB){
      decisions(actor);pump();
     }
     if(ev(A,'S.phase')!=='result'||ev(B,'S.phase')!=='result')throw new Error('戦闘まで進みません');
-    same('戦闘後');turns++;
-    if(ev(A,'S.over')){over++;break}
+    same('戦闘後');st.turns++;
+    if(ev(A,'S.over')){st.over++;break}
     const first=Math.random()<.5?A:B,second=first===A?B:A;
     ev(first,'nextTurn()');
-    if(ev(first,'S.order[S.stage]===NET.me')&&Math.random()<.6){early++;decisions(first);pump()}   // 相手が「次へ」を押す前に決定が届く場合
+    if(ev(first,'S.order[S.stage]===NET.me')&&Math.random()<.6){st.early++;decisions(first);pump()}   // 相手が「次へ」を押す前に決定が届く場合
     ev(second,'nextTurn()');pump();
     if(ev(A,'NET.err')||ev(B,'NET.err'))throw new Error('NET.err '+ev(A,'NET.err')+ev(B,'NET.err'));
    }
+}
+{let errs={};const st={turns:0,mism:0,early:0,over:0};
+ for(let g=0;g<GAMES;g++){
+  try{
+   const p=pair(),{A,B,pump}=p;connect(p,mkDeck(),mkDeck());
+   if(!ev(A,'NET.on')||!ev(B,'NET.on'))throw new Error('接続の握手に失敗');
+   playOnline(A,B,pump,st);
   }catch(e){const k=String(e.stack||e).split('\n').slice(0,2).join(' | ').slice(0,300);errs[k]=(errs[k]||0)+1}
  }
- ok(`オンライン ${GAMES}試合（${turns}ターン・先行決定${early}回）で状態が毎回一致`,!Object.keys(errs).length&&!mism,JSON.stringify(errs));
+ ok(`オンライン ${GAMES}試合（${st.turns}ターン・先行決定${st.early}回）で状態が毎回一致`,!Object.keys(errs).length&&!st.mism,JSON.stringify(errs));
 }
 
 // ───── ④ 通信まわりの異常系 ─────
@@ -137,7 +140,7 @@ function connect(p,dA,dB){
  ok('手番でない側の手札は操作できない表示',!/draggable="true"/.test(html(wait))&&/相手が行動を決めています/.test(html(wait)));
  ok('画面に undefined/NaN が出ない',!/undefined|NaN|\[object/.test(html(act)+html(wait)));}
 {const L=makeCtx();ev(L,"SCR='lobby';NET.code='ABC123';render()");
- ok('ロビー画面が開ける（PeerJSなしでは部屋を作れない表示）',/id="roomcode"/.test(L._els.app._h)&&/disabled onclick="netHost/.test(L._els.app._h));}
+ ok('ロビー画面が開ける（通信ライブラリなしでは部屋を作れない表示）',/id="roomcode"/.test(L._els.app._h)&&/disabled onclick="netHost/.test(L._els.app._h));}
 
 // ───── ⑤ プレイヤー名とデッキの紐づけ ─────
 {const store={};let c=makeCtx(store);
@@ -182,6 +185,89 @@ function connect(p,dA,dB){
  const h=(pi,v)=>ev(c,`chHTML(${pi},0,${v})`);
  ok('P1視点：自分(下側)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(0,0))&&/ch up/.test(h(0,0))&&/ghosts bot/.test(h(1,0))&&/ch dn/.test(h(1,0)));
  ok('P2視点：自分(下側＝プレイヤー2)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(1,1))&&/ch up/.test(h(1,1))&&/ghosts bot/.test(h(0,1))&&/ch dn/.test(h(0,1)));}
+
+// ───── ⑦ 条件「相手の状態異常の値がN以上」 ─────
+{const c=makeCtx();
+ const res=J(ev(c,`(()=>{
+  startMatch();const mk=n=>mkField(mkC({name:n,slot:1,hp:40,spd:[1,1],ps:[]}));
+  const A=mk('a'),B=mk('b');S.p[0].chars=[A];S.p[1].chars=[B];S.log=[];
+  S.p[0].deck=Array.from({length:20},()=>({n:'d',c:1,d:[]}));S.p[0].hand=[];S.p[0].disc=[];
+  const eff=[['draw',2,['foeStGe','vib',5]]];
+  const r={};
+  B.st.vib=4;fx(0,A,eff,'発動時',B);r.at4=S.p[0].hand.length;
+  B.st.vib=5;fx(0,A,eff,'発動時',B);r.at5=S.p[0].hand.length;
+  B.st.vib=9;fx(0,A,eff,'発動時',B);r.at9=S.p[0].hand.length;
+  r.text=fxText(eff);
+  let e1='',e2='';try{condOk(['foeStGe','fire',5],'t')}catch(e){e1=e.message}try{condOk(['foeStGe','vib'],'t')}catch(e){e2=e.message}
+  r.e1=e1;r.e2=e2;r.andOk=condTest({and:['kill',['foeStGe','vib',5]]},{A,B,dmg:0});
+  return r})()`));
+ ok('相手の振動が4のときはドローしない・5以上でドロー2',res.at4===0&&res.at5===2&&res.at9===4,JSON.stringify(res));
+ ok('条件の説明文が表示される',/相手の振動が5以上のとき/.test(res.text)&&/ドロー2/.test(res.text),res.text);
+ ok('条件の書き間違いを検出（状態名・数値なし）',/burn\/bleed\/rupt\/vib/.test(res.e1)&&/数値が必要/.test(res.e2),res.e1+res.e2);}
+
+// ───── ⑧ パッシブ「共鳴(vibcheck)」「青い残響(rangedres)」 ─────
+{const c=makeCtx();
+ const r=JSON.parse(ev(c,`(()=>{
+  startMatch();const mk=(n,ps)=>mkField(mkC({name:n,slot:1,hp:60,spd:[1,1],ps}));
+  const o={};
+  const A=mk('a',['vibcheck']),B=mk('b',[]);S.p[0].chars=[A];S.p[1].chars=[B];S.log=[];S.dm={};S.ev=[];S.fr=[];
+  const die={t:'a',r:[5,5]};A.card={n:'t',c:1,d:[]};A.tgt=0;
+  B.st.vib=2;o.v2=roll(A,die);B.st.vib=3;o.v3=roll(A,die);B.st.vib=9;o.v9=roll(A,die);
+  A.tgt=null;o.noTgt=roll(A,die);A.tgt=0;
+  const R2=mk('r',['rangedres']),X=mk('x',[]);S.p[0].chars=[X];S.p[1].chars=[R2];
+  X.card={n:'遠',c:1,req:'ranged',d:[]};let h=R2.hp;hit(0,1,R2,10,X,null);o.ranged=h-R2.hp;
+  X.card={n:'近',c:1,d:[]};h=R2.hp;hit(0,1,R2,10,X,null);o.melee=h-R2.hp;
+  X.card={n:'遠',c:1,req:'ranged',d:[]};S.log=[];hit(0,1,R2,0,X,null);o.zeroLog=S.log.filter(x=>x.includes('半減')).length;
+  return JSON.stringify(o)})()`));
+ ok('共鳴：相手の振動が3未満は+0、3以上で+2（相手が居ないときは+0）',r.v2===5&&r.v3===7&&r.v9===7&&r.noTgt===5,JSON.stringify(r));
+ ok('青い残響：遠距離カードのダメージだけ半減（0ダメージではログも出さない）',r.ranged===5&&r.melee===10&&r.zeroLog===0,JSON.stringify(r));}
+
+// ───── ⑨ 中継（MQTTブローカー）経由の通信：重複・順序の入れ替わり・ブローカー停止・切断 ─────
+function makeBroker(){   // 本物のブローカーの代わりをする、メモリ上の簡易版
+ const B={subs:[],q:[],down:new Set(),dup:false,reorder:false};
+ B.mqtt={connect(url,opts){
+  const c={url,options:Object.assign({},opts),_ev:{},ended:false,
+   on(e,f){(c._ev[e]=c._ev[e]||[]).push(f);return c},
+   emit(e,...a){(c._ev[e]||[]).slice().forEach(f=>f(...a))},
+   subscribe(topic,o,cb){B.q.push({k:'ctl',fn:()=>{if(c.ended)return;B.subs.push({c,topic});cb&&cb(null)}})},
+   publish(topic,payload){B.q.push({k:'msg',fn:()=>{B.subs.filter(s=>s.topic===topic&&s.c.url===c.url&&!s.c.ended&&s.c!==c).forEach(s=>{const n=B.dup?2:1;for(let i=0;i<n;i++)s.c.emit('message',topic,payload)})}})},
+   end(){if(c.ended)return;c.ended=true;B.subs=B.subs.filter(s=>s.c!==c);c.emit('close')}};
+  B.q.push({k:'ctl',fn:()=>{if(c.ended)return;if(B.down.has(url)){c.emit('error',new Error('down'));c.emit('close')}else c.emit('connect')}});
+  return c}};
+ B.pump=()=>{let n=0;while(B.q.length&&n++<20000){let i=0;if(B.reorder&&B.q[0].k==='msg'){let m=1;while(m<3&&B.q[m]&&B.q[m].k==='msg')m++;i=Math.floor(Math.random()*m)}B.q.splice(i,1)[0].fn()}};
+ return B;
+}
+function withTimers(ctx){const T={to:[],iv:[]};ctx.setTimeout=(f,ms)=>{T.to.push({f,ms});return T.to.length};ctx.clearTimeout=id=>{if(T.to[id-1])T.to[id-1].f=null};ctx.setInterval=f=>{T.iv.push(f);return T.iv.length};ctx.clearInterval=id=>{T.iv[id-1]=null};return T}
+function relayPair(opts){
+ const B=Object.assign(makeBroker(),opts||{}),A=makeCtx(),G=makeCtx();A.mqtt=B.mqtt;G.mqtt=B.mqtt;
+ const TA=withTimers(A),TG=withTimers(G),d=mkDeck();
+ [[A,'アリス',0],[G,'ボブ',1]].forEach(([c,nm,sl])=>{ev(c,`PF.name=${JSON.stringify(nm)};DK.d[${sl}]=${JSON.stringify(d)};NET.slot=${sl}`)});
+ return{B,A,G,TA,TG};
+}
+const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code');ev(p.G,`NET.code=${JSON.stringify(code)};netJoin()`);p.B.pump();return code};
+{const p=relayPair();const code=relayStart(p);
+ ok('中継：部屋のコードが6文字で、待機表示が出る',code.length===6);
+ ok('中継：入室すると握手して始まり、名前が双方に出る',ev(p.A,'NET.on')&&ev(p.G,'NET.on')&&ev(p.A,'S.p[0].name')==='アリス'&&ev(p.G,'S.p[1].name')==='ボブ'&&ev(p.G,'S.p[0].name')==='アリス');}
+{const p=relayPair();p.B.down.add(ev(p.A,'RELAY.brokers[0]'));const code=relayStart(p);
+ ok('中継：先頭のブローカーが落ちていても、次のブローカーでつながる',ev(p.A,'NET.on')&&ev(p.G,'NET.on'),code);}
+{const p=relayPair();ev(p.A,'netHost()');p.B.pump();ev(p.G,'NET.code="ZZZZZZ";netJoin()');p.B.pump();
+ for(let i=0;i<5&&ev(p.G,'NET.role');i++){const t=p.TG.to.find(x=>x.f);if(t){const f=t.f;t.f=null;f();p.B.pump()}}
+ ok('中継：コードが違うと「部屋が見つかりません」になる（ほかの部屋には入れない）',!ev(p.G,'NET.on')&&/部屋が見つかりません/.test(ev(p.G,'NET.status')));}
+{const p=relayPair();p.B.down.add(ev(p.A,'RELAY.brokers[0]'));p.B.down.add(ev(p.A,'RELAY.brokers[1]'));ev(p.A,'netHost()');p.B.pump();
+ const t=p.TA.to.find(x=>x.f&&x.ms===12000);if(t){const f=t.f;t.f=null;f()}
+ ok('中継：すべてのブローカーが落ちているときは、その旨が表示される',/中継サーバーにつながりません/.test(ev(p.A,'NET.status')));}
+{let errs={};const st={turns:0,mism:0,early:0,over:0};
+ const N=Math.max(10,Math.floor(GAMES/3));
+ for(let g=0;g<N;g++){try{const p=relayPair({dup:true,reorder:true});relayStart(p);
+   if(!ev(p.A,'NET.on')||!ev(p.G,'NET.on'))throw new Error('中継の握手に失敗');
+   playOnline(p.A,p.G,p.B.pump,st);}catch(e){const k=String(e.stack||e).split('\n').slice(0,2).join(' | ').slice(0,300);errs[k]=(errs[k]||0)+1}}
+ ok(`中継：メッセージの重複・順序入れ替わりがあっても、${N}試合で状態が毎回一致（${st.turns}ターン）`,!Object.keys(errs).length&&!st.mism,JSON.stringify(errs));}
+{const p=relayPair();relayStart(p);
+ // 切断の検出：相手から何も届かない状態が25秒続いたら切断とみなす
+ ev(p.A,'NET.conn.last=Date.now()-30000');p.TA.iv.filter(Boolean).forEach(f=>f());
+ ok('中継：25秒何も届かなければ切断として表示される',ev(p.A,'NET.lost')&&!ev(p.A,'canAct()'));}
+{const p=relayPair();relayStart(p);ev(p.G,'toHome()');p.B.pump();
+ ok('中継：片方がホームへ戻ると、相手に切断が伝わり、接続が閉じられる',ev(p.A,'NET.lost')&&ev(p.G,'NET.clients.length')===0&&!ev(p.G,'NET.on'));}
 
 finish();
 function finish(){
