@@ -1,0 +1,2 @@
+addEventListener('resize',drawArrows);
+render();
