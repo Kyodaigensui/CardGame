@@ -242,6 +242,7 @@ const FXA={draw:(p,pi,ch,v)=>draw(p,v),cost:(p,pi,ch,v)=>{p.cost=Math.min(p.max,
 //   ['foeHp',10]           相手の残りHPが10以下のとき
 //   ['selfHp',10]          自分のHPが10以下のとき
 //   ['foeSt','burn']       相手が火傷(burn)/出血(bleed)/破裂(rupt)/振動(vib)状態のとき
+//   ['foeStGe','vib',5]    相手の状態異常の値が5以上のとき（状態＝burn/bleed/rupt/vib）
 //   {and:['kill',['dmg',8]]}  複数条件をすべて満たすとき
 // 例："斬撃":{hit:[['draw',1],['coin',2,'kill']]}   ← ドローは的中で、コイン+2は倒したときだけ
 // 条件を増やすときは COND に1行足す（t＝表示文、f＝判定。x={A:使用者,B:相手,dmg:与ダメージ}）
@@ -251,12 +252,13 @@ const COND={
  dmg:{t:n=>`${n}以上のダメージを与えたとき`,f:(x,n)=>x.dmg>=n},
  foeHp:{t:n=>`相手の残りHPが${n}以下のとき`,f:(x,n)=>x.B.alive&&x.B.hp<=n},
  selfHp:{t:n=>`自分のHPが${n}以下のとき`,f:(x,n)=>x.A.hp<=n},
- foeSt:{t:k=>`相手が${STK[k]}状態のとき`,f:(x,k)=>(x.B.st[k]||0)>0}
+ foeSt:{t:k=>`相手が${STK[k]}状態のとき`,f:(x,k)=>(x.B.st[k]||0)>0},
+ foeStGe:{t:(k,n)=>`相手の${STK[k]}が${n}以上のとき`,f:(x,k,n)=>(x.B.st[k]||0)>=n}
 };
 const condKey=c=>Array.isArray(c)?c:[c];
-const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,a])=>COND[k].f(x,a))(condKey(c));
-const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,a])=>COND[k].t(a))(condKey(c));
-const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if(k==='foeSt'&&!STK[a])throw new Error(`foeStの状態は burn/bleed/rupt/vib のどれか（${path}）`)};
+const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,...a])=>COND[k].f(x,...a))(condKey(c));
+const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,...a])=>COND[k].t(...a))(condKey(c));
+const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
 const fxText=(l,showCond=true)=>l.map(([k,v,c])=>(showCond&&c?`［${condText(c)}］`:'')+FXT[k](v)).join('、');
 const fxLine=(s,dl=true)=>(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
 function fx(pi,ch,list,label,tc,ctx){
@@ -293,7 +295,7 @@ function bleed(pi,ch){if(ch.alive&&ch.st.bleed){direct(pi,ch,ch.st.bleed,'bleed'
 function hit(pa,pb,B,dmg,A,die){
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
- if(A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
+ if(dmg>0&&A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
   dmg=Math.floor(dmg/2);
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
  const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;

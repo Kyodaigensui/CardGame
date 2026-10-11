@@ -96,7 +96,8 @@ const PK={
  vibcheck:{
   t:p=>`相手の振動が${p.min}以上なら、ダイス値+${p.v}`,
   need:['min','v'],
-  dice:(c,x)=>c.tgt?.st?.vib>=x.min?x.v:0
+  // c.tgt は「狙っている相手キャラの番号」。相手側のキャラを取り出して、その振動を見る
+  dice:(c,x)=>{const o=S.p.findIndex(q=>q.chars.includes(c)),t=o<0||c.tgt==null?null:S.p[1-o].chars[c.tgt];return t&&t.st.vib>=x.min?x.v:0}
  },
  rangedres:{
   t:()=>`遠距離属性から受けるダメージ半減`
