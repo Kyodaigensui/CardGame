@@ -192,7 +192,7 @@ function netHost(){   // 部屋を作る：設定の全ブローカーで待ち�
    const L=NET.conn=relayLink(c,T.tIn,T.tOut,netRecv,netClosed);
    NET.send=L.send;L.feed(raw);
   });
-  c.on('error',()=>{});   // 待機中の個別のエラーは無視（ほかのブローカーが生きていればよい）
+  c.on('error',e=>console.error('[MQTT host error]',e));   // 待機中の個別のエラーは無視（ほかのブローカーが生きていればよい）
  });
  setTimeout(()=>{if(NET.role==='host'&&!ready&&!NET.conn){NET.status='中継サーバーにつながりません。ネットワークを確認して、もう一度お試しください。';render()}},12000);
 }
