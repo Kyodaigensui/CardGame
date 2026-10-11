@@ -250,7 +250,19 @@ function netJoin(){   // 部屋に入る：設定のブローカーを順に試�
   let c;try{c=mqtt.connect(url,{clientId:cid(),clean:true,connectTimeout:6000,reconnectPeriod:0})}catch(e){attempt();return}
   NET.clients=[c];let paired=false,over=false,timer=0;
   const L=relayLink(c,T.tIn,T.tOut,m=>{if(!paired){paired=true;clearTimeout(timer);c.options.reconnectPeriod=1000;NET.conn=L;NET.send=L.send}netRecv(m)},netClosed);
-  const giveUp=()=>{if(over||paired||NET.role!=='guest')return;over=true;clearTimeout(timer);L.close();attempt()};
+  const giveUp=()=>{
+    if(over||paired||NET.role!=='guest')return;
+    console.warn('[MQTT guest] 接続を終了して次へ進みます', {
+     url,
+     paired,
+     connected: c.connected,
+     role: NET.role
+    });
+    over=true;
+    clearTimeout(timer);
+    L.close();
+    attempt();
+  };
   timer=setTimeout(giveUp,7000);   // この中継では、ホストの返事が来なかった → 次へ
   c.on('connect',()=>c.subscribe(T.tIn,{qos:1},err=>{if(err){giveUp();return}L.send({t:'join',v:netVer(),deck:NET.myDeck,name:PF.name})}));
   c.on('message',(topic,payload)=>L.feed(String(payload)));
