@@ -50,6 +50,8 @@ const PAS={
  emolv:{n:'熱血',k:'emolv',lv:2,v:1},      // 感情レベルが lv 以上のとき、全ダイス値+v
  lvbuff:{n:'臨戦無退',k:'lvbuff',v:2},            // 感情レベルが上がったとき、1ターンの間ダメージ+v
  ailmentup2:{n:'制式服-リウ協会',k:'ailmentup',v:2},
+ vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
+ rangedres:{n:'青い残響',k:'rangedres'},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
@@ -90,7 +92,15 @@ const PK={
  // 感情レベルが上がるたびに、与ダメージ+v を「1ターン分」得る
  //   戦闘中に上がった → 次のターン1回ぶん（nx） / ターン開始時に上がった → そのターン（bf）
  lvbuff:{t:p=>`感情レベルが上がったとき、1ターンの間ダメージ+${p.v}`,need:['v'],
-  lvup:(c,x)=>{const k=S.inCombat?'nx':'bf';c[k].dmgup+=x.v;L(`　${c.name}の${x.n}：${S.inCombat?'次のターン':'このターン'}ダメージ+${x.v}`)}}
+  lvup:(c,x)=>{const k=S.inCombat?'nx':'bf';c[k].dmgup+=x.v;L(`　${c.name}の${x.n}：${S.inCombat?'次のターン':'このターン'}ダメージ+${x.v}`)}},
+ vibcheck:{
+  t:p=>`相手の振動が${p.min}以上なら、ダイス値+${p.v}`,
+  need:['min','v'],
+  dice:(c,x)=>c.tgt?.st?.vib>=x.min?x.v:0
+ },
+ rangedres:{
+  t:()=>`遠距離属性から受けるダメージ半減`
+},
 };
 // ---------- ③ 仕組み（ここから下は触らなくてOK） ----------
 const pasText=p=>PK[p.k].t(p);
