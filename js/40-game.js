@@ -560,7 +560,7 @@ function renderHome(){
    <p>新しい名前：<input id="pfname" maxlength="12" onkeydown="if(event.key==='Enter')pfCreate()"> <button class="sub" onclick="pfCreate()">追加</button> <button class="sub" onclick="pfDelete()">いまの名前を削除</button></p>
    <p><small>バックアップ（別の端末へ移す／消えたときの復元用。デッキ2つ分）</small><br><textarea id="pfcode" rows="2" style="width:100%;background:#10131f;color:var(--ink);border:1px solid var(--line)"></textarea><br><button class="sub" onclick="pfOut()">書き出し</button> <button class="sub" onclick="pfIn()">読み込み</button></p>
   </details>${msg}</div>`;
- document.getElementById('app').innerHTML=`<div class="home"><h1 style="font-size:1.8rem">（仮）カードゲーム</h1><p><small>Library of Ruina風・2人交代制の対戦</small></p>${named?box+st(0)+st(1):gate}
+ document.getElementById('app').innerHTML=`<div class="home"><h1 style="font-size:1.8rem">（仮）カードゲーム</h1><p><small>圧倒的理不尽のクソカス2人交代制の対戦</small></p>${named?box+st(0)+st(1):gate}
  ${named?`<p><button class="go" ${ok?'':'disabled'} onclick="startMatch()">対戦開始（1台で交代）</button></p><p><button class="go" onclick="SCR='deck';render()">デッキ構築</button></p><p><button class="go" onclick="SCR='lobby';render()">オンライン対戦</button></p>`:''}<p><button class="go" onclick="SCR='rules';render()">ルール説明</button></p>${named&&!ok?'<p class="err">1台で対戦するには、デッキ1・デッキ2の両方を完成させてください（オンラインは使う1つだけでOK）</p>':''}</div>`;
 }
 // ===== ルール説明画面 =====
