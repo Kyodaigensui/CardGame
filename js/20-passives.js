@@ -52,6 +52,7 @@ const PAS={
  ailmentup2:{n:'制式服-リウ協会',k:'ailmentup',v:2},
  vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
  rangedres:{n:'青い残響',k:'rangedres'},
+ emostack:{n:'龍生九子',k:'emostack'},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
@@ -91,6 +92,14 @@ const PK={
   dice:(c,x)=>{const p=ownerOf(c);return p&&p.lv>=x.lv?x.v:0}},
  // 感情レベルが上がるたびに、与ダメージ+v を「1ターン分」得る
  //   戦闘中に上がった → 次のターン1回ぶん（nx） / ターン開始時に上がった → そのターン（bf）
+ // 感情レベル2ごとに全ダイス値+1
+emostack:{
+  t:()=>`感情レベル2ごとにダイス値+1`,
+  dice:c=>{
+    const p=ownerOf(c);
+    return p?Math.floor(p.lv/2):0;
+  }
+},
  lvbuff:{t:p=>`感情レベルが上がったとき、1ターンの間ダメージ+${p.v}`,need:['v'],
   lvup:(c,x)=>{const k=S.inCombat?'nx':'bf';c[k].dmgup+=x.v;L(`　${c.name}の${x.n}：${S.inCombat?'次のターン':'このターン'}ダメージ+${x.v}`)}},
  vibcheck:{
