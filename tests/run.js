@@ -140,6 +140,7 @@ function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で�
  ok('手番でない側の手札は操作できない表示',!/draggable="true"/.test(html(wait))&&/相手が行動を決めています/.test(html(wait)));
  ok('画面に undefined/NaN が出ない',!/undefined|NaN|\[object/.test(html(act)+html(wait)));}
 {const L=makeCtx();ev(L,"SCR='lobby';NET.code='ABC123';render()");
+ ok('ロビーに版の目印（ver.）が出る',/ver\.[0-9a-z]{3,6}/.test(L._els.app._h));
  ok('ロビー画面が開ける（通信ライブラリなしでは部屋を作れない表示）',/id="roomcode"/.test(L._els.app._h)&&/disabled onclick="netHost/.test(L._els.app._h));}
 
 // ───── ⑤ プレイヤー名とデッキの紐づけ ─────
@@ -246,13 +247,16 @@ function relayPair(opts){
 }
 const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code');ev(p.G,`NET.code=${JSON.stringify(code)};netJoin()`);p.B.pump();return code};
 {const p=relayPair();const code=relayStart(p);
- ok('中継：部屋のコードが6文字で、待機表示が出る',code.length===6);
+ ok('中継：部屋のコードが6文字で、待機表示（接続できた中継サーバーの数つき）が出る',code.length===6&&/待機中です.*2\/2/.test(ev(p.A,'NET.status')),ev(p.A,'NET.status'));
  ok('中継：入室すると握手して始まり、名前が双方に出る',ev(p.A,'NET.on')&&ev(p.G,'NET.on')&&ev(p.A,'S.p[0].name')==='アリス'&&ev(p.G,'S.p[1].name')==='ボブ'&&ev(p.G,'S.p[0].name')==='アリス');}
 {const p=relayPair();p.B.down.add(ev(p.A,'RELAY.brokers[0]'));const code=relayStart(p);
  ok('中継：先頭のブローカーが落ちていても、次のブローカーでつながる',ev(p.A,'NET.on')&&ev(p.G,'NET.on'),code);}
 {const p=relayPair();ev(p.A,'netHost()');p.B.pump();ev(p.G,'NET.code="ZZZZZZ";netJoin()');p.B.pump();
  for(let i=0;i<5&&ev(p.G,'NET.role');i++){const t=p.TG.to.find(x=>x.f);if(t){const f=t.f;t.f=null;f();p.B.pump()}}
- ok('中継：コードが違うと「部屋が見つかりません」になる（ほかの部屋には入れない）',!ev(p.G,'NET.on')&&/部屋が見つかりません/.test(ev(p.G,'NET.status')));}
+ ok('中継：コードが違うと「部屋が見つかりません」になる（ほかの部屋には入れない）。古いページの可能性も案内する',!ev(p.G,'NET.on')&&/部屋が見つかりません/.test(ev(p.G,'NET.status'))&&/更新/.test(ev(p.G,'NET.status')));}
+{const p=relayPair();ev(p.A,'netHost()');p.B.pump();p.B.down.add(ev(p.A,'RELAY.brokers[0]'));p.B.down.add(ev(p.A,'RELAY.brokers[1]'));ev(p.G,'NET.code="ABCDEF";netJoin()');p.B.pump();
+ for(let i=0;i<6&&ev(p.G,'NET.role');i++){const x=p.TG.to.find(y=>y.f);if(x){const f=x.f;x.f=null;f();p.B.pump()}}
+ ok('中継：どの中継サーバーにもつながれない入室者には、「ネットワークで止められている」旨を表示（部屋が無い、とは別の文言）',/つながれませんでした/.test(ev(p.G,'NET.status'))&&!/部屋が見つかりません/.test(ev(p.G,'NET.status')));}
 {const p=relayPair();p.B.down.add(ev(p.A,'RELAY.brokers[0]'));p.B.down.add(ev(p.A,'RELAY.brokers[1]'));ev(p.A,'netHost()');p.B.pump();
  const t=p.TA.to.find(x=>x.f&&x.ms===12000);if(t){const f=t.f;t.f=null;f()}
  ok('中継：すべてのブローカーが落ちているときは、その旨が表示される',/中継サーバーにつながりません/.test(ev(p.A,'NET.status')));}
