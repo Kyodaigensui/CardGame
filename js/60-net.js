@@ -153,33 +153,7 @@ const cid=()=>'cg_'+Math.random().toString(36).slice(2,10);
 const relayTopics=(code,role)=>{const b=`${RELAY.prefix}${code}/`;return role==='host'?{tIn:b+'h',tOut:b+'g'}:{tIn:b+'g',tOut:b+'h'}};
 function relayLink(client,tIn,tOut,onMsg,onDead){
  const L={client,tx:0,rx:1,buf:{},last:Date.now(),dead:false};
- L.send = o => {
-  if (L.dead || !client.connected || client.disconnecting) {
-    console.warn('[MQTT] 送信を中止：接続が利用できません', {
-      connected: client.connected,
-      disconnecting: client.disconnecting,
-      dead: L.dead
-    });
-    return false;
-  }
-
-  try {
-    client.publish(
-      tOut,
-      JSON.stringify({ n: ++L.tx, m: o }),
-      { qos: 1 },
-      err => {
-        if (err) {
-          console.error('[MQTT] 送信失敗', err);
-        }
-      }
-    );
-    return true;
-  } catch (e) {
-    console.error('[MQTT] 送信時の例外', e);
-    return false;
-  }
-};
+ L.send=o=>{try{client.publish(tOut,JSON.stringify({n:++L.tx,m:o}),{qos:1})}catch(e){}};
  L.feed=raw=>{   // 届いたものを、通し番号の順に1回ずつ処理する
   let e;try{e=JSON.parse(raw)}catch(_){return}
   if(!e||typeof e!=='object')return;
@@ -194,52 +168,19 @@ function relayLink(client,tIn,tOut,onMsg,onDead){
   try{client.publish(tOut,JSON.stringify({p:1}),{qos:0})}catch(_){}
   if(Date.now()-L.last>25000){L.close();onDead()}
  },5000);
- L.close = () => {
-  if (L.dead) return;
-
-  L.dead = true;
-  clearInterval(L.timer);
-
-  // この接続に対応する参照だけを解除する
-  if (NET.conn === L) NET.conn = null;
-  if (NET.send === L.send) NET.send = null;
-
-  try {
-    client.end(false);
-  } catch (e) {
-    console.warn('[MQTT] 切断処理の例外', e);
-  }
- };
+ L.close=()=>{L.dead=true;clearInterval(L.timer);try{client.end(false)}catch(_){}};
  return L;
 }
 function netHost(){   // 部屋を作る：設定の全ブローカーで待ち受け、最初に入ってきた相手の接続を使う
  if(!mqttOK()||dErr(DK.d[NET.slot]).length||!PF.name||NET.role)return;
  NET.role='host';NET.code=genCode();NET.status='部屋を準備しています…';render();
- const T=relayTopics(NET.code,'host');let ready=0;
+ const T=relayTopics(NET.code,'host');let ready=0;const total=RELAY.brokers.length;
  RELAY.brokers.forEach(url=>{
   let c;try{c=mqtt.connect(url,{clientId:cid(),clean:true,connectTimeout:8000,reconnectPeriod:2000})}catch(e){return}
   NET.clients.push(c);
   c.on('connect',()=>c.subscribe(T.tIn,{qos:1},err=>{
    if(err||NET.conn)return;
-   ready++;NET.status='待機中です。相手にコード（または招待リンク）を伝えてください。';render();
-   console.log('[guest] MQTT接続成功', url);
-
-   c.subscribe(T.tIn, { qos: 1 }, err => {
-     console.log('[guest] 購読結果', { url, err });
-
-     if (err) {
-      giveUp();
-      return;
-     }
-
-     console.log('[guest] join送信', url);
-     L.send({
-       t: 'join',
-       v: netVer(),
-       deck: NET.myDeck,
-       name: PF.name
-     });
-   });
+   ready++;NET.status=`待機中です。相手にコード（または招待リンク）を伝えてください。（中継サーバー ${ready}/${total} に接続）`;render();
   }));
   c.on('message',(topic,payload)=>{
    const raw=String(payload);
@@ -251,7 +192,7 @@ function netHost(){   // 部屋を作る：設定の全ブローカーで待ち�
    const L=NET.conn=relayLink(c,T.tIn,T.tOut,netRecv,netClosed);
    NET.send=L.send;L.feed(raw);
   });
-  c.on('error',e=>console.error('[MQTT host error]',e));   // 待機中の個別のエラーは無視（ほかのブローカーが生きていればよい）
+  c.on('error',()=>{});   // 待機中の個別のエラーは無視（ほかのブローカーが生きていればよい）
  });
  setTimeout(()=>{if(NET.role==='host'&&!ready&&!NET.conn){NET.status='中継サーバーにつながりません。ネットワークを確認して、もう一度お試しください。';render()}},12000);
 }
@@ -260,31 +201,19 @@ function netJoin(){   // 部屋に入る：設定のブローカーを順に試�
  if(!mqttOK()||dErr(DK.d[NET.slot]).length||!PF.name||NET.role)return;
  if(code.length!==6){NET.status='コードは6文字です。';render();return}
  NET.role='guest';NET.code=code;NET.myDeck=DK.d[NET.slot];
- const T=relayTopics(code,'guest'),urls=RELAY.brokers;let idx=0;
+ const T=relayTopics(code,'guest'),urls=RELAY.brokers;let idx=0,anyOk=false;   // anyOk＝どれかの中継サーバーにつながれたか
  const attempt=()=>{
   if(NET.role!=='guest'||NET.on)return;
-  if(idx>=urls.length){NET.status='その部屋が見つかりません。コードを確かめるか、相手が部屋を作ってからもう一度お試しください。';NET.role=null;NET.clients=[];render();return}
+  if(idx>=urls.length){
+   NET.status=anyOk?'その部屋が見つかりません。コードを確かめてください。コードが合っているのに出る場合は、相手のページが古い（更新前）かもしれません。お互いに Ctrl+Shift+R で更新して、ロビーの「ver.」が同じか確かめてください。':'中継サーバーにつながれませんでした。ネットワークで通信が止められている可能性があります。別の回線（スマホのテザリングなど）でもお試しください。';
+   NET.role=null;NET.clients=[];render();return}
   const url=urls[idx++];NET.status=`接続しています…（${idx}/${urls.length}）`;render();
-  let c;try{c=mqtt.connect(url,{clientId:cid(),clean:true,connectTimeout:6000,reconnectPeriod:0})}catch(e){attempt();return}
+  let c;try{c=mqtt.connect(url,{clientId:cid(),clean:true,connectTimeout:10000,reconnectPeriod:0})}catch(e){attempt();return}
   NET.clients=[c];let paired=false,over=false,timer=0;
   const L=relayLink(c,T.tIn,T.tOut,m=>{if(!paired){paired=true;clearTimeout(timer);c.options.reconnectPeriod=1000;NET.conn=L;NET.send=L.send}netRecv(m)},netClosed);
-  const giveUp = () => {
-   if (over || paired || NET.role !== 'guest') return;
-    console.warn('[guest] giveUp実行', {
-      url,
-      connected: c.connected,
-      disconnecting: c.disconnecting,
-      paired,
-      over,
-      role: NET.role
-    });
-    over = true;
-    clearTimeout(timer);
-    L.close();
-    attempt();
-  };
-  timer=setTimeout(giveUp,7000);   // この中継では、ホストの返事が来なかった → 次へ
-  c.on('connect',()=>c.subscribe(T.tIn,{qos:1},err=>{if(err){giveUp();return}L.send({t:'join',v:netVer(),deck:NET.myDeck,name:PF.name})}));
+  const giveUp=()=>{if(over||paired||NET.role!=='guest')return;over=true;clearTimeout(timer);L.close();attempt()};
+  timer=setTimeout(giveUp,12000);   // この中継では、ホストの返事が来なかった → 次へ
+  c.on('connect',()=>{anyOk=true;c.subscribe(T.tIn,{qos:1},err=>{if(err){giveUp();return}L.send({t:'join',v:netVer(),deck:NET.myDeck,name:PF.name})})});
   c.on('message',(topic,payload)=>L.feed(String(payload)));
   c.on('error',giveUp);
   c.on('close',()=>{if(!paired)giveUp()});
@@ -300,6 +229,7 @@ function renderLobby(){
  document.getElementById('app').innerHTML=`<div class="home lobby">
   <h1 style="font-size:1.6rem">オンライン対戦</h1>
   <p><small>1人が「部屋を作る」でコードを作り、もう1人がそのコードで「部屋に入る」と対戦が始まります。</small></p>
+  <p><small style="color:var(--dim)">通信：中継サーバー方式　ver.${netVer().slice(0,6)}（相手と同じ表示になっているか確認してください）</small></p>
   <p>プレイヤー名：<b>${PF.name||'（未設定：ホームで決めてください）'}</b></p>
   <p>使うデッキ：<select onchange="NET.slot=+this.value;render()" ${busy?'disabled':''}><option value="0" ${NET.slot===0?'selected':''}>デッキ1</option><option value="1" ${NET.slot===1?'selected':''}>デッキ2</option></select>
    <span class="${e.length?'err':'ok'}">${dTot(d)}/${C.DECK}枚（${e.length?'未完成：'+e.join(' '):'OK'}）</span></p>
