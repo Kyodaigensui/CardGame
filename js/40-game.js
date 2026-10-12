@@ -189,10 +189,39 @@ function done(){
 }
 // ===== 戦闘 =====
 const L=m=>S.log.push(m);
-function coin(pi,n){
- const p=S.p[pi];p.coin+=n;
- while(p.lv<5&&p.coin>=C.COIN){p.coin-=C.COIN;p.lv++;p.max=C.COST+p.lv;p.cost=p.max;L(`✦ ${p.name}の感情レベルが${p.lv}に上昇！コスト全回復`);p.chars.forEach(c=>{if(c.alive)hook('lvup',c,p.lv)})}
- if(p.lv>=5)p.coin=0;
+/**
+ * 感情レベル上昇に必要なコイン数
+ * 自分の場の生存キャラクター数が少ないほど、必要量が減る
+ * 感情レベルが高いほど、必要量が増える
+ */
+const coinNeed = p => {
+  const count = p.chars.filter(c => c.alive).length;
+
+  // 1人なら50%、2人なら約67%、3人なら100%
+  const peopleRate = Math.max(0.5, Math.min(1, count / 3));
+
+  // 感情レベルが1上がるごとに必要量が25%増加
+  const levelRate = 1 + p.lv * 0.25;
+
+  return Math.max(
+    1,
+    Math.ceil(C.COIN * peopleRate * levelRate)
+  );
+};
+function coin(pi, n) {
+  const p = S.p[pi];
+  p.coin += n;
+  while (p.lv < 5 && p.coin >= coinNeed(p)) {
+    p.coin -= coinNeed(p);
+    p.lv++;
+    p.max = C.COST + p.lv;
+    p.cost = p.max;
+    L(`✦ ${p.name}の感情レベルが${p.lv}に上昇！コスト全回復`);
+    p.chars.forEach(c => {
+      if (c.alive) hook('lvup', c, p.lv);
+    });
+  }
+  if (p.lv >= 5) p.coin = 0;
 }
 // ===== 属性（キャラの二段目パッシブ。帰属できない）／カードの限定属性 =====
 // 属性を増やす手順：①ここに1行足す ②キャラに at:['属性名'] ③カードに req:'属性名'
@@ -458,7 +487,20 @@ function chHTML(pi,ci,view){
  <div class="sts">${sts}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div><ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>${atHTML(c)}${a}${fl}${gh}</div>`;
 }
 const costDots=(p,u)=>{const on=p.cost-u;let h='';for(let i=0;i<p.max;i++)h+=`<i class="dot${i<on?' on':i<p.cost?' rs':''}"></i>`;return `<span class="cost" title="コスト ${on}/${p.max}">コスト ${h} <small>${on}/${p.max}</small></span>`};
-const emoGauge=p=>{let h='';for(let i=0;i<5;i++)h+=`<i class="seg${i<p.lv?' on':''}"></i>`;return `<span class="emo" title="感情レベル ${p.lv}/5（コイン ${p.coin}/${C.COIN}）">感情Lv <b>${p.lv}</b> ${h}${p.lv<5?`<span class="cbar"><i style="width:${p.coin/C.COIN*100}%"></i></span>`:' <small>MAX</small>'}</span>`};
+const emoGauge = p => {
+  const need = coinNeed(p);
+  let h = '';
+  for (let i = 0; i < 5; i++) {
+    h += `<i class="seg${i < p.lv ? ' on' : ''}"></i>`;
+  }
+  return `<span class="emo" title="感情レベル ${p.lv}/5（コイン ${p.coin}/${need}）">
+    感情Lv <b>${p.lv}</b> ${h}
+    ${p.lv < 5
+      ? `<span class="cbar"><i style="width:${Math.min(100, p.coin / need * 100)}%"></i></span>`
+      : ' <small>MAX</small>'}
+  </span>`;
+};
+
 function sideHTML(pi,view,btm){
  const p=S.p[pi],u=S.phase==='decide'&&pi===view?used(p):0;
  const info=`<div class="info" style="margin:${btm?'6px 0 0':'0 0 4px'}"><span>${p.name}</span>${costDots(p,u)}${emoGauge(p)}<span>山札 ${p.deck.length}</span>${p.gone?`<span>消滅 ${p.gone}</span>`:''}</div>`;
