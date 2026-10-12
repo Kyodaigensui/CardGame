@@ -292,7 +292,13 @@ function vibex(B){   // 振動爆発：振動÷2枚の手札を山札に戻し�
  L(`　${STN.vib.i}振動爆発！${B.name}の振動${B.st.vib}：${P.name}の手札${n}枚が山札に戻る`);
  S.ev.push([pb,P.chars.indexOf(B),{k:'vib',a:0,t:`手札-${n}`}]);B.st.vib=0;
 }
-function bleed(pi,ch){if(ch.alive&&ch.st.bleed){direct(pi,ch,ch.st.bleed,'bleed');pf([],[ix(pi,ch)],null)}}
+function bleed(pi,ch){
+ if(!ch.alive||!ch.st.bleed)return;
+ const v=ch.st.bleed;
+ direct(pi,ch,v,'bleed');
+ ch.st.bleed=decay(ch.st.bleed);
+ pf([],[ix(pi,ch)],null);
+}
 function hit(pa,pb,B,dmg,A,die){
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
@@ -306,7 +312,11 @@ function hit(pa,pb,B,dmg,A,die){
  B.hp-=dmg;coin(pa,1);
  if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
   if(A.alive)hook('kill',A,B);}   // 倒した直後（PKの kill フック）
- else if(B.st.rupt)direct(pb,B,B.st.rupt,'rupt');
+ else if(B.st.rupt){
+  const v=B.st.rupt;
+  direct(pb,B,v,'rupt');
+  B.st.rupt=decay(B.st.rupt);
+ }
  const cx={A,B,dmg};
  if(A.card&&A.card.hit){   // カード的中時：効果ごとに、条件を満たした最初の的中で1回だけ発動
   const todo=A.card.hit.filter((e,i)=>{if(A.hitFired[i]||(e[2]&&!condTest(e[2],cx)))return false;A.hitFired[i]=true;return true});
@@ -318,13 +328,20 @@ function oneSided(pa,A,pb,B,dice){
  for(const d of dice){
   if(!A.alive||!B.alive)return;
   if(d.t!=='a')continue;
-  const v=roll(A,d);L(`　${A.name}[攻${v}] → ${B.name}に${v}ダメージ`);hit(pa,pb,B,v,A,d);pf([ix(pa,A)],[ix(pb,B)],[ix(pa,A),ix(pb,B)]);
+  bleed(pa,A);
+  if(!A.alive)return;
+  const v=roll(A,d);
+  L(`　${A.name}[攻${v}] → ${B.name}に${v}ダメージ`);hit(pa,pb,B,v,A,d);pf([ix(pa,A)],[ix(pb,B)],[ix(pa,A),ix(pb,B)]);
  }
 }
 function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
  let i=0,j=0;
  while(i<da.length&&j<db.length&&A.alive&&B.alive){
-  const x=da[i],y=db[j],vx=roll(A,x),vy=roll(B,y);
+  const x=da[i],y=db[j];
+  bleed(pa,A);
+  bleed(pb,B);
+  if(!A.alive||!B.alive)break;
+  const vx=roll(A,x),vy=roll(B,y);
   const head=`　${A.name}[${T[x.t]}${vx}] vs ${B.name}[${T[y.t]}${vy}] `;
   coin(pa,1);coin(pb,1);
   if(vx===vy){L(head+'→ 相打ち');pf([],[ix(pa,A),ix(pb,B)],[ix(pa,A),ix(pb,B)]);i++;j++;continue}
@@ -361,7 +378,7 @@ function combat(){
   let t=Q.chars[c.tgt];
   if(!t.alive){t=Q.chars.find(x=>x.alive);if(!t)continue}
   c.used=true;
-  bleed(a.pi,c);if(!c.alive)continue;
+  if(!c.alive)continue;
   if(t.card&&!t.used&&t.tgt===a.ci){t.used=true;L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t)}
   else{L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}`);fx(a.pi,c,c.card.on,'発動時',t);
    let ii=0;
@@ -375,7 +392,7 @@ function combat(){
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
  pf([],[],null);
  const n=S.p.map(alive);
- if(!n[0]||!n[1]){S.over=n[0]===n[1]?'引き分け':n[0]?`${S.p[0].name}の勝利`:`${S.p[1].name}の勝利`;L(`★ ${S.over}`)}
+ if(!n[0]||!n[1]){S.over=n[0]===n[1]?'引き分け':n[0]?`${S.p[0].name}の勝利、おめ`:`${S.p[1].name}の勝利、おめ`;L(`★ ${S.over}`)}
  S.inCombat=false;S.phase='result';S.cover=null;play(frames,base,hp0,hold0,st0);
 }
 function play(frames,base,hp0,hold0,st0){
