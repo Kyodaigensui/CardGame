@@ -210,19 +210,31 @@ const coinNeed = p => {
 };
 function coin(pi, n) {
   const p = S.p[pi];
-  p.coin += n;
-  while (p.lv < 5 && p.coin >= coinNeed(p)) {
+  p.coin = Math.min(coinNeed(p), p.coin + n);
+}
+function resolveEmotion(p) {
+  if (p.lv >= 5) {
+    p.coin = 0;
+    return;
+  }
+
+  if (p.coin >= coinNeed(p)) {
     p.coin -= coinNeed(p);
     p.lv++;
+
     p.max = C.COST + p.lv;
     p.cost = p.max;
+
     L(`✦ ${p.name}の感情レベルが${p.lv}に上昇！コスト全回復`);
+
     p.chars.forEach(c => {
       if (c.alive) hook('lvup', c, p.lv);
     });
+
+    if (p.lv >= 5) p.coin = 0;
   }
-  if (p.lv >= 5) p.coin = 0;
 }
+
 // ===== 属性（キャラの二段目パッシブ。帰属できない）／カードの限定属性 =====
 // 属性を増やす手順：①ここに1行足す ②キャラに at:['属性名'] ③カードに req:'属性名'
 // noSpeed:true にすると、その属性限定のカードは戦闘時に速度を無視して最初に発動する
@@ -419,6 +431,7 @@ function combat(){
  L('── ターン終了時 ──');
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{if(c.alive&&c.st.burn){direct(pi,c,c.st.burn,'burn');pf([],[ix(pi,c)],null)}}));
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
+ S.p.forEach(p => resolveEmotion(p));
  pf([],[],null);
  const n=S.p.map(alive);
  if(!n[0]||!n[1]){S.over=n[0]===n[1]?'引き分け':n[0]?`${S.p[0].name}の勝利、おめ`:`${S.p[1].name}の勝利、おめ`;L(`★ ${S.over}`)}
@@ -560,7 +573,7 @@ function renderHome(){
    <p>新しい名前：<input id="pfname" maxlength="12" onkeydown="if(event.key==='Enter')pfCreate()"> <button class="sub" onclick="pfCreate()">追加</button> <button class="sub" onclick="pfDelete()">いまの名前を削除</button></p>
    <p><small>バックアップ（別の端末へ移す／消えたときの復元用。デッキ2つ分）</small><br><textarea id="pfcode" rows="2" style="width:100%;background:#10131f;color:var(--ink);border:1px solid var(--line)"></textarea><br><button class="sub" onclick="pfOut()">書き出し</button> <button class="sub" onclick="pfIn()">読み込み</button></p>
   </details>${msg}</div>`;
- document.getElementById('app').innerHTML=`<div class="home"><h1 style="font-size:1.8rem">（仮）カードゲーム</h1><p><small>圧倒的理不尽のクソカス2人交代制の対戦</small></p>${named?box+st(0)+st(1):gate}
+ document.getElementById('app').innerHTML=`<div class="home"><h1 style="font-size:1.8rem">（仮）カードゲーム</h1><p><small>Library of Ruina風・2人交代制の対戦</small></p>${named?box+st(0)+st(1):gate}
  ${named?`<p><button class="go" ${ok?'':'disabled'} onclick="startMatch()">対戦開始（1台で交代）</button></p><p><button class="go" onclick="SCR='deck';render()">デッキ構築</button></p><p><button class="go" onclick="SCR='lobby';render()">オンライン対戦</button></p>`:''}<p><button class="go" onclick="SCR='rules';render()">ルール説明</button></p>${named&&!ok?'<p class="err">1台で対戦するには、デッキ1・デッキ2の両方を完成させてください（オンラインは使う1つだけでOK）</p>':''}</div>`;
 }
 // ===== ルール説明画面 =====
