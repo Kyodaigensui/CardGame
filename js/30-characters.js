@@ -1,7 +1,7 @@
 // ===== キャラカード（ps＝パッシブ、先頭が「一番上」 / slot＝帰属枠：元のパッシブが少ないほど大きく） =====
 const POOL1=[
- {name:"イサドラ",title:"南部ツヴァイ協会6課",slot:1,hp:60,spd:[2,5],ps:['yourshield','armor']},
- {name:"ジュリア",title:"南部ツヴァイ協会6課",slot:1,hp:62,spd:[1,4],ps:['yourshield','tough']},
+ {name:"イサドラ",title:"南部ツヴァイ協会6課",slot:1,hp:60,spd:[2,5],ps:['ailres','yourshield','armor']},
+ {name:"ジュリア",title:"南部ツヴァイ協会6課",slot:1,hp:62,spd:[1,4],ps:['ailres','yourshield','tough']},
  {name:"リーウェイ",title:"終止符事務所:所長",slot:1,at:['ranged'],hp:50,spd:[3,6],ps:['aim','ailmentup']},
  {name:"タマキ",title:"終止符事務所",slot:1,at:['ranged'],hp:45,spd:[3,6],ps:['aim','debuffup']},
  {name:"サルヴァドール",title:"夜明け事務所:所長",slot:1,hp:65,spd:[2,5],ps:['ailmentup1','armor','tough']},
