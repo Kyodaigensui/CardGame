@@ -37,7 +37,7 @@ const PAS={
  strongest:{n:'最強',k:'catchup',v:2},
  bloodlust:{n:'赤い霧',k:'killup',v:2},
  hongoku:{n:'本国剣術',k:'atk',v:2},
- yourshield:{n:'あなたの盾',k:'def',v:1},
+ yourshield:{n:'衝撃相殺グレートソード',k:'def',v:3},
  debuffup:{n:'狙撃',k:'debuffup',v:1},
  ailmentup:{n:'集中',k:'ailmentup',v:1},
  ailmentup1:{n:'スティグマ工房の武器',k:'ailmentup',v:1},
@@ -53,6 +53,8 @@ const PAS={
  vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
  rangedres:{n:'青い残響',k:'rangedres'},
  emostack:{n:'龍生九子',k:'emostack'},
+ ailres:{n:'あなたの盾',k:'ailres',v:3},               // 火傷・出血・破裂すべて、1回ごとに v 減らす
+ burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
@@ -110,7 +112,10 @@ emostack:{
  },
  rangedres:{
   t:()=>`遠距離属性から受けるダメージ半減`
-},
+ },
+  // 状態異常（火傷・出血・破裂）で受けるダメージを、1回ごとに v 減らす。kinds があれば、その種類だけ
+ ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
+ ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
 };
 // ---------- ③ 仕組み（ここから下は触らなくてOK） ----------
 const pasText=p=>PK[p.k].t(p);
