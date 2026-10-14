@@ -262,6 +262,7 @@ const STN={
  dmgdn:{n:'与ダメージ減少',i:'🥀',c:'#b39a72',t:'このターン、与えるダメージが数値分減る'},
  atk:{n:'攻撃ダイス上昇',i:'🗡',c:'#e8603c',t:'このターン、攻撃ダイスの出目が数値分上がる'}
 };
+Object.keys(PAS).forEach(id=>(PAS[id].kinds||[]).forEach(k=>{if(!['burn','bleed','rupt'].includes(k))throw new Error(`パッシブ「${id}」の kinds「${k}」は burn / bleed / rupt のどれか`)}));   // 状態異常耐性(ailres)の対象の書き間違い検出
 const BF0=()=>({dmgup:0,guard:0,roll:0,dmgdn:0,vuln:0,rolldn:0,atk:0});   // バフ・次ターン系デバフの入れ物
 const addNx=(tc,k,v)=>{if(tc&&tc.alive)tc.nx[k]+=v};   // 相手の「次のターン」に効くデバフ
 const decay=v=>Math.floor(v*2/3);   // ターン終了時の減衰（値の2/3に・小数点以下切り捨て）。変えたいときはここだけ
@@ -318,8 +319,10 @@ const ix=(pi,c)=>[pi,S.p[pi].chars.indexOf(c)];
 function pf(lu,sh,ar){S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]}
 const stSnap=()=>S.p.map(p=>p.chars.map(c=>({st:{...c.st},bf:{...c.bf},nx:{...c.nx}})));
 const holdSnap=()=>S.p.map(p=>p.chars.map(c=>c.alive?[...(c.card&&!c.used?c.card.d:[]),...(c.stock||[]).map(x=>({...x,s:1}))]:[]));
-function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（軽減・バフの影響を受けない）
+function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（ダメージ軽減・バフの影響は受けないが、状態異常耐性パッシブ(ailres)では減る）
  if(dmg<=0||!B.alive)return;
+ const res=hookSum('ailres',B,kind);   // 状態異常耐性パッシブ：1回ごとに res 減らす
+ if(res>0){const cut=Math.min(res,dmg);dmg-=cut;L(`　${B.name}の耐性で${STN[kind].n}ダメージ-${cut}`);if(dmg<=0)return}
  const bi=S.p[pb].chars.indexOf(B),dk=`${pb}-${bi}`;
  B.hp=Math.max(0,B.hp-dmg);S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
  L(`　${STN[kind].i}${B.name}は${STN[kind].n}で${dmg}ダメージ`);
