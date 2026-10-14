@@ -1,5 +1,28 @@
 const key=x=>x.n||x.name,byKey={};
 [...SKILLS,...CHARS].forEach(c=>byKey[key(c)]=c);
+
+// ===== 幻想体カード（試作データ。後から効果・名前・階層を差し替えられます） =====
+const ABN_HIERARCHIES=['総記の階','歴史の階','技術科学の階','文学の階'];
+const ABN_CARDS=[
+ {id:'blank_page',n:'白紙の頁',hierarchy:'総記の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
+ {id:'long_story',n:'長い物語',hierarchy:'総記の階',mood:'positive',desc:'ターン開始時、HPを1回復。',fx:{turnHeal:1}},
+ {id:'broken_fable',n:'壊れた寓話',hierarchy:'総記の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
+ {id:'quiet_margin',n:'静かな余白',hierarchy:'総記の階',mood:'mixed',desc:'このキャラが与える攻撃ダメージごとに、1回復（ターンごと1回）。',fx:{hitHeal:1}},
+ {id:'first_step',n:'最初の一歩',hierarchy:'歴史の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
+ {id:'old_guard',n:'古い守り',hierarchy:'歴史の階',mood:'negative',desc:'このキャラが受ける攻撃ダメージを1軽減。',fx:{reduce:1}},
+ {id:'victory_record',n:'勝利の記録',hierarchy:'歴史の階',mood:'positive',desc:'敵を倒すたび、このキャラの攻撃ダイス値が戦闘中ずっと+1。',fx:{killAtk:1}},
+ {id:'bitter_memory',n:'苦い記憶',hierarchy:'歴史の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
+ {id:'metal_skin',n:'金属の肌',hierarchy:'技術科学の階',mood:'positive',desc:'このキャラが受ける攻撃ダメージを1軽減。',fx:{reduce:1}},
+ {id:'overclock',n:'過負荷',hierarchy:'技術科学の階',mood:'negative',desc:'このキャラの攻撃ダイス値+2。',fx:{atk:2}},
+ {id:'maintenance',n:'自動修復',hierarchy:'技術科学の階',mood:'positive',desc:'ターン開始時、HPを1回復。',fx:{turnHeal:1}},
+ {id:'short_circuit',n:'短絡',hierarchy:'技術科学の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
+ {id:'thorned_tale',n:'茨の物語',hierarchy:'文学の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
+ {id:'sweet_ending',n:'甘い結末',hierarchy:'文学の階',mood:'positive',desc:'このキャラが与える攻撃ダメージごとに、1回復（ターンごと1回）。',fx:{hitHeal:1}},
+ {id:'silver_tongue',n:'銀の舌',hierarchy:'文学の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
+ {id:'fading_ink',n:'薄れるインク',hierarchy:'文学の階',mood:'mixed',desc:'ターン開始時、HPを1回復。',fx:{turnHeal:1}},
+];
+const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
+const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
 const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.slice(0,5).forEach(c=>d[c.name]=1);return d};   // 初期デッキ：技10＋キャラ5
 // ===== プレイヤー名とデッキの保存 =====
 // 名前ごとにデッキ2つを、このブラウザ（localStorage）へ保存する。別の端末・別のブラウザへは自動では引き継がれない（バックアップで持ち運べる）
@@ -19,47 +42,52 @@ function loadDecks(){   // いまの名前のデッキを読む
  PF.name=pf?pf.name:null;
  return fixDecks(pf?pf.decks:null);
 }
-let SCR='home',DK={d:loadDecks(),cur:0,warn:false,sort:'cost'};   // sort：cost＝コスト順 / file＝登録順
+const loadHierarchies=()=>{
+ const pf=readProfiles().find(x=>x.name===PF.name);
+ return validHiers(pf&&pf.hierarchies);
+};
+let SCR='home',DK={d:loadDecks(),cur:0,warn:false,sort:'cost',hiers:loadHierarchies()};   // sort：cost＝コスト順 / file＝登録順
 const saveDecks=()=>{
  if(!PF.name){DK.warn=true;return}
- const l=readProfiles(),e={name:PF.name,decks:DK.d},i=l.findIndex(x=>x.name===PF.name);
+ const l=readProfiles(),e={name:PF.name,decks:DK.d,hierarchies:validHiers(DK.hiers)},i=l.findIndex(x=>x.name===PF.name);
  if(i>=0)l[i]=e;else l.push(e);
  if(!writeProfiles(l))DK.warn=true;
 };
-function pfUse(name){lsSet('cg_cur',name);DK.d=loadDecks();DK.cur=0;DK.warn=false;PF.msg='';render()}   // 名前を切り替える
+function pfUse(name){lsSet('cg_cur',name);DK.d=loadDecks();DK.cur=0;DK.hiers=loadHierarchies();DK.warn=false;PF.msg='';render()}   // 名前を切り替える
 function pfCreate(){   // 名前を決めて作る
  const el=document.getElementById('pfname'),n=cleanName(el&&el.value);
  if(!n){PF.msg='名前を入力してください。';render();return}
  const l=readProfiles();
  if(l.some(x=>x.name===n)){PF.msg='その名前はすでにあります。「切り替え」から選んでください。';render();return}
  let old=null;if(!l.length){try{old=JSON.parse(lsGet('cg_decks'))}catch(e){}}   // 旧バージョンで作ったデッキは、最初の名前に引き継ぐ
- l.push({name:n,decks:fixDecks(old)});
+ l.push({name:n,decks:fixDecks(old),hierarchies:[...DEFAULT_ABN_HIERARCHIES]});
  if(!writeProfiles(l)){PF.msg='この環境ではブラウザに保存できません（プライベートモードなど）。';render();return}
  pfUse(n);
 }
 function pfDelete(){
  if(!PF.name||!confirm(`「${PF.name}」とそのデッキを削除します。よろしいですか？`))return;
  const l=readProfiles().filter(x=>x.name!==PF.name);writeProfiles(l);
- lsSet('cg_cur',l.length?l[0].name:'');DK.d=loadDecks();DK.cur=0;PF.msg='';render();
+ lsSet('cg_cur',l.length?l[0].name:'');DK.d=loadDecks();DK.cur=0;DK.hiers=loadHierarchies();PF.msg='';render();
 }
-function pfOut(){const e=document.getElementById('pfcode');if(e&&PF.name)e.value=JSON.stringify({v:1,name:PF.name,decks:DK.d})}   // バックアップの書き出し
+function pfOut(){const e=document.getElementById('pfcode');if(e&&PF.name)e.value=JSON.stringify({v:2,name:PF.name,decks:DK.d,hierarchies:validHiers(DK.hiers)})}   // バックアップの書き出し
 function pfIn(){   // バックアップの読み込み（同じ名前があれば上書き）
  const e=document.getElementById('pfcode');let o=null;try{o=JSON.parse(e.value)}catch(_){}
  const n=o&&cleanName(o.name);
  if(!n||!Array.isArray(o.decks)||o.decks.length<2){PF.msg='バックアップのコードが正しくありません。';render();return}
- const decks=fixDecks(o.decks),l=readProfiles(),i=l.findIndex(x=>x.name===n);
+ const decks=fixDecks(o.decks),hierarchies=validHiers(o.hierarchies),l=readProfiles(),i=l.findIndex(x=>x.name===n);
  if(i>=0&&!confirm(`「${n}」はすでにあります。デッキを上書きしますか？`))return;
- if(i>=0)l[i]={name:n,decks};else l.push({name:n,decks});
+ if(i>=0)l[i]={name:n,decks,hierarchies};else l.push({name:n,decks,hierarchies});
  writeProfiles(l);pfUse(n);
 }
 const dTot=d=>Object.values(d).reduce((a,b)=>a+b,0);
 const dChars=d=>Object.entries(d).reduce((a,[k,v])=>a+(isCh(byKey[k])?v:0),0);
 const dErr=d=>{const e=[];if(dTot(d)!==C.DECK)e.push(`${C.DECK}枚にしてください（現在${dTot(d)}枚）`);if(dChars(d)<1)e.push('キャラカードを1枚以上入れてください');return e};
+function dkHierarchy(value){if(!ABN_HIERARCHIES.includes(value))return;DK.hiers[DK.cur]=value;saveDecks();render()}
 
 let S;
 const setCover=i=>{S.cover=NET.on?null:i};   // オンラインでは画面を隠さない
-const newP=(name,deck)=>{
- const p={name,chars:[],pool:[],deck:[],disc:[],hand:[],cost:C.COST,max:C.COST,lv:0,coin:0};
+const newP=(name,deck,hierarchy=ABN_HIERARCHIES[0])=>{
+ const p={name,chars:[],pool:[],deck:[],disc:[],hand:[],cost:C.COST,max:C.COST,lv:0,coin:0,hierarchy:ABN_HIERARCHIES.includes(hierarchy)?hierarchy:ABN_HIERARCHIES[0],emoPos:0,emoNeg:0,pendingAbn:false,abnOffers:[],abnSelected:null};
  for(const [k,n] of Object.entries(deck).sort(([a],[b])=>a<b?-1:a>b?1:0)){const c=byKey[k];   // キー順に固定（両者で同じ並びにする）
   if(isCh(c))p.pool.push(mkC(c));else for(let i=0;i<n;i++)p.deck.push(c)}
  return p;
@@ -73,7 +101,7 @@ const alive=p=>p.chars.filter(c=>c.alive).length;
 function startMatch(){
  if(dErr(DK.d[0]).length||dErr(DK.d[1]).length)return;
  SCR='match';
- S={turn:0,p:[newP(PF.name||'プレイヤー1',DK.d[0]),newP('プレイヤー2',DK.d[1])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false};
+ S={turn:0,p:[newP(PF.name||'プレイヤー1',DK.d[0],DK.hiers[0]),newP('プレイヤー2',DK.d[1],DK.hiers[1])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false};
  render();
 }
 const toHome=()=>{netClose();S=null;SCR='home';render()};
@@ -92,7 +120,7 @@ function pickCh(i){
 // 場に出すキャラを確定する（pi＝プレイヤー番号）。オンラインでも「P1→P2の順」で適用して乱数の使い方を揃える
 function applySetup(pi,pick){
  const p=S.p[pi];
- p.chars=pick.map(i=>mkField(p.pool[i]));
+ p.chars=pick.map(i=>({...mkField(p.pool[i]),abn:[],abnState:{},abnFlags:{},showAbn:false}));
  p.deck=sh([...p.deck,...p.pool.filter((_,i)=>!pick.includes(i))]);p.pool=[];   // 選ばなかったキャラは山札に戻す
  draw(p,5);
 }
@@ -126,6 +154,8 @@ function startTurn(){
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{
   if(!c.alive)return;
   hook('turn',c,pi);   // 再生・蔵書の加護など（PKの turn フック）
+  const heal=(c.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.turnHeal)||0),0);
+  if(heal&&c.hp<c.max){const old=c.hp;c.hp=Math.min(c.max,c.hp+heal);if(c.hp>old)L(`　${c.name}の幻想体カード効果：HPを${c.hp-old}回復`)}
  }));
  render();
  if(NET.on)netAfterTurnStart();
@@ -134,7 +164,19 @@ function startTurn(){
 // オンライン中は「自分の手番のときだけ」操作できる。相手の操作の再現中(REPLAY)は通す
 const canAct=()=>!NET.on||REPLAY||(!!S&&S.phase==='decide'&&act()===NET.me&&!NET.lost&&!NET.err);
 const logOp=o=>{if(NET.on&&!REPLAY)S.ops.push(o)};   // 手番中の操作を記録し、決定時に相手へ送って再現してもらう
-function selCard(i){if(!canAct())return;S.sel=S.sel===i?null:i;render()}
+function pickAbnormality(i){
+ if(!canAct())return;const p=S.p[act()];if(!p.pendingAbn||!p.abnOffers[i])return;
+ p.abnSelected=i;S.msg='カードを付与する味方キャラを選んでください';render();
+}
+function assignAbnormality(ci){
+ const p=S.p[act()],c=p.chars[ci],card=p.abnOffers[p.abnSelected];
+ if(!p.pendingAbn||p.abnSelected==null||!c||!c.alive||!card)return false;
+ if(!Array.isArray(c.abn))c.abn=[];if(!c.abnState)c.abnState={};if(!c.abnFlags)c.abnFlags={};
+ c.abn.push(card);p.pendingAbn=false;p.abnOffers=[];p.abnSelected=null;
+ S.msg=`「${card.n}」を${c.name}に付与しました`;logOp(['ABN',ci,card.id]);render();return true;
+}
+function toggleCharacterView(pi,ci,e){if(e)e.stopPropagation();const c=S&&S.p[pi]&&S.p[pi].chars[ci];if(!c)return;c.showAbn=!c.showAbn;render()}
+function selCard(i){if(!canAct()||S.p[act()].pendingAbn)return;S.sel=S.sel===i?null:i;render()}
 function attribute(p,c,hi){
  const card=p.hand[hi];
  if(c.slot<=0){S.msg=`${c.name}には帰属枠が残っていません`;render();return}
@@ -145,8 +187,10 @@ function attribute(p,c,hi){
  S.sel=null;S.msg=`${card.name}の「${x.n}」を${c.name}に帰属しました。${card.name}は消滅します`;render();
 }
 function assign(ci,hi){
- if(!canAct())return;logOp(['A',ci,hi]);
+ if(!canAct())return;
  const p=S.p[act()],c=p.chars[ci],card=p.hand[hi];
+ if(p.pendingAbn){S.msg='先に幻想体カードを選んで味方キャラに付与してください';render();return}
+ logOp(['A',ci,hi]);
  if(!c||!c.alive||!card)return;
  if(isCh(card))return attribute(p,c,hi);
  if(card.req&&!c.at.includes(card.req)){S.msg=`「${card.n}」は${ATTR[card.req].n}属性のキャラだけが使えます`;render();return}
@@ -157,12 +201,13 @@ function assign(ci,hi){
 function mine(ci){
  if(!canAct())return;
  const p=S.p[act()],c=p.chars[ci];
+ if(p.pendingAbn){if(p.abnSelected==null){S.msg='先に幻想体カードを1枚選んでください';render();return}assignAbnormality(ci);return}
  if(S.sel!=null)assign(ci,S.sel);else if(c.card){S.pend=ci;S.msg='攻撃対象の相手キャラをクリックしてください';render()}
 }
 function undoRedir(yi){S.p[1-act()].chars.forEach(z=>{if(z.redirBy===yi){z.tgt=z.tgt0;z.redirBy=null;z.tgt0=null}})}
 function unassign(ci,e){e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const c=S.p[act()].chars[ci];if(c.card)S.p[act()].hand.push(c.card);c.card=null;c.tgt=null;if(S.pend===ci)S.pend=null;S.msg='';render()}
 function pickTgt(ci){
- if(!canAct())return;logOp(['P',S.pend,ci]);
+ if(!canAct()||S.p[act()].pendingAbn)return;logOp(['P',S.pend,ci]);
  if(S.pend==null||!S.p[1-act()].chars[ci].alive)return;
  const yi=S.pend,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci];
  undoRedir(yi);
@@ -180,6 +225,7 @@ function redir(yes){
 const askHTML=()=>{if(!S.ask)return '';const y=S.p[act()].chars[S.ask.yi],z=S.p[1-act()].chars[S.ask.zi];return `<div class="ask"><b>${y.name}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いので、${z.name}のマッチ対象を${y.name}に変更できます。<br><button class="go" onclick="redir(true)">対象を自分に変更する</button> <button class="sub" onclick="redir(false)">変更しない</button></div>`};
 function done(){
  if(!canAct())return;
+ if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
  if(S.ask){S.msg='マッチ対象を変更するか選んでください';render();return}
  const p=S.p[act()];
  if(p.chars.some(c=>c.alive&&c.card&&c.tgt==null)){S.msg='攻撃対象が未設定のキャラがいます';render();return}
@@ -212,6 +258,25 @@ function coin(pi, n) {
   const p = S.p[pi];
   p.coin = Math.min(coinNeed(p), p.coin + n);
 }
+// 感情比率は、攻撃命中・マッチ勝敗・撃破／被撃破などの戦闘イベントで記録します。
+function moodEvent(pi, mood, n=1) {
+ const p=S&&S.p&&S.p[pi];if(!p)return;
+ if(mood==='positive')p.emoPos=(p.emoPos||0)+n;
+ else if(mood==='negative')p.emoNeg=(p.emoNeg||0)+n;
+}
+const positiveMoodRatio=p=>((p.emoPos||0)+1)/((p.emoPos||0)+(p.emoNeg||0)+2);
+function makeAbnormalityOffers(p){
+ let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy);
+ if(pool.length<3)pool=ABN_CARDS.slice();
+ const ratio=positiveMoodRatio(p),offers=[];
+ while(pool.length&&offers.length<3){
+  const weights=pool.map(c=>c.mood==='positive'?0.2+1.8*ratio:c.mood==='negative'?0.2+1.8*(1-ratio):0.8);
+  const total=weights.reduce((a,b)=>a+b,0);let r=rnd()*total,at=weights.length-1;
+  for(let i=0;i<weights.length;i++){r-=weights[i];if(r<0){at=i;break}}
+  offers.push(pool.splice(at,1)[0]);
+ }
+ return offers;
+}
 function resolveEmotion(p) {
   if (p.lv >= 5) {
     p.coin = 0;
@@ -226,6 +291,7 @@ function resolveEmotion(p) {
     p.cost = p.max;
 
     L(`✦ ${p.name}の感情レベルが${p.lv}に上昇！コスト全回復`);
+    if(!p.pendingAbn){p.abnOffers=makeAbnormalityOffers(p);p.pendingAbn=true;p.abnSelected=null;L(`　幻想体カード候補を3枚用意（${p.hierarchy}／＋感情${p.emoPos}・−感情${p.emoNeg}）`)}
 
     p.chars.forEach(c => {
       if (c.alive) hook('lvup', c, p.lv);
@@ -324,9 +390,33 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
  const res=hookSum('ailres',B,kind);   // 状態異常耐性パッシブ：1回ごとに res 減らす
  if(res>0){const cut=Math.min(res,dmg);dmg-=cut;L(`　${B.name}の耐性で${STN[kind].n}ダメージ-${cut}`);if(dmg<=0)return}
  const bi=S.p[pb].chars.indexOf(B),dk=`${pb}-${bi}`;
- B.hp=Math.max(0,B.hp-dmg);S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
+ B.hp=Math.max(0,B.hp-dmg);moodEvent(pb,'negative');S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
  L(`　${STN[kind].i}${B.name}は${STN[kind].n}で${dmg}ダメージ`);
- if(B.hp<=0){B.alive=false;L(`　${B.name}は倒れた`);coin(pb,2)}
+ if(B.hp<=0){B.alive=false;moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pb,2)}
+}
+function abnormalityRoll(c,d){
+ const raw=roll(c,d);let bonus=0;
+ for(const card of (c.abn||[])){const f=card.fx||{};bonus+=(f.all||0)+(d.t==='a'?(f.atk||0):0)}
+ if(d.t==='a'&&c.abnState){
+  bonus+=(c.abnState.nextAtk||0);c.abnState.nextAtk=0;
+  const killRate=(c.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);
+  bonus+=(c.abnState.kills||0)*killRate;
+ }
+ if(bonus)L(`　${c.name}の幻想体カード効果：ダイス値${bonus>0?'+':''}${bonus}`);
+ return raw+bonus;
+}
+function abnormalityHit(A){
+ if(!A||!A.alive)return;
+ const cards=(A.abn||[]).filter(x=>x.fx&&x.fx.hitHeal);
+ if(!cards.length||A.abnFlags&&A.abnFlags.hitHealTurn===S.turn)return;
+ const n=cards.reduce((a,x)=>a+x.fx.hitHeal,0),before=A.hp;A.hp=Math.min(A.max,A.hp+n);
+ if(!A.abnFlags)A.abnFlags={};A.abnFlags.hitHealTurn=S.turn;
+ if(A.hp>before)L(`　${A.name}の幻想体カード効果：HPを${A.hp-before}回復`);
+}
+function abnormalityDamageTaken(B){
+ if(!B||!B.alive)return;
+ const n=(B.abn||[]).reduce((a,x)=>a+((x.fx&&x.fx.hurtCharge)||0),0);
+ if(n){if(!B.abnState)B.abnState={};B.abnState.nextAtk=Math.max(B.abnState.nextAtk||0,n);L(`　${B.name}の幻想体カード効果：次の攻撃ダイス値+${B.abnState.nextAtk}`)}
 }
 function vibex(B){   // 振動爆発：振動÷2枚の手札を山札に戻し、振動を消す
  if(!B||!B.st.vib)return;
@@ -351,16 +441,18 @@ function hit(pa,pb,B,dmg,A,die){
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
  const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
+ const ar=(B.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.reduce)||0),0);
+ if(ar&&dmg>0){const cut=Math.min(ar,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`)}
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
- B.hp-=dmg;coin(pa,1);
- if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
-  if(A.alive)hook('kill',A,B);}   // 倒した直後（PKの kill フック）
- else if(B.st.rupt){
+ B.hp-=dmg;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');abnormalityHit(A);
+ if(B.hp<=0){B.hp=0;B.alive=false;moodEvent(pa,'positive',2);moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
+  if(A.alive){const k=(A.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);if(k){if(!A.abnState)A.abnState={};A.abnState.kills=(A.abnState.kills||0)+1;L(`　${A.name}の幻想体カード効果：撃破ボーナス+${A.abnState.kills*k}`)}hook('kill',A,B);}}   // 倒した直後（PKの kill フック）
+ else {abnormalityDamageTaken(B);if(B.st.rupt){
   const v=B.st.rupt;
   direct(pb,B,v,'rupt');
   B.st.rupt=decay(B.st.rupt);
- }
+ }}
  const cx={A,B,dmg};
  if(A.card&&A.card.hit){   // カード的中時：効果ごとに、条件を満たした最初の的中で1回だけ発動
   const todo=A.card.hit.filter((e,i)=>{if(A.hitFired[i]||(e[2]&&!condTest(e[2],cx)))return false;A.hitFired[i]=true;return true});
@@ -374,7 +466,7 @@ function oneSided(pa,A,pb,B,dice){
   if(d.t!=='a')continue;
   bleed(pa,A);
   if(!A.alive)return;
-  const v=roll(A,d);
+  const v=abnormalityRoll(A,d);
   L(`　${A.name}[攻${v}] → ${B.name}に${v}ダメージ`);hit(pa,pb,B,v,A,d);pf([ix(pa,A)],[ix(pb,B)],[ix(pa,A),ix(pb,B)]);
  }
 }
@@ -385,12 +477,13 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   bleed(pa,A);
   bleed(pb,B);
   if(!A.alive||!B.alive)break;
-  const vx=roll(A,x),vy=roll(B,y);
+  const vx=abnormalityRoll(A,x),vy=abnormalityRoll(B,y);
   const head=`　${A.name}[${T[x.t]}${vx}] vs ${B.name}[${T[y.t]}${vy}] `;
   coin(pa,1);coin(pb,1);
   if(vx===vy){L(head+'→ 相打ち');pf([],[ix(pa,A),ix(pb,B)],[ix(pa,A),ix(pb,B)]);i++;j++;continue}
   const aw=vx>vy;
   const [wp,W,wd,wv,lp,Lc,ld,lv]=aw?[pa,A,x,vx,pb,B,y,vy]:[pb,B,y,vy,pa,A,x,vx];
+  moodEvent(wp,'positive');moodEvent(lp,'negative');
   let dmg=0;
   if(wd.t==='a')dmg=ld.t==='d'?Math.max(0,wv-lv):wv;
   L(head+`→ ${W.name}の勝ち`+(wd.t==='a'?(dmg?`、${dmg}ダメージ`:'、完全に防がれた'):wd.t==='e'?'、回避ダイス再使用':'、防御成功'));
@@ -498,9 +591,12 @@ function chHTML(pi,ci,view){
   const tg=c.tgt!=null?` → ${S.p[1-pi].chars[c.tgt].name}`:'（対象未設定）';
   a=`<div class="act">${isMine?`<button class="x" onclick="unassign(${ci},event)">×</button>`:''}<b>${c.card.n}</b>${tg}${fxLine(c.card)}<div>${diceHTML(c.card.d)}</div></div>`;
  }
+ const showAbn=!!c.showAbn,abnList=c.abn||[];
+ const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
+ const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
  return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?' <span class="sz">2枠</span>':''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
- <div class="sts">${sts}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div><ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>${atHTML(c)}${a}${fl}${gh}</div>`;
+ <div class="sts">${sts}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
 const costDots=(p,u)=>{const on=p.cost-u;let h='';for(let i=0;i<p.max;i++)h+=`<i class="dot${i<on?' on':i<p.cost?' rs':''}"></i>`;return `<span class="cost" title="コスト ${on}/${p.max}">コスト ${h} <small>${on}/${p.max}</small></span>`};
 const emoGauge = p => {
@@ -509,8 +605,8 @@ const emoGauge = p => {
   for (let i = 0; i < 5; i++) {
     h += `<i class="seg${i < p.lv ? ' on' : ''}"></i>`;
   }
-  return `<span class="emo" title="感情レベル ${p.lv}/5（コイン ${p.coin}/${need}）">
-    感情Lv <b>${p.lv}</b> ${h}
+  return `<span class="emo" title="感情レベル ${p.lv}/5（コイン ${p.coin}/${need}）／＋感情${p.emoPos||0}・−感情${p.emoNeg||0}">
+    感情Lv <b>${p.lv}</b> ${h} <small>＋${p.emoPos||0} / −${p.emoNeg||0}</small>
     ${p.lv < 5
       ? `<span class="cbar"><i style="width:${Math.min(100, p.coin / need * 100)}%"></i></span>`
       : ' <small>MAX</small>'}
@@ -533,6 +629,12 @@ const handHTML=(c,i,mode)=>{
  return `<div class="card${mode==='setup'?' off':''}${mode==='play'&&S.sel===i?' sel':''}" ${drag}><b>${c.n}</b> <span class="c">コスト${c.c}</span>${fxLine(c,false)}${diceRows(c)}</div>`;
 };
 const legendHTML=()=>`<details class="lg"><summary>状態異常・バフの説明</summary>${Object.keys(STN).map(k=>`<div><span class="stt" style="--c:${STN[k].c}">${STN[k].i}</span> <b>${STN[k].n}</b>：${STN[k].t}</div>`).join('')}${Object.keys(ATTR).map(k=>`<div><b>属性：${ATTR[k].n}</b>：${ATTR[k].t}</div>`).join('')}<div><small>破線のバッジは「次のターンから」有効になるバフです。</small></div></details>`;
+function abnormalityOfferHTML(p,enabled){
+ if(!p.pendingAbn||!enabled)return '';
+ const ratio=Math.round(positiveMoodRatio(p)*100),selected=p.abnSelected;
+ const cards=p.abnOffers.map((c,i)=>`<div class="card${selected===i?' sel':''}" style="min-width:150px;max-width:240px;flex:1;border:1px solid ${selected===i?'#e7c65a':'var(--line)'};padding:10px"><b>${c.n}</b><div><small>${c.hierarchy}／${c.mood==='positive'?'正の感情':c.mood==='negative'?'負の感情':'混合'}</small></div><p>${c.desc}</p><button class="sub" onclick="pickAbnormality(${i})">${selected===i?'選択中':'このカードを選ぶ'}</button></div>`).join('');
+ return `<section style="margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:rgba(30,35,50,.75)"><h2 style="margin:0 0 6px">幻想体カードを1枚選択</h2><div class="msg">階層：${p.hierarchy}　感情比率：＋${p.emoPos||0} / −${p.emoNeg||0}（正の感情傾向 ${ratio}%）</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${cards}</div><p class="msg">${selected==null?'候補から1枚選び、その後に付与したい味方キャラをクリックしてください。':'選んだカードを付与する味方キャラをクリックしてください。'}</p></section>`;
+}
 function renderMatch(){
  if(S.phase==='setup'){
   const p=S.p[S.sp];
@@ -549,7 +651,7 @@ function renderMatch(){
  let h=`<div id="board">${sideHTML(1-view,view,false)}<div class="gap"></div>${sideHTML(view,view,true)}<svg id="arr"></svg></div>`;
  if(decide){
   const p=S.p[view];
-  h+=`<div class="msg">${can?(S.msg||'技カードを自分のキャラへドラッグ（またはカード→キャラの順にクリック）。キャラカードを重ねるとパッシブを帰属できます'):'相手が行動を決めています。決定されるまでお待ちください…'}</div>
+  h+=abnormalityOfferHTML(p,can)+`<div class="msg">${can?(p.pendingAbn?'幻想体カードの選択と付与を完了してください。':(S.msg||'技カードを自分のキャラへドラッグ（またはカード→キャラの順にクリック）。キャラカードを重ねるとパッシブを帰属できます')):'相手が行動を決めています。決定されるまでお待ちください…'}</div>
   <div class="handwrap"><div class="hand">${p.hand.map((c,i)=>handHTML(c,i,can?'play':'view')).join('')}</div></div>`;
   if(can)h=`<div class="topbar"><button class="go" onclick="done()">${S.stage===0?(NET.on?'決定（相手の番へ）':'決定（相手に交代）'):'決定して戦闘開始'}</button></div>`+askHTML()+h;   // 誤操作を防ぐため一番上に配置
  }else{
@@ -641,12 +743,15 @@ function renderRules(){
    <li>コインは、ダイスをぶつけ合うたび（双方+1）、ダメージを与えたとき（+1）、キャラが倒れたとき（倒された側のプレイヤーに+2。攻撃で倒した側にも+2）に貯まります。</li>
    <li>コインが<b>${C.COIN}枚</b>たまるたびに<b>感情レベル</b>が1上がります（最大5）。</li>
    <li>感情レベルが上がると、コストの上限が（${C.COST}＋レベル）になり、<b>コストが全回復</b>します。</li>
+   <li>攻撃命中・マッチ勝利・撃破を「正の感情」、被弾・マッチ敗北・味方の撃破を「負の感情」として記録します。正負の比率によって、提示される幻想体カードの傾向が変わります。</li>
+   <li>感情レベル上昇後、次の自分の行動決定時に候補3枚から1枚を選び、味方キャラ1体に付与します。候補はデッキ構築で選んだ階層のカードから出ます。</li>
   </ul></section>
 
  <section><h2>7. パッシブとキャラ</h2>
   <ul>
    <li>キャラは<b>パッシブ</b>（常に働く能力）を持ちます。数値を足すもの、ターン開始時に働くもの、条件で働くものなどがあります。</li>
    <li>手札に来た<b>キャラカード</b>を味方キャラにドラッグすると、そのカードの一番上のパッシブを、そのキャラに<b>帰属</b>できます。帰属したカードは消滅し、キャラの「帰属枠」が1つ減ります。帰属枠が0のキャラには帰属できません。</li>
+   <li>戦闘中のキャラにある「幻想体カード」ボタンで、パッシブ表示と幻想体カード表示を切り替えられます。</li>
   </ul></section>
 
  <section><h2>8. 状態異常とバフ・デバフ</h2>
@@ -689,6 +794,7 @@ function renderDeck(){
  const inDeck=[...CHARS.filter(c=>d[key(c)]),...SKILLS.filter(c=>d[key(c)]).sort((a,b)=>a.c-b.c)];   // 右ペイン：キャラ→技（コスト順）
  document.getElementById('app').innerHTML=`<h1 style="margin:10px 0">デッキ構築　<small>${PF.name||''}</small></h1>
  <div>${[0,1].map(i=>`<button class="sub${i===DK.cur?' sel':''}" onclick="DK.cur=${i};render()">デッキ${i+1}</button>`).join(' ')}</div>
+ <p style="margin:10px 0"><label for="abnHierarchy">このデッキで使う幻想体カードの階層：</label> <select id="abnHierarchy" onchange="dkHierarchy(this.value)">${ABN_HIERARCHIES.map(x=>`<option value="${x}"${DK.hiers[DK.cur]===x?' selected':''}>${x}</option>`).join(' ')}</select><br><small>感情レベルが上がると、この階層の幻想体カードから候補3枚が提示されます。</small></p>
  <p>枚数 <b>${dTot(d)}</b>/${C.DECK}（キャラ ${dChars(d)}枚）　<span class="${er.length?'err':'ok'}">${er.join(' ')||'このデッキで対戦できます'}</span></p>
  <p><small>技カードは同名${C.MAXC}枚まで、キャラカードは1枚まで。変更は自動で保存されます。</small>${DK.warn?'<span class="err">　この環境ではブラウザ保存が使えません。下のコードで書き出してください。</span>':''}</p>
  <div class="dkwrap">
