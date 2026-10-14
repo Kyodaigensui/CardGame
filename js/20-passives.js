@@ -35,7 +35,7 @@ const PAS={
  flow:{n:'気力',k:'ts',fx:[['cost',1]]},
  fervor:{n:'高揚',k:'ts',fx:[['coin',1]]},
  strongest:{n:'最強',k:'catchup',v:2},
- bloodlust:{n:'赤い霧',k:'killup',v:1},
+ bloodlust:{n:'赤い霧',k:'killup',v:2},
  hongoku:{n:'本国剣術',k:'atk',v:2},
  yourshield:{n:'あなたの盾',k:'def',v:1},
  debuffup:{n:'狙撃',k:'debuffup',v:1},
