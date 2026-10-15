@@ -16,15 +16,33 @@ const ABN_CARDS=[
  {id:'blizzard',n:'吹雪',hierarchy:'総記の階',mood:'negative',levels:[5,5],desc:'このターン、選択したキャラ以外の全員が行動不能。次のターン、相手全員の速度-6。',fx:{blizzard:true}},
  {id:'gaze',n:'眼差し',hierarchy:'総記の階',mood:'mixed',levels:[5,5],desc:'このキャラの与ダメージ・被ダメージが2倍になる。',fx:{gaze:true}},
  {id:'guilt',n:'罪悪感',hierarchy:'総記の階',mood:'negativeMany',levels:[3,4],desc:'被ダメージ-1〜2。受けたダメージの1/3を攻撃者に反射する。',fx:{guilt:true}},
- // 他の階層の仮カード（既存機能を維持）
- {id:'first_step',n:'最初の一歩',hierarchy:'歴史の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
- {id:'old_guard',n:'古い守り',hierarchy:'歴史の階',mood:'negative',desc:'このキャラが受ける攻撃ダメージを1軽減。',fx:{reduce:1}},
- {id:'victory_record',n:'勝利の記録',hierarchy:'歴史の階',mood:'positive',desc:'敵を倒すたび、このキャラの攻撃ダイス値が戦闘中ずっと+1。',fx:{killAtk:1}},
- {id:'bitter_memory',n:'苦い記憶',hierarchy:'歴史の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
- {id:'metal_skin',n:'金属の肌',hierarchy:'技術科学の階',mood:'positive',desc:'このキャラが受ける攻撃ダメージを1軽減。',fx:{reduce:1}},
- {id:'overclock',n:'過負荷',hierarchy:'技術科学の階',mood:'negative',desc:'このキャラの攻撃ダイス値+2。',fx:{atk:2}},
- {id:'maintenance',n:'自動修復',hierarchy:'技術科学の階',mood:'positive',desc:'ターン開始時、HPを1回復。',fx:{turnHeal:1}},
- {id:'short_circuit',n:'短絡',hierarchy:'技術科学の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
+ // 歴史の階：ユーザー指定のカード
+ {id:'embers',n:'残り火',hierarchy:'歴史の階',mood:'positive',levels:[1,2],desc:'被ダメージ時、攻撃者に火傷1〜2を付与。さらに40%で次のターン、ダイス的中時に火傷1〜2を付与する能力を得る（重複しない）。',fx:{embers:true}},
+ {id:'nostalgic_embrace',n:'懐かしいあの日の抱擁',hierarchy:'歴史の階',mood:'positive',levels:[1,2],desc:'マッチ勝利時、20%でダイス値分の追加ダメージ。同じ相手との連続マッチ勝利で発動率が上昇する。',fx:{nostalgicEmbrace:true}},
+ {id:'love_expression',n:'愛情表現',hierarchy:'歴史の階',mood:'negativeSuper',levels:[1,2],desc:'マッチ中のダイス値+1〜2。一方攻撃中のダイス値-1〜2。',fx:{loveExpression:true}},
+ {id:'fairy_care',n:'妖精の世話',hierarchy:'歴史の階',mood:'negativeMany',levels:[1,2],desc:'3ターンの間、ターン終了時に最大体力の15%を回復。効果中に3回ダメージを受けると最大体力の25%のダメージを受け、効果が消える。',fx:{fairyCare:true}},
+ {id:'gluttony',n:'食い意地',hierarchy:'歴史の階',mood:'positiveMany',levels:[3,4],desc:'このターンに一度でもダメージを受けた相手を攻撃すると、ダメージ+1〜3、体力を2〜5回復する。',fx:{gluttony:true}},
+ {id:'predation',n:'捕食',hierarchy:'歴史の階',mood:'negativeMany',levels:[3,4],desc:'このキャラ以外の味方の体力を各10減らし、実際に減った合計分を回復。このターン、ダイス値+3・速度+3。',fx:{predation:true}},
+ {id:'spores',n:'胞子',hierarchy:'歴史の階',mood:'mixed',levels:[3,4],desc:'被ダメージ時、攻撃者に火傷1〜3と出血1〜3を付与する。',fx:{spores:true}},
+ {id:'working_bee',n:'働き蜂',hierarchy:'歴史の階',mood:'negative',levels:[3,4],desc:'自分に最も多くダメージを与えた相手に「蜂の標的」を付与し、その相手の被ダメージを2〜4増加させる。',fx:{workingBee:true}},
+ {id:'vines',n:'蔓',hierarchy:'歴史の階',mood:'positive',levels:[3,4],desc:'ターン開始時、ランダムな敵1体の速度-6。このキャラがその敵を攻撃するとダメージ+2〜4。',fx:{vines:true}},
+ {id:'loyalty',n:'忠誠心',hierarchy:'歴史の階',mood:'negativeMany',levels:[5,5],desc:'このキャラが受けたダメージ5ごとに、次のターン味方全員のダイス値+1。',fx:{loyalty:true}},
+ {id:'thorn_wall',n:'棘の壁',hierarchy:'歴史の階',mood:'positiveMany',levels:[5,5],desc:'被ダメージ時、攻撃者に2〜8ダメージと速度-1〜3を付与。速度低下が-3なら、与えたダメージ分を回復する。',fx:{thornWall:true}},
+ {id:'malice',n:'悪意',hierarchy:'歴史の階',mood:'mixed',levels:[5,5],desc:'ターン開始時、全敵にダメージ。自分の残り体力が少ないほど増え、最小5・最大30。',fx:{malice:true}},
+ {id:'metal_resonance',n:'金属の響き',hierarchy:'技術科学の階',mood:'mixed',levels:[1,2],desc:'ダイス的中時、相手に速度-1と次のターンのダイス値-1を付与する。',fx:{metalResonance:true}},
+ {id:'bound_anger',n:'縛られた怒り',hierarchy:'技術科学の階',mood:'mixed',levels:[3,4],desc:'このキャラクターのダイス値は1〜3、速度は1に固定される。',fx:{boundAnger:true}},
+ {id:'violence',n:'暴力性',hierarchy:'技術科学の階',mood:'negativeMany',levels:[1,2],desc:'全ダイスの最小値-1、最大値+3。',fx:{violence:true}},
+ {id:'charging',n:'充電',hierarchy:'技術科学の階',mood:'mixed',levels:[3,4],desc:'幕の開始時にコストが最大なら、このターン速度+1〜2、与ダメージ+2〜7。',fx:{charging:true}},
+ {id:'pattern_recognition',n:'パターン反復認識機能',hierarchy:'技術科学の階',mood:'positive',levels:[1,2],desc:'マッチに3回勝利するたび、コスト1回復し、次のターン速度+1〜2。',fx:{patternRecognition:true}},
+ {id:'cleaning',n:'掃除',hierarchy:'技術科学の階',mood:'positiveMany',levels:[3,4],desc:'自分の速度が相手より高いとき、速度差2ごとにダイス値+1（最大+3）。',fx:{cleaning:true}},
+ {id:'music',n:'音楽',hierarchy:'技術科学の階',mood:'negative',levels:[5,5],desc:'全キャラクターの与ダメージ+4〜8、被ダメージ+4〜8。カード所有者の味方は敵を倒すたびHP15回復。',fx:{music:true}},
+ {id:'music_addiction',n:'音楽中毒',hierarchy:'技術科学の階',mood:'negativeMany',levels:[3,4],desc:'攻撃ダイス値+1〜3。守備ダイス（防御・回避）の値は1に固定される。',fx:{musicAddiction:true}},
+ {id:'rest',n:'安息',hierarchy:'技術科学の階',mood:'positive',levels:[3,4],desc:'体力が最も少ない敵を攻撃すると、与ダメージ+2〜7。',fx:{rest:true}},
+ {id:'mourning',n:'哀悼',hierarchy:'技術科学の階',mood:'mixed',levels:[1,2],desc:'状態異常を持つ全キャラクターは被ダメージ+2〜7。このキャラクター自身が状態異常中ならダイス値+1〜2。',fx:{mourning:true}},
+ {id:'coffin',n:'棺',hierarchy:'技術科学の階',mood:'positive',levels:[5,5],desc:'体力50%以下の敵に攻撃が的中すると、40%の確率で次のターン行動不能にする。',fx:{coffin:true}},
+ {id:'request',n:'依頼',hierarchy:'技術科学の階',mood:'positiveMany',levels:[1,2],desc:'依頼対象を持つ敵がいなければ、ダイス的中時に依頼対象を付与（被ダメージ+2〜4）。このキャラクターが依頼対象の敵を倒すと、体力が最大値の50%分回復する。',fx:{request:true}},
+ {id:'seventh_bullet',n:'7つ目の弾丸',hierarchy:'技術科学の階',mood:'negative',levels:[3,4],desc:'攻撃ダイスのダメージ量+1〜7。7回目に使用する攻撃ページは、味方も含めて対象がランダムになる。',fx:{seventhBullet:true}},
+ {id:'blackening',n:'黒化',hierarchy:'技術科学の階',mood:'negativeMany',levels:[5,5],desc:'全キャラクターの被ダメージが1.5倍になる。このキャラクターは速度+1〜2、攻撃ダイス値+2〜4。',fx:{blackening:true}},
  {id:'thorned_tale',n:'茨の物語',hierarchy:'文学の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
  {id:'sweet_ending',n:'甘い結末',hierarchy:'文学の階',mood:'positive',desc:'このキャラが与える攻撃ダメージごとに、1回復（ターンごと1回）。',fx:{hitHeal:1}},
  {id:'silver_tongue',n:'銀の舌',hierarchy:'文学の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
@@ -143,17 +161,44 @@ function confirmSetup(){
 }
 function startTurn(){
  S.turn++;S.msg='';S.sel=null;S.pend=null;S.ask=null;
- S.turnDamageTeam=[false,false];
+ S.log=[];S.dm={};S.ev=[];S.turnDamageTeam=[false,false];
+ // 「悪意」：速度順の計算より先に、残りHPが少ないほど強い全体攻撃を行う。
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>{
+  if(!c.alive||!hasAbn(c,'malice'))return;
+  const ratio=c.max>0?Math.max(0,Math.min(1,1-c.hp/c.max)):0;
+  const dmg=Math.max(5,Math.min(30,Math.round(5+25*ratio)));
+  S.p[1-pi].chars.forEach(enemy=>{if(enemy.alive){L(`　「悪意」：${c.name}が${enemy.name}に${dmg}ダメージ`);direct(1-pi,enemy,dmg,'malice')}});
+ }));
+ // 「蔓」は速度計算より先に対象を選び、このターンの速度-6を反映する。
+ const vineStartLog=[];
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>{
+  if(!c.alive||!hasAbn(c,'vines'))return;
+  const foes=S.p[1-pi].chars.filter(z=>z.alive);if(!foes.length)return;
+  const target=foes[Math.floor(rnd()*foes.length)];if(!c.abnState)c.abnState={};if(!target.abnState)target.abnState={};
+  c.abnState.vineTarget=target;target.abnState.speedDownNext=(target.abnState.speedDownNext||0)+6;
+  vineStartLog.push(`　「蔓」：${c.name}が${target.name}の速度-6を付与`);
+ }));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{
   if(!c.abnState)c.abnState={};
   if(c.abnState.skipThisTurn==null)c.abnState.skipThisTurn=false;
   if(c.abnState.iceShard>=3){c.abnState.skipThisTurn=true;L(`　${c.name}は氷の欠片が3以上あるため行動不能（欠片を除去）`);c.abnState.iceShard=0}
   c.abnState.surgingActive=(c.abnState.surgingCountdown||0)>0;
   c.abnState.teamDiceBonus=0;
+  // 充電：ターン開始時にコストが最大なら、このターンだけ速度・与ダメージを強化。
+  if(hasAbn(c,'charging')&&p.cost>=p.max){c.abnState.chargingTurn=S.turn;c.abnState.chargingSpeed=R(1,2);c.abnState.chargingDamage=R(2,7);L(`　「充電」：${c.name}は速度+${c.abnState.chargingSpeed}、与ダメージ+${c.abnState.chargingDamage}`)}else if(hasAbn(c,'charging'))c.abnState.chargingTurn=0;
+  const patternSpeed=c.abnState.speedUpNext||0;c.abnState.speedUpNext=0;
   c.abnState.speedDownNow=c.abnState.speedDownNext||0;c.abnState.speedDownNext=0;
-  c.sp=c.alive?R(c.spd[0],c.spd[1])+pv(c,'spd')+(c.abnState.yearningSpeed||0)+(c.abnState.surgingActive?4:0)-(c.abnState.speedDownNow||0):0;
+  if(c.abnState.skipNextTurn){c.abnState.skipThisTurn=true;c.abnState.skipNextTurn=false}
+  c.sp=c.alive?R(c.spd[0],c.spd[1])+pv(c,'spd')+(c.abnState.yearningSpeed||0)+(c.abnState.surgingActive?4:0)+patternSpeed+(c.abnState.blackeningSpeed||0)+(c.abnState.chargingTurn===S.turn?(c.abnState.chargingSpeed||0):0)-(c.abnState.speedDownNow||0):0;
+  if(c.alive&&hasAbn(c,'bound_anger'))c.sp=1;
  }));
- S.p.forEach(p=>{if(p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){const bonus=R(1,2);p.chars.forEach(c=>{if(!c.abnState)c.abnState={};c.abnState.teamDiceBonus=bonus});}});
+ // 忠誠心：前ターンに蓄積したダメージ5ごとのボーナスを、このターンの味方全員へ。
+ S.p.forEach(p=>{
+  const bonus=p.chars.reduce((n,c)=>n+((c.abnState&&c.abnState.loyaltyPending)||0),0);
+  if(bonus)p.chars.forEach(c=>{if(!c.abnState)c.abnState={};c.abnState.teamDiceBonus=(c.abnState.teamDiceBonus||0)+bonus});
+  p.chars.forEach(c=>{if(c.abnState)c.abnState.loyaltyPending=0});
+ });
+ S.p.forEach(p=>{if(p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){const bonus=R(1,2);p.chars.forEach(c=>{if(!c.abnState)c.abnState={};c.abnState.teamDiceBonus=(c.abnState.teamDiceBonus||0)+bonus});}});
  // パッシブの speed フック（例：最強）：素の速度が出そろってから一斉に判定する（持ち主同士で連鎖しない）
  const chaseLog=[],allMax=Math.max(...S.p.flatMap(p=>p.chars.filter(c=>c.alive).map(c=>c.sp))),spNew=new Map();
  S.p.forEach(p=>{
@@ -168,8 +213,9 @@ function startTurn(){
  const s=S.p.map(p=>{const a=p.chars.filter(c=>c.alive);return a.length?a.reduce((x,c)=>x+c.sp,0)/a.length:0});
  S.order=s[0]<s[1]?[0,1]:s[0]>s[1]?[1,0]:sh([0,1]);
  S.phase='decide';S.stage=0;setCover(S.order[0]);S.ops=[];
- S.log=[`── ターン${S.turn} ──`,`速度ダイスの平均 P1:${s[0].toFixed(1)} / P2:${s[1].toFixed(1)}　低い${S.p[S.order[0]].name}から行動を決めます`];
+ S.log.unshift(`── ターン${S.turn} ──`,`速度ダイスの平均 P1:${s[0].toFixed(1)} / P2:${s[1].toFixed(1)}　低い${S.p[S.order[0]].name}から行動を決めます`);
  chaseLog.forEach(m=>L(m));
+ vineStartLog.forEach(m=>L(m));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{
   if(!c.alive)return;
   hook('turn',c,pi);   // 再生・蔵書の加護など（PKの turn フック）
@@ -194,7 +240,14 @@ function assignAbnormality(ci){
  if(!p.pendingAbn||p.abnSelected==null||!c||!c.alive||!card)return false;
  if(!Array.isArray(c.abn))c.abn=[];if(!c.abnState)c.abnState={};if(!c.abnFlags)c.abnFlags={};
  c.abn.push(card);
+ if(card.fx&&card.fx.music){c.abnState.musicDmgUp=R(4,8);c.abnState.musicDmgTaken=R(4,8);L(`　「音楽」：全キャラクターの与ダメージ+${c.abnState.musicDmgUp}、被ダメージ+${c.abnState.musicDmgTaken}`)}
+ if(card.fx&&card.fx.blackening){c.abnState.blackeningSpeed=R(1,2);c.abnState.blackeningAtk=R(2,4);c.sp+=c.abnState.blackeningSpeed;L(`　「黒化」：速度+${c.abnState.blackeningSpeed}、攻撃ダイス値+${c.abnState.blackeningAtk}。全キャラクターの被ダメージ1.5倍`)}
+ if(card.fx&&card.fx.boundAnger){c.sp=1;L(`　「縛られた怒り」：${c.name}の速度は1に固定される`)}
+ if(card.fx&&card.fx.patternRecognition&&!c.abnState.patternWins)c.abnState.patternWins=0;
+ if(card.fx&&card.fx.request)c.abnState.requestKey=`request-${act()}-${ci}`;
  if(card.fx&&card.fx.yearning){const oldMax=c.max,oldHp=c.hp;c.max=Math.ceil(c.max*1.15);c.hp=Math.min(c.max,Math.ceil(oldHp*1.15));if(!c.abnState)c.abnState={};c.abnState.yearningSpeed=R(1,2);L(`　${c.name}の「熱望」：最大体力${oldMax}→${c.max}、速度+${c.abnState.yearningSpeed}`)}
+ if(card.fx&&card.fx.fairyCare){c.abnState.fairyCareTurns=3;c.abnState.fairyCareHits=0;L(`　${c.name}の「妖精の世話」：3ターンの回復効果を得た`)}
+ if(card.fx&&card.fx.predation){let lost=0;p.chars.forEach(z=>{if(z===c||!z.alive)return;const n=Math.min(10,Math.max(0,z.hp));z.hp-=n;lost+=n;L(`　「捕食」：${z.name}の体力-${n}`);if(z.hp<=0){z.hp=0;z.alive=false;L(`　${z.name}は倒れた`)}});const oldHp=c.hp;c.hp=Math.min(c.max,c.hp+lost);c.abnState.predationTurn=S.turn;c.sp+=3;L(`　「捕食」：${c.name}はHP${c.hp-oldHp}回復、ダイス+3・速度+3`)}
  if(card.fx&&card.fx.surgingHeartbeat){if(!c.abnState)c.abnState={};c.abnState.surgingCountdown=3;c.abnState.surgingAppliedTurn=S.turn}
  if(card.fx&&card.fx.blizzard){S.p.forEach((pp,pi)=>pp.chars.forEach((z,zi)=>{if(z!==c){if(!z.abnState)z.abnState={};z.abnState.skipThisTurn=true;if(pi!==act()){z.abnState.speedDownNext=6}}}));L(`　「吹雪」：${c.name}以外の全員がこのターン行動不能、相手全員は次のターン速度-6`)}
  p.pendingAbn=false;p.abnOffers=[];p.abnSelected=null;
@@ -294,8 +347,7 @@ function makeAbnormalityOffers(p){
  // 一度取得して味方に付与した幻想体カードは、同じプレイヤーの以後の候補から除外する。
  const acquired=new Set((p.chars||[]).flatMap(c=>(c.abn||[]).map(a=>a.id).filter(Boolean)));
  let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&!acquired.has(c.id)&&(!c.levels||(p.lv>=c.levels[0]&&p.lv<=c.levels[1])));
- // レベル条件内の未取得カードが少ない場合も、未取得カードだけを候補にする。
- if(pool.length<3)pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&!acquired.has(c.id));
+ // 指定レベル外のカードで補充しない。候補が3枚未満なら、その枚数だけ提示する。
  const ratio=positiveMoodRatio(p),offers=[];
  const weight=c=>{
   if(c.mood==='positive')return 0.2+1.8*ratio;
@@ -355,6 +407,8 @@ const STN={
  bleed:{n:'出血',i:'🩸',c:'#e0455a',t:'行動のたびに数値分のダメージを受ける。ターン終了時に数値が約2/3に減る'},
  rupt:{n:'破裂',i:'💥',c:'#b17cf0',t:'ダメージを受けるたびに数値分の追加ダメージを受ける。ターン終了時に数値が約2/3に減る'},
  vib:{n:'振動',i:'〰',c:'#5cc8f5',t:'「振動爆発」を持つダイスでダメージを受けると、数値÷2枚の手札が山札に戻り、振動は消える'},
+ malice:{n:'悪意',i:'☠',c:'#8f344f',t:'悪意による固定ダメージ'},
+ fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ'},
  dmgup:{n:'ダメージ上昇',i:'⚔',c:'#d9a93f',t:'このターン、与えるダメージが数値分上がる'},
  guard:{n:'被ダメージ減少',i:'🛡',c:'#4e8fd6',t:'このターン、受けるダメージが数値分減る'},
  roll:{n:'マッチ数値上昇',i:'🎲',c:'#4fb58a',t:'このターン、ダイスの出目が数値分上がる'},
@@ -424,17 +478,35 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
  if(dmg<=0||!B.alive)return;
  const res=hookSum('ailres',B,kind);   // 状態異常耐性パッシブ：1回ごとに res 減らす
  if(res>0){const cut=Math.min(res,dmg);dmg-=cut;L(`　${B.name}の耐性で${STN[kind].n}ダメージ-${cut}`);if(dmg<=0)return}
+ // 全キャラクター対象の被ダメージ効果は、状態異常などの固定ダメージにも適用する。
+ const marks=requestMarks(B),requestBonus=Object.values(marks).reduce((a,v)=>a+(Number(v)||0),0);if(requestBonus){dmg+=requestBonus;L(`　「依頼対象」：被ダメージ+${requestBonus}`)}
+ if(hasStatusAbn(B)&&globalAbnHolders('mourning').length){const n=R(2,7);dmg+=n;L(`　「哀悼」：状態異常中の${B.name}は被ダメージ+${n}`)}
+ const music=globalAbnHolders('music'),musicTaken=music.reduce((a,x)=>a+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(musicTaken){dmg+=musicTaken;L(`　「音楽」：被ダメージ+${musicTaken}`)}
+ if(globalAbnHolders('blackening').length){dmg=Math.ceil(dmg*1.5);L(`　「黒化」：被ダメージ1.5倍`)}
  const bi=S.p[pb].chars.indexOf(B),dk=`${pb}-${bi}`;
- B.hp=Math.max(0,B.hp-dmg);moodEvent(pb,'negative');S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
+ B.hp=Math.max(0,B.hp-dmg);if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;if(kind==='malice'&&S.turnDamageTeam)S.turnDamageTeam[1-pb]=true;
+ if(kind!=='fairy'&&hasAbn(B,'fairy_care')&&(B.abnState.fairyCareTurns||0)>0){B.abnState.fairyCareHits=(B.abnState.fairyCareHits||0)+1;if(B.abnState.fairyCareHits>=3){B.abnState.fairyCareTurns=0;const extra=Math.max(1,Math.ceil(B.max*0.25));B.hp=Math.max(0,B.hp-extra);L(`　「妖精の世話」：${B.name}は効果終了、追加で${extra}ダメージ`)}}
+ moodEvent(pb,'negative');S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
  L(`　${STN[kind].i}${B.name}は${STN[kind].n}で${dmg}ダメージ`);
  if(B.hp<=0){B.alive=false;moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pb,2)}
 }
-function abnormalityRoll(c,d){
- const raw=roll(c,d);let bonus=0;
+function abnormalityRoll(c,d,inMatch=false,opponent=null){
+ // ダイス範囲を変えるページは、既存のダイス補正を維持したまま基礎範囲だけ差し替える。
+ let rollDie={...d};
+ if(hasAbn(c,'bound_anger'))rollDie.r=[1,3];
+ else if(hasAbn(c,'music_addiction')&&(d.t==='d'||d.t==='e'))rollDie.r=[1,1];
+ else if(hasAbn(c,'violence'))rollDie.r=[Math.max(0,d.r[0]-1),d.r[1]+3];
+ const raw=roll(c,rollDie);let bonus=0;
  for(const card of (c.abn||[])){
   const f=card.fx||{};bonus+=(f.all||0)+(d.t==='a'?(f.atk||0):0);
   if(f.guardDie&&(d.t==='d'||d.t==='e'))bonus+=R(f.guardDie[0],f.guardDie[1]);
   if(f.surgingHeartbeat&&c.abnState&&c.abnState.surgingActive)bonus+=4;
+  if(f.loveExpression)bonus+=inMatch?R(1,2):-R(1,2);
+  if(f.predation&&c.abnState&&c.abnState.predationTurn===S.turn)bonus+=3;
+  if(f.musicAddiction&&d.t==='a')bonus+=R(1,3);
+  if(f.mourning&&hasStatusAbn(c))bonus+=R(1,2);
+  if(f.blackening&&d.t==='a')bonus+=(c.abnState&&c.abnState.blackeningAtk)||R(2,4);
+  if(f.cleaning&&opponent&&c.sp>opponent.sp)bonus+=Math.min(3,Math.floor((c.sp-opponent.sp)/2));
  }
  if(c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
  if(d.t==='a'&&c.abnState){
@@ -443,7 +515,7 @@ function abnormalityRoll(c,d){
   bonus+=(c.abnState.kills||0)*killRate;
  }
  if(bonus)L(`　${c.name}の幻想体カード効果：ダイス値${bonus>0?'+':''}${bonus}`);
- return raw+bonus;
+ return Math.max(0,raw+bonus);
 }
 function abnormalityHit(A){
  if(!A||!A.alive)return;
@@ -454,6 +526,9 @@ function abnormalityHit(A){
  if(A.hp>before)L(`　${A.name}の幻想体カード効果：HPを${A.hp-before}回復`);
 }
 function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
+function globalAbnHolders(id){const out=[];if(S&&S.p)S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>{if(hasAbn(c,id))out.push({pi,ci,c})}));return out}
+function hasStatusAbn(c){return !!(c&&c.st&&['burn','bleed','rupt','vib'].some(k=>(c.st[k]||0)>0))}
+function requestMarks(c){return c&&c.abnState&&c.abnState.requestMarks?c.abnState.requestMarks:{}}
 function abnormalityDamageTaken(B){
  if(!B||!B.alive)return;
  const n=(B.abn||[]).reduce((a,x)=>a+((x.fx&&x.fx.hurtCharge)||0),0);
@@ -475,6 +550,18 @@ function bleed(pi,ch){
  pf([],[ix(pi,ch)],null);
 }
 function hit(pa,pb,B,dmg,A,die){
+ const targetDamagedBefore=!!(B.abnState&&B.abnState.damagedTurn===S.turn);
+ let gluttonyHeal=0;
+ if(dmg>0&&A&&die&&die.t==='a'){
+  if(hasAbn(A,'charging')&&A.abnState&&A.abnState.chargingTurn===S.turn){const n=A.abnState.chargingDamage||0;dmg+=n;if(n)L(`　「充電」：与ダメージ+${n}`)}
+  if(hasAbn(A,'seventh_bullet')){const n=R(1,7);dmg+=n;L(`　「7つ目の弾丸」：攻撃ダイスの追加ダメージ+${n}`)}
+  const music=globalAbnHolders('music');if(music.length){const n=music.reduce((sum,x)=>sum+((x.c.abnState&&x.c.abnState.musicDmgUp)||0),0);dmg+=n;if(n)L(`　「音楽」：与ダメージ+${n}`)}
+  if(pa!==pb&&hasAbn(A,'rest')){const foes=S.p[1-pa].chars.filter(x=>x.alive);if(foes.length&&B.alive&&B.hp<=Math.min(...foes.map(x=>x.hp))){const n=R(2,7);dmg+=n;L(`　「安息」：最も体力の少ない敵への追加ダメージ+${n}`)}}
+ }
+
+ if(dmg>0&&A&&A.abnState&&A.abnState.hiveMarks){const mark=Object.values(A.abnState.hiveMarks).reduce((n,v)=>n+v,0);if(mark){dmg+=mark;L(`　「蜂の標的」：${A.name}の被ダメージ+${mark}`)}}
+ if(dmg>0&&hasAbn(A,'gluttony')&&targetDamagedBefore){const extra=R(1,3);dmg+=extra;gluttonyHeal=R(2,5);L(`　「食い意地」：ダメージ+${extra}（HP回復${gluttonyHeal}予定）`)}
+ if(dmg>0&&hasAbn(A,'vines')&&A.abnState&&A.abnState.vineTarget===B){const extra=R(2,4);dmg+=extra;L(`　「蔓」：${B.name}への追加ダメージ+${extra}`)}
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
  if(dmg>0&&hasAbn(A,'frost_sword')&&(B.abnState&&(B.abnState.speedDownNow||B.abnState.frostSpeedDown))){const extra=R(1,2);dmg+=extra;L(`　霜の剣：速度低下中の${B.name}に追加ダメージ+${extra}`)}
@@ -494,16 +581,60 @@ function hit(pa,pb,B,dmg,A,die){
   const cut=Math.min(rangeCut,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`);
  }
  if(dmg>0&&B.abnState&&B.abnState.surgingActive){const cut=Math.min(4,dmg);dmg-=cut;L(`　「押し寄せる鼓動」：被ダメージ-${cut}`)}
+ // 「依頼対象」は以後の被ダメージを増やす。「哀悼」「音楽」は記載どおり全キャラクターへ適用。
+ if(dmg>0){const marks=requestMarks(B),n=Object.values(marks).reduce((a,v)=>a+(Number(v)||0),0);if(n){dmg+=n;L(`　「依頼対象」：被ダメージ+${n}`)}}
+ if(dmg>0&&hasStatusAbn(B)&&globalAbnHolders('mourning').length){const n=R(2,7);dmg+=n;L(`　「哀悼」：状態異常中の${B.name}は被ダメージ+${n}`)}
+ if(dmg>0){const music=globalAbnHolders('music');const n=music.reduce((sum,x)=>sum+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(n){dmg+=n;L(`　「音楽」：被ダメージ+${n}`)}}
  if(dmg>0&&hasAbn(B,'gaze')){dmg*=2;L(`　${B.name}の「眼差し」：被ダメージ2倍`)}
+ if(dmg>0&&globalAbnHolders('blackening').length){dmg=Math.ceil(dmg*1.5);L(`　「黒化」：被ダメージ1.5倍`)}
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
- B.hp-=dmg;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');abnormalityHit(A);
+ B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
+ // 金属の響き：的中した相手へ次ターンの速度・ダイス値低下を付与。
+ if(A&&hasAbn(A,'metal_resonance')&&B.hp>0){B.abnState.speedDownNext=(B.abnState.speedDownNext||0)+1;if(!B.nx)B.nx=BF0();B.nx.rolldn=(B.nx.rolldn||0)+1;L(`　「金属の響き」：${B.name}に速度-1・次ターンのダイス値-1`)}
+ // 棺：攻撃後にHPが半分以下になった敵は、40%で次ターン行動不能。
+ if(A&&pa!==pb&&hasAbn(A,'coffin')&&B.hp>0&&B.hp<=B.max*0.5&&rnd()<0.4){B.abnState.skipNextTurn=true;L(`　「棺」：${B.name}は次のターン行動不能（40%判定成功）`)}
+ // 依頼：敵に依頼対象が存在しない場合、最初に命中した敵を指定する。
+ if(A&&pa!==pb&&hasAbn(A,'request')&&B.hp>0){const enemies=S.p[1-pa].chars;const anyMarked=enemies.some(z=>z.alive&&Object.keys(requestMarks(z)).length>0);if(!anyMarked){if(!A.abnState.requestKey)A.abnState.requestKey=`request-${pa}-${S.p[pa].chars.indexOf(A)}`;const n=R(2,4);if(!B.abnState.requestMarks)B.abnState.requestMarks={};B.abnState.requestMarks[A.abnState.requestKey]=n;L(`　「依頼」：${B.name}に依頼対象（被ダメージ+${n}）`)}}
+ // 食い意地：このターンにすでに傷ついている相手への攻撃で回復。
+ if(gluttonyHeal&&A&&A.alive){const old=A.hp;A.hp=Math.min(A.max,A.hp+gluttonyHeal);if(A.hp>old)L(`　「食い意地」：${A.name}はHP${A.hp-old}回復`)}
+ abnormalityHit(A);
+ // 受けたダメージの総量を記録（働き蜂・忠誠心）。
+ if(A){
+  const ai=S.p[pa].chars.indexOf(A),srcKey=`${pa}-${ai}`;
+  if(!B.abnState.damageBy)B.abnState.damageBy={};B.abnState.damageBy[srcKey]=(B.abnState.damageBy[srcKey]||0)+dmg;
+  if(hasAbn(B,'working_bee')){
+   const bestKey=Object.keys(B.abnState.damageBy).sort((x,y)=>B.abnState.damageBy[y]-B.abnState.damageBy[x])[0];
+   if(bestKey&&bestKey!==B.abnState.beeTargetKey){
+    const oldTarget=B.abnState.beeTargetRef,markKey=`bee-${pb}-${S.p[pb].chars.indexOf(B)}`;
+    if(oldTarget&&oldTarget.abnState&&oldTarget.abnState.hiveMarks)delete oldTarget.abnState.hiveMarks[markKey];
+    const [tpi,tci]=bestKey.split('-').map(Number),newTarget=S.p[tpi]&&S.p[tpi].chars[tci];
+    if(newTarget){if(!newTarget.abnState)newTarget.abnState={};if(!newTarget.abnState.hiveMarks)newTarget.abnState.hiveMarks={};const mark=R(2,4);newTarget.abnState.hiveMarks[markKey]=mark;B.abnState.beeTargetKey=bestKey;B.abnState.beeTargetRef=newTarget;L(`　「働き蜂」：${newTarget.name}に蜂の標的（被ダメージ+${mark}）`)}
+   }
+  }
+ }
+ // 残り火：被弾した相手に火傷を与え、40%で次ターンの命中時火傷を予約する。
+ if(hasAbn(B,'embers')&&A&&A.alive){const burn=R(1,2);A.st.burn=(A.st.burn||0)+burn;L(`　「残り火」：${A.name}に火傷+${burn}`);if((B.abnState.emberBurnTurn||0)<S.turn&&rnd()<0.4){B.abnState.emberBurnTurn=S.turn+1;L(`　「残り火」：${B.name}は次のターン、命中時に火傷を付与する`)}}
+ // 残り火で得た能力は、指定された次のターンにこのキャラが命中した相手へ火傷を付与する。
+ if(hasAbn(A,'embers')&&A.abnState.emberBurnTurn===S.turn&&B.alive){const burn=R(1,2);B.st.burn=(B.st.burn||0)+burn;L(`　「残り火」：${B.name}に火傷+${burn}`)}
+ // 胞子：攻撃者に火傷と出血を与える。
+ if(hasAbn(B,'spores')&&A&&A.alive){const burn=R(1,3),bleed=R(1,3);A.st.burn=(A.st.burn||0)+burn;A.st.bleed=(A.st.bleed||0)+bleed;L(`　「胞子」：${A.name}に火傷+${burn}・出血+${bleed}`)}
+ // 妖精の世話：効果期間中に3回ダメージを受けると、最大HPの25%を失って終了。
+ if(hasAbn(B,'fairy_care')&&(B.abnState.fairyCareTurns||0)>0){B.abnState.fairyCareHits=(B.abnState.fairyCareHits||0)+1;if(B.abnState.fairyCareHits>=3){B.abnState.fairyCareTurns=0;const n=Math.max(1,Math.ceil(B.max*0.25));B.hp-=n;L(`　「妖精の世話」：${B.name}は効果終了、追加で${n}ダメージ`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
+ // 忠誠心：受けた攻撃ダメージ5ごとに、次ターンの味方全体ダイスボーナスを蓄積。
+ if(hasAbn(B,'loyalty')){B.abnState.loyaltyDamage=(B.abnState.loyaltyDamage||0)+dmg;const n=Math.floor(B.abnState.loyaltyDamage/5);if(n>0){B.abnState.loyaltyDamage%=5;B.abnState.loyaltyPending=(B.abnState.loyaltyPending||0)+n;L(`　「忠誠心」：次のターン味方全員のダイス値+${n}`)}}
+ // 棘の壁：攻撃者に固定ダメージと次ターンの速度低下を与える。
+ if(hasAbn(B,'thorn_wall')&&A&&A.alive){const reflect=R(2,8),slow=R(1,3),dealt=Math.min(A.hp,reflect);A.hp-=dealt;if(!A.abnState)A.abnState={};A.abnState.speedDownNext=Math.max(A.abnState.speedDownNext||0,slow);L(`　「棘の壁」：${A.name}に${dealt}ダメージ、速度-${slow}`);if(slow===3){const old=B.hp;B.hp=Math.min(B.max,B.hp+dealt);L(`　「棘の壁」：${B.name}はHP${B.hp-old}回復`)}if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}
  // 青ざめた手：同じ相手への3回目の命中ごとに追加ダメージ
  if(hasAbn(A,'pale_hand')){if(!A.abnState)A.abnState={};if(A.abnState.paleTarget!==B){A.abnState.paleTarget=B;A.abnState.paleHits=0}A.abnState.paleHits=(A.abnState.paleHits||0)+1;if(A.abnState.paleHits>=3){const extra=R(3,10);A.abnState.paleHits=0;B.hp-=extra;S.dm[dk]=(S.dm[dk]||0)+extra;L(`　「青ざめた手」：${B.name}に追加ダメージ${extra}`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
  // 罪悪感：受けた攻撃ダメージの1/3を攻撃者へ反射（反射自体は再反射しない）
  if(hasAbn(B,'guilt')&&A&&A.alive){const reflected=Math.floor(dmg/3);if(reflected>0){A.hp=Math.max(0,A.hp-reflected);L(`　「罪悪感」：${A.name}に${reflected}反射ダメージ`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}}
  if(B.hp<=0){B.hp=0;B.alive=false;moodEvent(pa,'positive',2);moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
-  if(A.alive){const k=(A.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);if(k){if(!A.abnState)A.abnState={};A.abnState.kills=(A.abnState.kills||0)+1;L(`　${A.name}の幻想体カード効果：撃破ボーナス+${A.abnState.kills*k}`)}hook('kill',A,B);}}   // 倒した直後（PKの kill フック）
+  // 依頼：自分が指定した依頼対象を倒したとき、最大HPの50%分を回復。
+  if(A&&hasAbn(A,'request')&&A.abnState&&B.abnState&&B.abnState.requestMarks&&B.abnState.requestMarks[A.abnState.requestKey]!=null){const old=A.hp;A.hp=Math.min(A.max,A.hp+Math.ceil(A.max*0.5));L(`　「依頼」：${A.name}はHP${A.hp-old}回復`);delete B.abnState.requestMarks[A.abnState.requestKey]}
+  // 音楽：このページの所有者側は敵撃破ごとに味方全員がHP15回復。
+  const musicOwners=globalAbnHolders('music').filter(x=>x.pi===pa);if(musicOwners.length&&pa!==pb){S.p[pa].chars.forEach(z=>{if(!z.alive)return;const old=z.hp;z.hp=Math.min(z.max,z.hp+15);if(z.hp>old)L(`　「音楽」：${z.name}はHP${z.hp-old}回復`)})}
+  if(A&&A.alive){const k=(A.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);if(k){if(!A.abnState)A.abnState={};A.abnState.kills=(A.abnState.kills||0)+1;L(`　${A.name}の幻想体カード効果：撃破ボーナス+${A.abnState.kills*k}`)}hook('kill',A,B);}}   // 倒した直後（PKの kill フック）
  else {abnormalityDamageTaken(B);if(B.st.rupt){
   const v=B.st.rupt;
   direct(pb,B,v,'rupt');
@@ -522,7 +653,7 @@ function oneSided(pa,A,pb,B,dice){
   if(d.t!=='a')continue;
   bleed(pa,A);
   if(!A.alive)return;
-  const v=abnormalityRoll(A,d);
+  const v=abnormalityRoll(A,d,false,B);
   L(`　${A.name}[攻${v}] → ${B.name}に${v}ダメージ`);hit(pa,pb,B,v,A,d);pf([ix(pa,A)],[ix(pb,B)],[ix(pa,A),ix(pb,B)]);
  }
 }
@@ -533,16 +664,25 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   bleed(pa,A);
   bleed(pb,B);
   if(!A.alive||!B.alive)break;
-  const vx=abnormalityRoll(A,x),vy=abnormalityRoll(B,y);
+  [ [A,B], [B,A] ].forEach(([holder,opponent])=>{if(hasAbn(holder,'nostalgic_embrace')){if(!holder.abnState)holder.abnState={};if(holder.abnState.nostalgicTarget===opponent)holder.abnState.nostalgicStreak=(holder.abnState.nostalgicStreak||0)+1;else{holder.abnState.nostalgicTarget=opponent;holder.abnState.nostalgicStreak=0}}});
+  const vx=abnormalityRoll(A,x,true,B),vy=abnormalityRoll(B,y,true,A);
   const head=`　${A.name}[${T[x.t]}${vx}] vs ${B.name}[${T[y.t]}${vy}] `;
   coin(pa,1);coin(pb,1);
   if(vx===vy){L(head+'→ 相打ち');pf([],[ix(pa,A),ix(pb,B)],[ix(pa,A),ix(pb,B)]);i++;j++;continue}
   const aw=vx>vy;
   const [wp,W,wd,wv,lp,Lc,ld,lv]=aw?[pa,A,x,vx,pb,B,y,vy]:[pb,B,y,vy,pa,A,x,vx];
   moodEvent(wp,'positive');moodEvent(lp,'negative');
-  if(W===A)winA++;else winB++;if(hasAbn(W,'frost_sword')&&Math.random()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
+  if(W===A)winA++;else winB++;
+  if(hasAbn(W,'pattern_recognition')){if(!W.abnState)W.abnState={};W.abnState.patternWins=(W.abnState.patternWins||0)+1;if(W.abnState.patternWins>=3){W.abnState.patternWins-=3;const wpPlayer=S.p[wp],oldCost=wpPlayer.cost;wpPlayer.cost=Math.min(wpPlayer.max,wpPlayer.cost+1);const speed=R(1,2);W.abnState.speedUpNext=(W.abnState.speedUpNext||0)+speed;L(`　「パターン反復認識機能」：${W.name}が3回マッチ勝利、コスト${wpPlayer.cost-oldCost>0?'+1':'は最大'}、次ターン速度+${speed}`)}}
+  if(hasAbn(W,'frost_sword')&&Math.random()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
   let dmg=0;
   if(wd.t==='a')dmg=ld.t==='d'?Math.max(0,wv-lv):wv;
+  // 懐かしいあの日の抱擁：同じ相手との連続マッチ勝利ごとに発動率+20%。
+  if(hasAbn(W,'nostalgic_embrace')){
+   if(!W.abnState)W.abnState={};
+   const chance=Math.min(1,0.2*((W.abnState.nostalgicStreak||0)+1));
+   if(wd.t==='a'&&rnd()<chance){dmg+=wv;L(`　「懐かしいあの日の抱擁」：追加ダメージ+${wv}（発動率${Math.round(chance*100)}%）`)}
+  }
   L(head+`→ ${W.name}の勝ち`+(wd.t==='a'?(dmg?`、${dmg}ダメージ`:'、完全に防がれた'):wd.t==='e'?'、回避ダイス再使用':'、防御成功'));
   if(dmg)hit(wp,lp,Lc,dmg,W,wd);
   pf([ix(wp,W)],[ix(lp,Lc)],[ix(wp,W),ix(lp,Lc)]);   // 勝者が攻撃・敗者が揺れる
@@ -571,20 +711,26 @@ function combat(){
   if(!c.alive||c.used)continue;
   if(c.abnState&&c.abnState.skipThisTurn){c.used=true;L(`　${c.name}は行動不能のため行動をスキップ`);continue;}
   S.dm={};
-  const qi=1-a.pi,Q=S.p[qi];
+  let qi=1-a.pi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
-  if(!t.alive){t=Q.chars.find(x=>x.alive);if(!t)continue}
   c.used=true;
   if(!c.alive)continue;
-  if(t.card&&!t.used&&t.tgt===a.ci){t.used=true;L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t)}
-  else{L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}`);fx(a.pi,c,c.card.on,'発動時',t);
+  if(hasAbn(c,'seventh_bullet')&&c.card.d.some(d=>d.t==='a')){
+   if(!c.abnState)c.abnState={};c.abnState.seventhBulletPages=(c.abnState.seventhBulletPages||0)+1;
+   if(c.abnState.seventhBulletPages===7){const all=S.p.flatMap((pp,pi)=>pp.chars.map((z,ci)=>({pi,ci,c:z}))).filter(x=>x.c.alive&&x.c!==c);if(all.length){const picked=all[Math.floor(rnd()*all.length)];qi=picked.pi;Q=S.p[qi];t=picked.c;L(`　「7つ目の弾丸」：7回目の攻撃ページの対象がランダムに決定 → ${t.name}${qi===a.pi?'（味方）':''}`)}}
+  }
+  if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t)continue}
+  if(qi!==a.pi&&t.card&&!t.used&&t.tgt===a.ci){t.used=true;L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t)}
+  else{L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}${qi===a.pi?'（味方）':''}`);fx(a.pi,c,c.card.on,'発動時',t);
    let ii=0;
-   if(t.stock&&t.stock.length){L(`　${t.name}は保存していた守備ダイスで対応`);const r=doMatch(a.pi,c,qi,t,c.card.d,t.stock);ii=r[0];t.stock=t.stock.slice(r[1])}
+   if(qi!==a.pi&&t.stock&&t.stock.length){L(`　${t.name}は保存していた守備ダイスで対応`);const r=doMatch(a.pi,c,qi,t,c.card.d,t.stock);ii=r[0];t.stock=t.stock.slice(r[1])}
    else oneSided(a.pi,c,qi,t,c.card.d);
    const dd=c.card.d.slice(ii).filter(x=>x.t!=='a');
    if(c.alive&&dd.length){c.stock=(c.stock||[]).concat(dd);L(`　${c.name}の守備ダイス${dd.length}個を保存（一方攻撃を受けたとき使用）`)}}
  }
  L('── ターン終了時 ──');
+ // 妖精の世話：未解除なら3ターン、ターン終了時に最大HPの15%を回復する。
+ S.p.forEach(p=>p.chars.forEach(c=>{if(!c.alive||!hasAbn(c,'fairy_care')||!(c.abnState.fairyCareTurns>0))return;const heal=Math.max(1,Math.ceil(c.max*0.15)),old=c.hp;c.hp=Math.min(c.max,c.hp+heal);if(c.hp>old)L(`　「妖精の世話」：${c.name}はHP${c.hp-old}回復`);c.abnState.fairyCareTurns--;if(c.abnState.fairyCareTurns<=0)L(`　「妖精の世話」：${c.name}の回復効果が終了`)}));
  // 鼓動：そのチームがこのターン一度もダメージを与えられなければ、全員が最大体力の25%を失う
  S.p.forEach((p,pi)=>{if(!S.turnDamageTeam[pi]&&p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){p.chars.forEach(c=>{if(!c.alive)return;const n=Math.max(1,Math.ceil(c.max*0.25));c.hp-=n;L(`　「鼓動」：${c.name}は${n}ダメージ`);if(c.hp<=0){c.hp=0;c.alive=false;L(`　${c.name}は倒れた`)}})}});
  // 押し寄せる鼓動：付与から3ターン経過後に死亡
