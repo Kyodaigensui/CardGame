@@ -4,10 +4,19 @@ const key=x=>x.n||x.name,byKey={};
 // ===== 幻想体カード（試作データ。後から効果・名前・階層を差し替えられます） =====
 const ABN_HIERARCHIES=['総記の階','歴史の階','技術科学の階','文学の階'];
 const ABN_CARDS=[
- {id:'blank_page',n:'白紙の頁',hierarchy:'総記の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
- {id:'long_story',n:'長い物語',hierarchy:'総記の階',mood:'positive',desc:'ターン開始時、HPを1回復。',fx:{turnHeal:1}},
- {id:'broken_fable',n:'壊れた寓話',hierarchy:'総記の階',mood:'negative',desc:'攻撃ダメージを受けると、次の攻撃ダイス値+2。',fx:{hurtCharge:2}},
- {id:'quiet_margin',n:'静かな余白',hierarchy:'総記の階',mood:'mixed',desc:'このキャラが与える攻撃ダメージごとに、1回復（ターンごと1回）。',fx:{hitHeal:1}},
+ // 総記の階：ユーザー指定のカード
+ {id:'blood',n:'血',hierarchy:'総記の階',mood:'negativeMany',levels:[1,2],desc:'守備ダイス（防御・回避）の威力+1〜3、被ダメージ+1。',fx:{guardDie:[1,3],takenPlus:1}},
+ {id:'scar',n:'傷跡',hierarchy:'総記の階',mood:'positiveMany',levels:[1,2],desc:'被ダメージ-2〜3。',fx:{reduceRange:[2,3]}},
+ {id:'pale_hand',n:'青ざめた手',hierarchy:'総記の階',mood:'mixed',levels:[1,2],desc:'同じ相手に攻撃が3回当たるたび、追加ダメージ3〜10。対象を変えるとカウントリセット。',fx:{paleHand:true}},
+ {id:'yearning',n:'熱望',hierarchy:'総記の階',mood:'mixed',levels:[1,2],desc:'体力最大値と現在体力が15%上昇し、速度+1〜2。',fx:{yearning:true}},
+ {id:'heartbeat',n:'鼓動',hierarchy:'総記の階',mood:'negativeMany',levels:[1,2],desc:'味方全員がターン開始時、次のターンのダイス値+1〜2。そのターンに相手へダメージを与えられなければ、味方全員が最大体力の25%のダメージを受ける。',fx:{heartbeat:true}},
+ {id:'surging_heartbeat',n:'押し寄せる鼓動',hierarchy:'総記の階',mood:'negativeSuper',levels:[3,4],desc:'付与されたキャラは3ターン後に死亡する。それまで毎ターン開始時、ダイス値+4・速度+4・被ダメージ-4。',fx:{surgingHeartbeat:true}},
+ {id:'frost_sword',n:'霜の剣',hierarchy:'総記の階',mood:'positiveMany',levels:[3,4],desc:'マッチ勝利時、50%で相手の速度-1。速度低下中の相手への攻撃は追加ダメージ1〜2。',fx:{frostSword:true}},
+ {id:'kiss',n:'口づけ',hierarchy:'総記の階',mood:'positive',levels:[5,5],desc:'1枚のカードで2回以上マッチに勝利すると、相手に「氷の欠片」を1付与。氷の欠片3以上のキャラは次ターン行動不能になり、欠片をすべて失う。',fx:{kiss:true}},
+ {id:'blizzard',n:'吹雪',hierarchy:'総記の階',mood:'negative',levels:[5,5],desc:'このターン、選択したキャラ以外の全員が行動不能。次のターン、相手全員の速度-6。',fx:{blizzard:true}},
+ {id:'gaze',n:'眼差し',hierarchy:'総記の階',mood:'mixed',levels:[5,5],desc:'このキャラの与ダメージ・被ダメージが2倍になる。',fx:{gaze:true}},
+ {id:'guilt',n:'罪悪感',hierarchy:'総記の階',mood:'negativeMany',levels:[3,4],desc:'被ダメージ-1〜2。受けたダメージの1/3を攻撃者に反射する。',fx:{guilt:true}},
+ // 他の階層の仮カード（既存機能を維持）
  {id:'first_step',n:'最初の一歩',hierarchy:'歴史の階',mood:'positive',desc:'このキャラの攻撃ダイス値+1。',fx:{atk:1}},
  {id:'old_guard',n:'古い守り',hierarchy:'歴史の階',mood:'negative',desc:'このキャラが受ける攻撃ダメージを1軽減。',fx:{reduce:1}},
  {id:'victory_record',n:'勝利の記録',hierarchy:'歴史の階',mood:'positive',desc:'敵を倒すたび、このキャラの攻撃ダイス値が戦闘中ずっと+1。',fx:{killAtk:1}},
@@ -134,7 +143,17 @@ function confirmSetup(){
 }
 function startTurn(){
  S.turn++;S.msg='';S.sel=null;S.pend=null;S.ask=null;
- S.p.forEach(p=>p.chars.forEach(c=>c.sp=c.alive?R(c.spd[0],c.spd[1])+pv(c,'spd'):0));
+ S.turnDamageTeam=[false,false];
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>{
+  if(!c.abnState)c.abnState={};
+  if(c.abnState.skipThisTurn==null)c.abnState.skipThisTurn=false;
+  if(c.abnState.iceShard>=3){c.abnState.skipThisTurn=true;L(`　${c.name}は氷の欠片が3以上あるため行動不能（欠片を除去）`);c.abnState.iceShard=0}
+  c.abnState.surgingActive=(c.abnState.surgingCountdown||0)>0;
+  c.abnState.teamDiceBonus=0;
+  c.abnState.speedDownNow=c.abnState.speedDownNext||0;c.abnState.speedDownNext=0;
+  c.sp=c.alive?R(c.spd[0],c.spd[1])+pv(c,'spd')+(c.abnState.yearningSpeed||0)+(c.abnState.surgingActive?4:0)-(c.abnState.speedDownNow||0):0;
+ }));
+ S.p.forEach(p=>{if(p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){const bonus=R(1,2);p.chars.forEach(c=>{if(!c.abnState)c.abnState={};c.abnState.teamDiceBonus=bonus});}});
  // パッシブの speed フック（例：最強）：素の速度が出そろってから一斉に判定する（持ち主同士で連鎖しない）
  const chaseLog=[],allMax=Math.max(...S.p.flatMap(p=>p.chars.filter(c=>c.alive).map(c=>c.sp))),spNew=new Map();
  S.p.forEach(p=>{
@@ -156,6 +175,8 @@ function startTurn(){
   hook('turn',c,pi);   // 再生・蔵書の加護など（PKの turn フック）
   const heal=(c.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.turnHeal)||0),0);
   if(heal&&c.hp<c.max){const old=c.hp;c.hp=Math.min(c.max,c.hp+heal);if(c.hp>old)L(`　${c.name}の幻想体カード効果：HPを${c.hp-old}回復`)}
+  if(c.abnState.speedDownNow)L(`　${c.name}は速度-${c.abnState.speedDownNow}（このターン）`);
+  if(c.abnState.surgingActive)L(`　${c.name}の「押し寄せる鼓動」：ダイス+4、速度+4、被ダメージ-4`);
  }));
  render();
  if(NET.on)netAfterTurnStart();
@@ -172,7 +193,11 @@ function assignAbnormality(ci){
  const p=S.p[act()],c=p.chars[ci],card=p.abnOffers[p.abnSelected];
  if(!p.pendingAbn||p.abnSelected==null||!c||!c.alive||!card)return false;
  if(!Array.isArray(c.abn))c.abn=[];if(!c.abnState)c.abnState={};if(!c.abnFlags)c.abnFlags={};
- c.abn.push(card);p.pendingAbn=false;p.abnOffers=[];p.abnSelected=null;
+ c.abn.push(card);
+ if(card.fx&&card.fx.yearning){const oldMax=c.max,oldHp=c.hp;c.max=Math.ceil(c.max*1.15);c.hp=Math.min(c.max,Math.ceil(oldHp*1.15));if(!c.abnState)c.abnState={};c.abnState.yearningSpeed=R(1,2);L(`　${c.name}の「熱望」：最大体力${oldMax}→${c.max}、速度+${c.abnState.yearningSpeed}`)}
+ if(card.fx&&card.fx.surgingHeartbeat){if(!c.abnState)c.abnState={};c.abnState.surgingCountdown=3;c.abnState.surgingAppliedTurn=S.turn}
+ if(card.fx&&card.fx.blizzard){S.p.forEach((pp,pi)=>pp.chars.forEach((z,zi)=>{if(z!==c){if(!z.abnState)z.abnState={};z.abnState.skipThisTurn=true;if(pi!==act()){z.abnState.speedDownNext=6}}}));L(`　「吹雪」：${c.name}以外の全員がこのターン行動不能、相手全員は次のターン速度-6`)}
+ p.pendingAbn=false;p.abnOffers=[];p.abnSelected=null;
  S.msg=`「${card.n}」を${c.name}に付与しました`;logOp(['ABN',ci,card.id]);render();return true;
 }
 function toggleCharacterView(pi,ci,e){if(e)e.stopPropagation();const c=S&&S.p[pi]&&S.p[pi].chars[ci];if(!c)return;c.showAbn=!c.showAbn;render()}
@@ -266,12 +291,19 @@ function moodEvent(pi, mood, n=1) {
 }
 const positiveMoodRatio=p=>((p.emoPos||0)+1)/((p.emoPos||0)+(p.emoNeg||0)+2);
 function makeAbnormalityOffers(p){
- let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy);
- if(pool.length<3)pool=ABN_CARDS.slice();
+ let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&(!c.levels||(p.lv>=c.levels[0]&&p.lv<=c.levels[1])));
+ if(pool.length<3)pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy);
  const ratio=positiveMoodRatio(p),offers=[];
+ const weight=c=>{
+  if(c.mood==='positive')return 0.2+1.8*ratio;
+  if(c.mood==='negative')return 0.2+1.8*(1-ratio);
+  if(c.mood==='positiveMany')return 0.05+2.8*ratio;
+  if(c.mood==='negativeMany')return 0.05+2.8*(1-ratio);
+  if(c.mood==='negativeSuper')return 0.03+5*Math.max(0,(0.4-ratio)/0.4);
+  return 0.8;
+ };
  while(pool.length&&offers.length<3){
-  const weights=pool.map(c=>c.mood==='positive'?0.2+1.8*ratio:c.mood==='negative'?0.2+1.8*(1-ratio):0.8);
-  const total=weights.reduce((a,b)=>a+b,0);let r=rnd()*total,at=weights.length-1;
+  const weights=pool.map(weight),total=weights.reduce((a,b)=>a+b,0);let r=rnd()*total,at=weights.length-1;
   for(let i=0;i<weights.length;i++){r-=weights[i];if(r<0){at=i;break}}
   offers.push(pool.splice(at,1)[0]);
  }
@@ -396,7 +428,12 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
 }
 function abnormalityRoll(c,d){
  const raw=roll(c,d);let bonus=0;
- for(const card of (c.abn||[])){const f=card.fx||{};bonus+=(f.all||0)+(d.t==='a'?(f.atk||0):0)}
+ for(const card of (c.abn||[])){
+  const f=card.fx||{};bonus+=(f.all||0)+(d.t==='a'?(f.atk||0):0);
+  if(f.guardDie&&(d.t==='d'||d.t==='e'))bonus+=R(f.guardDie[0],f.guardDie[1]);
+  if(f.surgingHeartbeat&&c.abnState&&c.abnState.surgingActive)bonus+=4;
+ }
+ if(c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
  if(d.t==='a'&&c.abnState){
   bonus+=(c.abnState.nextAtk||0);c.abnState.nextAtk=0;
   const killRate=(c.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);
@@ -413,6 +450,7 @@ function abnormalityHit(A){
  if(!A.abnFlags)A.abnFlags={};A.abnFlags.hitHealTurn=S.turn;
  if(A.hp>before)L(`　${A.name}の幻想体カード効果：HPを${A.hp-before}回復`);
 }
+function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
 function abnormalityDamageTaken(B){
  if(!B||!B.alive)return;
  const n=(B.abn||[]).reduce((a,x)=>a+((x.fx&&x.fx.hurtCharge)||0),0);
@@ -436,6 +474,8 @@ function bleed(pi,ch){
 function hit(pa,pb,B,dmg,A,die){
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
+ if(dmg>0&&hasAbn(A,'frost_sword')&&(B.abnState&&(B.abnState.speedDownNow||B.abnState.frostSpeedDown))){const extra=R(1,2);dmg+=extra;L(`　霜の剣：速度低下中の${B.name}に追加ダメージ+${extra}`)}
+ if(dmg>0&&hasAbn(A,'gaze')){dmg*=2;L(`　${A.name}の「眼差し」：与ダメージ2倍`)}
  if(dmg>0&&A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
   dmg=Math.floor(dmg/2);
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
@@ -443,9 +483,22 @@ function hit(pa,pb,B,dmg,A,die){
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
  const ar=(B.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.reduce)||0),0);
  if(ar&&dmg>0){const cut=Math.min(ar,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`)}
+ if(dmg>0&&hasAbn(B,'blood')){dmg+=1;L(`　「血」：被ダメージ+1`)}
+ let rangeCut=0;
+ if(dmg>0&&(hasAbn(B,'scar')||hasAbn(B,'guilt'))){
+  if(hasAbn(B,'scar'))rangeCut+=R(2,3);
+  if(hasAbn(B,'guilt'))rangeCut+=R(1,2);
+  const cut=Math.min(rangeCut,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`);
+ }
+ if(dmg>0&&B.abnState&&B.abnState.surgingActive){const cut=Math.min(4,dmg);dmg-=cut;L(`　「押し寄せる鼓動」：被ダメージ-${cut}`)}
+ if(dmg>0&&hasAbn(B,'gaze')){dmg*=2;L(`　${B.name}の「眼差し」：被ダメージ2倍`)}
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
- B.hp-=dmg;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');abnormalityHit(A);
+ B.hp-=dmg;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');abnormalityHit(A);
+ // 青ざめた手：同じ相手への3回目の命中ごとに追加ダメージ
+ if(hasAbn(A,'pale_hand')){if(!A.abnState)A.abnState={};if(A.abnState.paleTarget!==B){A.abnState.paleTarget=B;A.abnState.paleHits=0}A.abnState.paleHits=(A.abnState.paleHits||0)+1;if(A.abnState.paleHits>=3){const extra=R(3,10);A.abnState.paleHits=0;B.hp-=extra;S.dm[dk]=(S.dm[dk]||0)+extra;L(`　「青ざめた手」：${B.name}に追加ダメージ${extra}`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
+ // 罪悪感：受けた攻撃ダメージの1/3を攻撃者へ反射（反射自体は再反射しない）
+ if(hasAbn(B,'guilt')&&A&&A.alive){const reflected=Math.floor(dmg/3);if(reflected>0){A.hp=Math.max(0,A.hp-reflected);L(`　「罪悪感」：${A.name}に${reflected}反射ダメージ`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}}
  if(B.hp<=0){B.hp=0;B.alive=false;moodEvent(pa,'positive',2);moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
   if(A.alive){const k=(A.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);if(k){if(!A.abnState)A.abnState={};A.abnState.kills=(A.abnState.kills||0)+1;L(`　${A.name}の幻想体カード効果：撃破ボーナス+${A.abnState.kills*k}`)}hook('kill',A,B);}}   // 倒した直後（PKの kill フック）
  else {abnormalityDamageTaken(B);if(B.st.rupt){
@@ -471,7 +524,7 @@ function oneSided(pa,A,pb,B,dice){
  }
 }
 function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
- let i=0,j=0;
+ let i=0,j=0,winA=0,winB=0;
  while(i<da.length&&j<db.length&&A.alive&&B.alive){
   const x=da[i],y=db[j];
   bleed(pa,A);
@@ -484,6 +537,7 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   const aw=vx>vy;
   const [wp,W,wd,wv,lp,Lc,ld,lv]=aw?[pa,A,x,vx,pb,B,y,vy]:[pb,B,y,vy,pa,A,x,vx];
   moodEvent(wp,'positive');moodEvent(lp,'negative');
+  if(W===A)winA++;else winB++;if(hasAbn(W,'frost_sword')&&Math.random()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
   let dmg=0;
   if(wd.t==='a')dmg=ld.t==='d'?Math.max(0,wv-lv):wv;
   L(head+`→ ${W.name}の勝ち`+(wd.t==='a'?(dmg?`、${dmg}ダメージ`:'、完全に防がれた'):wd.t==='e'?'、回避ダイス再使用':'、防御成功'));
@@ -495,6 +549,8 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   if(i<da.length)oneSided(pa,A,pb,B,da.slice(i));
   if(j<db.length)oneSided(pb,B,pa,A,db.slice(j));
  }
+ if(winA>=2&&hasAbn(A,'kiss')&&A.card){if(!B.abnState)B.abnState={};B.abnState.iceShard=(B.abnState.iceShard||0)+1;L(`　「口づけ」：${B.name}に氷の欠片+1（現在${B.abnState.iceShard}）`)}
+ if(winB>=2&&hasAbn(B,'kiss')&&B.card){if(!A.abnState)A.abnState={};A.abnState.iceShard=(A.abnState.iceShard||0)+1;L(`　「口づけ」：${A.name}に氷の欠片+1（現在${A.abnState.iceShard}）`)}
  return [i,j];
 }
 function combat(){
@@ -510,6 +566,7 @@ function combat(){
  for(const a of acts){
   const c=S.p[a.pi].chars[a.ci];
   if(!c.alive||c.used)continue;
+  if(c.abnState&&c.abnState.skipThisTurn){c.used=true;L(`　${c.name}は行動不能のため行動をスキップ`);continue;}
   S.dm={};
   const qi=1-a.pi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
@@ -525,6 +582,10 @@ function combat(){
    if(c.alive&&dd.length){c.stock=(c.stock||[]).concat(dd);L(`　${c.name}の守備ダイス${dd.length}個を保存（一方攻撃を受けたとき使用）`)}}
  }
  L('── ターン終了時 ──');
+ // 鼓動：そのチームがこのターン一度もダメージを与えられなければ、全員が最大体力の25%を失う
+ S.p.forEach((p,pi)=>{if(!S.turnDamageTeam[pi]&&p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){p.chars.forEach(c=>{if(!c.alive)return;const n=Math.max(1,Math.ceil(c.max*0.25));c.hp-=n;L(`　「鼓動」：${c.name}は${n}ダメージ`);if(c.hp<=0){c.hp=0;c.alive=false;L(`　${c.name}は倒れた`)}})}});
+ // 押し寄せる鼓動：付与から3ターン経過後に死亡
+ S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive&&c.abnState&&c.abnState.surgingCountdown>0&&S.turn>(c.abnState.surgingAppliedTurn||0)){c.abnState.surgingCountdown--;if(c.abnState.surgingCountdown<=0){c.hp=0;c.alive=false;c.abnState.surgingActive=false;L(`　「押し寄せる鼓動」：${c.name}は3ターン経過し死亡`)}}}));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{if(c.alive&&c.st.burn){direct(pi,c,c.st.burn,'burn');pf([],[ix(pi,c)],null)}}));
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
  S.p.forEach(p => resolveEmotion(p));
@@ -553,6 +614,7 @@ function nextTurn(){
    if(c.card){if(c.card.once&&c.used)p.gone=(p.gone||0)+1;else p.disc.push(c.card)}   // 使い捨てカードは使うと消滅
    c.card=null;c.tgt=null;c.used=false;c.hitFired=[];c.stock=null;c.redirBy=null;c.tgt0=null;
    c.bf=c.nx;c.nx=BF0();   // 「次のターン」のバフが有効になる
+   if(c.abnState){c.abnState.surgingActive=false;c.abnState.speedDownNow=0;c.abnState.frostSpeedDown=0;c.abnState.teamDiceBonus=0;c.abnState.skipThisTurn=false;}
   });
   p.deck=sh([...p.deck,...p.disc]);p.disc=[];   // 使った技カードを山札に混ぜる
   p.cost=Math.min(p.max,p.cost+n+1);draw(p,n+1);
@@ -632,7 +694,7 @@ const legendHTML=()=>`<details class="lg"><summary>状態異常・バフの説�
 function abnormalityOfferHTML(p,enabled){
  if(!p.pendingAbn||!enabled)return '';
  const ratio=Math.round(positiveMoodRatio(p)*100),selected=p.abnSelected;
- const cards=p.abnOffers.map((c,i)=>`<div class="card${selected===i?' sel':''}" style="min-width:150px;max-width:240px;flex:1;border:1px solid ${selected===i?'#e7c65a':'var(--line)'};padding:10px"><b>${c.n}</b><div><small>${c.hierarchy}／${c.mood==='positive'?'正の感情':c.mood==='negative'?'負の感情':'混合'}</small></div><p>${c.desc}</p><button class="sub" onclick="pickAbnormality(${i})">${selected===i?'選択中':'このカードを選ぶ'}</button></div>`).join('');
+ const cards=p.abnOffers.map((c,i)=>`<div class="card${selected===i?' sel':''}" style="min-width:150px;max-width:240px;flex:1;border:1px solid ${selected===i?'#e7c65a':'var(--line)'};padding:10px"><b>${c.n}</b><div><small>${c.hierarchy}／${c.mood==='positiveMany'?'正の感情多め':c.mood==='positive'?'正の感情':c.mood==='negativeSuper'?'負の感情超多め':c.mood==='negativeMany'?'負の感情多め':c.mood==='negative'?'負の感情':'混合'}</small></div><p>${c.desc}</p><button class="sub" onclick="pickAbnormality(${i})">${selected===i?'選択中':'このカードを選ぶ'}</button></div>`).join('');
  return `<section style="margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:rgba(30,35,50,.75)"><h2 style="margin:0 0 6px">幻想体カードを1枚選択</h2><div class="msg">階層：${p.hierarchy}　感情比率：＋${p.emoPos||0} / −${p.emoNeg||0}（正の感情傾向 ${ratio}%）</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${cards}</div><p class="msg">${selected==null?'候補から1枚選び、その後に付与したい味方キャラをクリックしてください。':'選んだカードを付与する味方キャラをクリックしてください。'}</p></section>`;
 }
 function renderMatch(){
