@@ -291,8 +291,11 @@ function moodEvent(pi, mood, n=1) {
 }
 const positiveMoodRatio=p=>((p.emoPos||0)+1)/((p.emoPos||0)+(p.emoNeg||0)+2);
 function makeAbnormalityOffers(p){
- let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&(!c.levels||(p.lv>=c.levels[0]&&p.lv<=c.levels[1])));
- if(pool.length<3)pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy);
+ // 一度取得して味方に付与した幻想体カードは、同じプレイヤーの以後の候補から除外する。
+ const acquired=new Set((p.chars||[]).flatMap(c=>(c.abn||[]).map(a=>a.id).filter(Boolean)));
+ let pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&!acquired.has(c.id)&&(!c.levels||(p.lv>=c.levels[0]&&p.lv<=c.levels[1])));
+ // レベル条件内の未取得カードが少ない場合も、未取得カードだけを候補にする。
+ if(pool.length<3)pool=ABN_CARDS.filter(c=>c.hierarchy===p.hierarchy&&!acquired.has(c.id));
  const ratio=positiveMoodRatio(p),offers=[];
  const weight=c=>{
   if(c.mood==='positive')return 0.2+1.8*ratio;
