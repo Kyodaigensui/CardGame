@@ -1,6 +1,28 @@
 const key=x=>x.n||x.name,byKey={};
 [...SKILLS,...CHARS].forEach(c=>byKey[key(c)]=c);
 
+// フィリップ「蜜蝋の翼」用の複数行動スロット。通常キャラは従来どおり1スロット。
+const ACTION_FIELDS=['card','tgt','used','hitFired','stock','redirBy','tgt0'];
+const actionStates=c=>c?(c._actionStates||[c]):[];
+const setActionSlot=(c,i)=>{if(c&&c._actionStates)c._actionSlot=Math.max(0,Math.min(c._actionStates.length-1,Number(i)||0))};
+const setupActionSlots=(c,count=3)=>{
+ if(!c||c._actionStates)return;
+ const states=[{
+  card:c.card||null,tgt:c.tgt==null?null:c.tgt,used:!!c.used,
+  hitFired:Array.isArray(c.hitFired)?c.hitFired:[],stock:c.stock||null,
+  redirBy:c.redirBy==null?null:c.redirBy,tgt0:c.tgt0==null?null:c.tgt0
+ }];
+ for(let i=1;i<count;i++)states.push({card:null,tgt:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null});
+ Object.defineProperty(c,'_actionStates',{value:states,writable:true,configurable:true,enumerable:true});
+ Object.defineProperty(c,'_actionSlot',{value:0,writable:true,configurable:true,enumerable:true});
+ for(const field of ACTION_FIELDS){
+  delete c[field];
+  Object.defineProperty(c,field,{configurable:true,enumerable:true,get(){return this._actionStates[this._actionSlot||0][field]},set(v){this._actionStates[this._actionSlot||0][field]=v}});
+ }
+ c.actionRights=count;
+};
+const hasPasKind=(c,k)=>!!(c&&Array.isArray(c.ps)&&c.ps.some(x=>x&&x.k===k));
+
 // ===== 幻想体カード（試作データ。後から効果・名前・階層を差し替えられます） =====
 const ABN_HIERARCHIES=['総記の階','歴史の階','技術科学の階','文学の階'];
 const ABN_CARDS=[
@@ -120,7 +142,7 @@ const newP=(name,deck,hierarchy=ABN_HIERARCHIES[0])=>{
  return p;
 };
 const draw=(p,n)=>{for(let i=0;i<n;i++){if(!p.deck.length){p.deck=sh(p.disc);p.disc=[]}if(p.deck.length)p.hand.push(p.deck.pop())}};
-const used=p=>p.chars.reduce((a,c)=>a+(c.card?c.card.c:0),0);
+const used=p=>p.chars.reduce((a,c)=>a+actionStates(c).reduce((n,st)=>n+(st.card?st.card.c:0),0),0);
 const act=()=>S.order[S.stage];
 const alive=p=>p.chars.filter(c=>c.alive).length;
 
@@ -160,8 +182,9 @@ function confirmSetup(){
  if(S.sp===0){S.sp=1;setCover(1);render()}else startTurn();
 }
 function startTurn(){
- S.turn++;S.msg='';S.sel=null;S.pend=null;S.ask=null;
+ S.turn++;S.msg='';S.sel=null;S.pend=null;S.pendActionSlot=0;S.ask=null;
  S.log=[];S.dm={};S.ev=[];S.turnDamageTeam=[false,false];
+ S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
  // 「悪意」：速度順の計算より先に、残りHPが少ないほど強い全体攻撃を行う。
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{
   if(!c.alive||!hasAbn(c,'malice'))return;
@@ -272,32 +295,40 @@ function assign(ci,hi){
  if(!c||!c.alive||!card)return;
  if(isCh(card))return attribute(p,c,hi);
  if(card.req&&!c.at.includes(card.req)){S.msg=`「${card.n}」は${ATTR[card.req].n}属性のキャラだけが使えます`;render();return}
- if(used(p)-(c.card?c.card.c:0)+card.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+(c.card?c.card.c:0)}）`;render();return}
- p.hand.splice(hi,1);if(c.card)p.hand.push(c.card);
- c.card=card;c.tgt=null;S.pend=ci;S.sel=null;S.msg='攻撃対象の相手キャラをクリックしてください';render();
+ const states=actionStates(c);let slot=states.findIndex(st=>!st.card);if(slot<0)slot=0;
+ const st=states[slot],old=st.card;
+ if(used(p)-(old?old.c:0)+card.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+(old?old.c:0)}）`;render();return}
+ p.hand.splice(hi,1);if(old)p.hand.push(old);
+ st.card=card;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+ S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render();
 }
 function mine(ci){
  if(!canAct())return;
  const p=S.p[act()],c=p.chars[ci];
  if(p.pendingAbn){if(p.abnSelected==null){S.msg='先に幻想体カードを1枚選んでください';render();return}assignAbnormality(ci);return}
- if(S.sel!=null)assign(ci,S.sel);else if(c.card){S.pend=ci;S.msg='攻撃対象の相手キャラをクリックしてください';render()}
+ if(S.sel!=null){assign(ci,S.sel);return}
+ const states=actionStates(c);let slot=states.findIndex(st=>st.card&&st.tgt==null);
+ if(slot<0){if(NET.on&&c.actionRights>1)return;slot=states.findIndex(st=>st.card)}
+ if(slot>=0){S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 }
-function undoRedir(yi){S.p[1-act()].chars.forEach(z=>{if(z.redirBy===yi){z.tgt=z.tgt0;z.redirBy=null;z.tgt0=null}})}
-function unassign(ci,e){e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const c=S.p[act()].chars[ci];if(c.card)S.p[act()].hand.push(c.card);c.card=null;c.tgt=null;if(S.pend===ci)S.pend=null;S.msg='';render()}
+function undoRedir(yi){S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(st.redirBy===yi){st.tgt=st.tgt0;st.redirBy=null;st.tgt0=null}}))}
+function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)p.hand.push(st.card);st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
+function chooseTarget(ci,slot,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()||NET.on)return;const c=S.p[act()].chars[ci],st=actionStates(c)[slot];if(!c||!st||!st.card)return;S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 function pickTgt(ci){
- if(!canAct()||S.p[act()].pendingAbn)return;logOp(['P',S.pend,ci]);
+ if(!canAct()||S.p[act()].pendingAbn)return;
  if(S.pend==null||!S.p[1-act()].chars[ci].alive)return;
- const yi=S.pend,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci];
- undoRedir(yi);
- // 相手の行動が決まっていて、自分の速度が相手より2以上高いなら、相手のマッチ対象を自分に変更できる
- if(z.card&&z.tgt!=null&&z.tgt!==yi&&z.redirBy==null&&!noSpd(z.card)&&!noSpd(y.card)&&y.sp-z.sp>=C.REDIR){S.ask={yi,zi:ci};S.pend=null;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
- y.tgt=ci;S.pend=null;S.msg='';render();
+ const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
+ logOp(['P',yi,ci]);undoRedir(yi);
+ // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
+ const zs=actionStates(z),zslot=zs.findIndex(st=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&y.sp-z.sp>=C.REDIR);
+ if(zslot>=0){S.ask={yi,zi:ci,ySlot:slot,zSlot:zslot};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
+ yst.tgt=ci;S.pend=null;S.pendActionSlot=0;S.msg='';render();
 }
 function redir(yes){
  if(!canAct()||!S.ask)return;logOp(['R',yes]);
- const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi];
- y.tgt=a.zi;
- if(yes){z.tgt0=z.tgt;z.tgt=a.yi;z.redirBy=a.yi}
+ const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],ys=actionStates(y)[a.ySlot||0],zs=actionStates(z)[a.zSlot||0];
+ ys.tgt=a.zi;
+ if(yes){zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=a.yi}
  S.ask=null;render();
 }
 const askHTML=()=>{if(!S.ask)return '';const y=S.p[act()].chars[S.ask.yi],z=S.p[1-act()].chars[S.ask.zi];return `<div class="ask"><b>${y.name}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いので、${z.name}のマッチ対象を${y.name}に変更できます。<br><button class="go" onclick="redir(true)">対象を自分に変更する</button> <button class="sub" onclick="redir(false)">変更しない</button></div>`};
@@ -306,8 +337,8 @@ function done(){
  if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
  if(S.ask){S.msg='マッチ対象を変更するか選んでください';render();return}
  const p=S.p[act()];
- if(p.chars.some(c=>c.alive&&c.card&&c.tgt==null)){S.msg='攻撃対象が未設定のキャラがいます';render();return}
- S.pend=null;S.sel=null;S.msg='';
+ if(p.chars.some(c=>c.alive&&actionStates(c).some(st=>st.card&&st.tgt==null))){S.msg='攻撃対象が未設定の行動があります';render();return}
+ S.pend=null;S.pendActionSlot=0;S.sel=null;S.msg='';
  if(NET.on&&!REPLAY){netSend({t:'decide',turn:S.turn,stage:S.stage,pi:act(),ops:S.ops});S.ops=[]}   // 決定内容（操作の記録）を相手へ送る
  if(S.stage===0){S.stage=1;setCover(act());render()}else{combat()}
 }
@@ -473,7 +504,7 @@ const ix=(pi,c)=>[pi,S.p[pi].chars.indexOf(c)];
 // ダイス1つごとにアニメーションの1コマを記録（lu=前に出る / sh=揺れる / ar=矢印）
 function pf(lu,sh,ar){S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]}
 const stSnap=()=>S.p.map(p=>p.chars.map(c=>({st:{...c.st},bf:{...c.bf},nx:{...c.nx}})));
-const holdSnap=()=>S.p.map(p=>p.chars.map(c=>c.alive?[...(c.card&&!c.used?c.card.d:[]),...(c.stock||[]).map(x=>({...x,s:1}))]:[]));
+const holdSnap=()=>S.p.map(p=>p.chars.map(c=>c.alive?[...actionStates(c).flatMap(st=>st.card&&!st.used?st.card.d:[]),...actionStates(c).flatMap(st=>(st.stock||[]).map(x=>({...x,s:1})))]:[]));
 function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（ダメージ軽減・バフの影響は受けないが、状態異常耐性パッシブ(ailres)では減る）
  if(dmg<=0||!B.alive)return;
  const res=hookSum('ailres',B,kind);   // 状態異常耐性パッシブ：1回ごとに res 減らす
@@ -483,12 +514,14 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
  if(hasStatusAbn(B)&&globalAbnHolders('mourning').length){const n=R(2,7);dmg+=n;L(`　「哀悼」：状態異常中の${B.name}は被ダメージ+${n}`)}
  const music=globalAbnHolders('music'),musicTaken=music.reduce((a,x)=>a+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(musicTaken){dmg+=musicTaken;L(`　「音楽」：被ダメージ+${musicTaken}`)}
  if(globalAbnHolders('blackening').length){dmg=Math.ceil(dmg*1.5);L(`　「黒化」：被ダメージ1.5倍`)}
+ if(dmg>0&&hasPasKind(B,'waxenwings')){dmg=Math.ceil(dmg*1.2);L(`　「蜜蝋の翼」：被ダメージ1.2倍`)}
  const bi=S.p[pb].chars.indexOf(B),dk=`${pb}-${bi}`;
  B.hp=Math.max(0,B.hp-dmg);if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;if(kind==='malice'&&S.turnDamageTeam)S.turnDamageTeam[1-pb]=true;
  if(kind!=='fairy'&&hasAbn(B,'fairy_care')&&(B.abnState.fairyCareTurns||0)>0){B.abnState.fairyCareHits=(B.abnState.fairyCareHits||0)+1;if(B.abnState.fairyCareHits>=3){B.abnState.fairyCareTurns=0;const extra=Math.max(1,Math.ceil(B.max*0.25));B.hp=Math.max(0,B.hp-extra);L(`　「妖精の世話」：${B.name}は効果終了、追加で${extra}ダメージ`)}}
  moodEvent(pb,'negative');S.dm[dk]=(S.dm[dk]||0)+dmg;S.ev.push([pb,bi,{k:kind,a:dmg}]);
  L(`　${STN[kind].i}${B.name}は${STN[kind].n}で${dmg}ダメージ`);
- if(B.hp<=0){B.alive=false;moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pb,2)}
+ if(B.hp<=0){B.alive=false;moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pb,2);checkPhillipAwakening(pb)}
+ checkPhillipAwakening(pb);
 }
 function abnormalityRoll(c,d,inMatch=false,opponent=null){
  // ダイス範囲を変えるページは、既存のダイス補正を維持したまま基礎範囲だけ差し替える。
@@ -508,6 +541,13 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
   if(f.blackening&&d.t==='a')bonus+=(c.abnState&&c.abnState.blackeningAtk)||R(2,4);
   if(f.cleaning&&opponent&&c.sp>opponent.sp)bonus+=Math.min(3,Math.floor((c.sp-opponent.sp)/2));
  }
+ if(hasPasKind(c,'waxenwings')){
+  bonus+=2;if(opponent&&opponent.st&&(opponent.st.burn||0)>0)bonus+=2;
+  if(d.t==='a'){
+   const burnFx=fx=>Array.isArray(fx)&&fx.some(e=>Array.isArray(e)&&e[0]==='burn');
+   if(burnFx(d.fx)||burnFx(c.card&&c.card.hit)||(hasPasKind(c,'unstableEgo')&&c.abnState&&c.abnState.unstableEgoMode==='sword'))bonus+=3;
+  }
+ }
  if(c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
  if(d.t==='a'&&c.abnState){
   bonus+=(c.abnState.nextAtk||0);c.abnState.nextAtk=0;
@@ -526,6 +566,22 @@ function abnormalityHit(A){
  if(A.hp>before)L(`　${A.name}の幻想体カード効果：HPを${A.hp-before}回復`);
 }
 function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
+
+const checkPhillipAwakening=pi=>{
+ const p=S&&S.p&&S.p[pi];if(!p)return false;
+ const live=p.chars.filter(c=>c.alive);
+ if(live.length!==1||live[0].name!=='フィリップ')return false;
+ const c=live[0];if(!c.abnState)c.abnState={};
+ if(c.abnState.phillipAwakened||hasPasKind(c,'waxenwings'))return false;
+ c.abnState.phillipAwakened=true;
+ const wing=PAS.waxenwings;if(!wing)return false;
+ c.ps.push({...wing});
+ c.size=3;setupActionSlots(c,3);
+ const old=c.hp,heal=Math.ceil(c.max*0.5);c.hp=Math.min(c.max,c.hp+heal);
+ L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。場の3枠を占有し、3回行動できる`);
+ if(c.hp>old)L(`　「蜜蝋の翼」：HP+${c.hp-old}`);
+ return true;
+};
 function globalAbnHolders(id){const out=[];if(S&&S.p)S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>{if(hasAbn(c,id))out.push({pi,ci,c})}));return out}
 function hasStatusAbn(c){return !!(c&&c.st&&['burn','bleed','rupt','vib'].some(k=>(c.st[k]||0)>0))}
 function requestMarks(c){return c&&c.abnState&&c.abnState.requestMarks?c.abnState.requestMarks:{}}
@@ -571,6 +627,7 @@ function hit(pa,pb,B,dmg,A,die){
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
  const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
+ if(dmg>0&&hasPasKind(B,'unstableEgo')&&B.abnState&&B.abnState.unstableEgoMode==='feather'){const cut=Math.min(5,dmg);dmg-=cut;L(`　「不安定な自我の殻」：羽の盾でダメージ-${cut}`)}
  const ar=(B.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.reduce)||0),0);
  if(ar&&dmg>0){const cut=Math.min(ar,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`)}
  if(dmg>0&&hasAbn(B,'blood')){dmg+=1;L(`　「血」：被ダメージ+1`)}
@@ -587,9 +644,12 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0){const music=globalAbnHolders('music');const n=music.reduce((sum,x)=>sum+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(n){dmg+=n;L(`　「音楽」：被ダメージ+${n}`)}}
  if(dmg>0&&hasAbn(B,'gaze')){dmg*=2;L(`　${B.name}の「眼差し」：被ダメージ2倍`)}
  if(dmg>0&&globalAbnHolders('blackening').length){dmg=Math.ceil(dmg*1.5);L(`　「黒化」：被ダメージ1.5倍`)}
+ if(dmg>0&&hasPasKind(B,'waxenwings')){dmg=Math.ceil(dmg*1.2);L(`　「蜜蝋の翼」：被ダメージ1.2倍`)}
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
  B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
+ if(A&&hasPasKind(B,'unstableEgo')&&B.abnState.unstableEgoMode==='feather'&&A.alive){A.st.burn=(A.st.burn||0)+2;L(`　「不安定な自我の殻」：${A.name}に火傷+2`)}
+ if(A&&hasPasKind(A,'unstableEgo')&&A.abnState&&A.abnState.unstableEgoMode==='sword'&&B.alive){B.st.burn=(B.st.burn||0)+4;L(`　「不安定な自我の殻」：${B.name}に火傷+4`)}
  // 金属の響き：的中した相手へ次ターンの速度・ダイス値低下を付与。
  if(A&&hasAbn(A,'metal_resonance')&&B.hp>0){B.abnState.speedDownNext=(B.abnState.speedDownNext||0)+1;if(!B.nx)B.nx=BF0();B.nx.rolldn=(B.nx.rolldn||0)+1;L(`　「金属の響き」：${B.name}に速度-1・次ターンのダイス値-1`)}
  // 棺：攻撃後にHPが半分以下になった敵は、40%で次ターン行動不能。
@@ -646,6 +706,7 @@ function hit(pa,pb,B,dmg,A,die){
   fx(pa,A,todo,'的中時',B,cx);
  }
  if(die&&die.fx)fx(pa,A,die.fx,'ダイス的中時',B,cx);
+ S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
 }
 function oneSided(pa,A,pb,B,dice){
  for(const d of dice){
@@ -703,30 +764,36 @@ function combat(){
  S.p.forEach(p=>{p.cost-=used(p)});
  const base=S.log.length,hp0=snap(),hold0=holdSnap(),st0=stSnap(),frames=S.fr=[];S.pv=base;S.dm={};S.ev=[];
  const acts=[];
- S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>{if(c.alive&&c.card&&c.tgt!=null)acts.push({pi,ci,sp:c.sp,r:rnd()})}));
- const pr=a=>noSpd(S.p[a.pi].chars[a.ci].card)?1:0;   // 速度無視のカードは最初（その中では速度順）
+ S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{if(c.alive&&st.card&&st.tgt!=null)acts.push({pi,ci,slot,sp:c.sp,r:rnd()})})));
+ const pr=a=>noSpd(actionStates(S.p[a.pi].chars[a.ci])[a.slot].card)?1:0;   // 速度無視のカードは最初（その中では速度順）
  acts.sort((a,b)=>pr(b)-pr(a)||b.sp-a.sp||a.r-b.r);
  for(const a of acts){
-  const c=S.p[a.pi].chars[a.ci];
-  if(!c.alive||c.used)continue;
-  if(c.abnState&&c.abnState.skipThisTurn){c.used=true;L(`　${c.name}は行動不能のため行動をスキップ`);continue;}
+  const c=S.p[a.pi].chars[a.ci];setActionSlot(c,a.slot);
+  if(!c.alive||c.used){setActionSlot(c,0);continue}
+  if(c.abnState&&c.abnState.skipThisTurn){c.used=true;L(`　${c.name}は行動不能のため行動をスキップ`);setActionSlot(c,0);continue;}
   S.dm={};
   let qi=1-a.pi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
   c.used=true;
-  if(!c.alive)continue;
+  if(!c.alive){setActionSlot(c,0);continue}
   if(hasAbn(c,'seventh_bullet')&&c.card.d.some(d=>d.t==='a')){
    if(!c.abnState)c.abnState={};c.abnState.seventhBulletPages=(c.abnState.seventhBulletPages||0)+1;
    if(c.abnState.seventhBulletPages===7){const all=S.p.flatMap((pp,pi)=>pp.chars.map((z,ci)=>({pi,ci,c:z}))).filter(x=>x.c.alive&&x.c!==c);if(all.length){const picked=all[Math.floor(rnd()*all.length)];qi=picked.pi;Q=S.p[qi];t=picked.c;L(`　「7つ目の弾丸」：7回目の攻撃ページの対象がランダムに決定 → ${t.name}${qi===a.pi?'（味方）':''}`)}}
   }
-  if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t)continue}
-  if(qi!==a.pi&&t.card&&!t.used&&t.tgt===a.ci){t.used=true;L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t)}
-  else{L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}${qi===a.pi?'（味方）':''}`);fx(a.pi,c,c.card.on,'発動時',t);
-   let ii=0;
-   if(qi!==a.pi&&t.stock&&t.stock.length){L(`　${t.name}は保存していた守備ダイスで対応`);const r=doMatch(a.pi,c,qi,t,c.card.d,t.stock);ii=r[0];t.stock=t.stock.slice(r[1])}
+  if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t){setActionSlot(c,0);continue}}
+  const tStates=actionStates(t),matchSlot=qi!==a.pi?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
+  if(matchSlot>=0){
+   setActionSlot(t,matchSlot);t.used=true;
+   L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t);setActionSlot(t,0);
+  }else{
+   L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}${qi===a.pi?'（味方）':''}`);fx(a.pi,c,c.card.on,'発動時',t);
+   let ii=0;const stockSlot=qi!==a.pi?tStates.findIndex(st=>st.stock&&st.stock.length):-1;
+   if(stockSlot>=0){setActionSlot(t,stockSlot);L(`　${t.name}は保存していた守備ダイスで対応`);const stock=t.stock;const r=doMatch(a.pi,c,qi,t,c.card.d,stock);ii=r[0];t.stock=t.stock.slice(r[1]);setActionSlot(t,0)}
    else oneSided(a.pi,c,qi,t,c.card.d);
    const dd=c.card.d.slice(ii).filter(x=>x.t!=='a');
-   if(c.alive&&dd.length){c.stock=(c.stock||[]).concat(dd);L(`　${c.name}の守備ダイス${dd.length}個を保存（一方攻撃を受けたとき使用）`)}}
+   if(c.alive&&dd.length){c.stock=(c.stock||[]).concat(dd);L(`　${c.name}の守備ダイス${dd.length}個を保存（一方攻撃を受けたとき使用）`)}
+  }
+  setActionSlot(c,0);
  }
  L('── ターン終了時 ──');
  // 妖精の世話：未解除なら3ターン、ターン終了時に最大HPの15%を回復する。
@@ -739,6 +806,7 @@ function combat(){
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
  S.p.forEach(p => resolveEmotion(p));
  pf([],[],null);
+ S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
  const n=S.p.map(alive);
  if(!n[0]||!n[1]){S.over=n[0]===n[1]?'引き分け':n[0]?`${S.p[0].name}の勝利、おめ`:`${S.p[1].name}の勝利、おめ`;L(`★ ${S.over}`)}
  S.inCombat=false;S.phase='result';S.cover=null;play(frames,base,hp0,hold0,st0);
@@ -760,8 +828,7 @@ function nextTurn(){
  S.p.forEach(p=>{
   const n=alive(p);
   p.chars.forEach(c=>{
-   if(c.card){if(c.card.once&&c.used)p.gone=(p.gone||0)+1;else p.disc.push(c.card)}   // 使い捨てカードは使うと消滅
-   c.card=null;c.tgt=null;c.used=false;c.hitFired=[];c.stock=null;c.redirBy=null;c.tgt0=null;
+   actionStates(c).forEach(st=>{if(st.card){if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else p.disc.push(st.card)}st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null});setActionSlot(c,0);
    c.bf=c.nx;c.nx=BF0();   // 「次のターン」のバフが有効になる
    if(c.abnState){c.abnState.surgingActive=false;c.abnState.speedDownNow=0;c.abnState.frostSpeedDown=0;c.abnState.teamDiceBonus=0;c.abnState.skipThisTurn=false;}
   });
@@ -798,14 +865,13 @@ function chHTML(pi,ci,view){
  const ev=isMine?`onclick="mine(${ci})" ondragover="event.preventDefault()" ondrop="event.preventDefault();assign(${ci},+event.dataTransfer.getData('text/plain'))"`:
   (cls.includes('tgt')?`onclick="pickTgt(${ci})"`:'');
  let a='';
- if(c.card&&(isMine||!decide||(NET.on&&pi===view))){
-  const tg=c.tgt!=null?` → ${S.p[1-pi].chars[c.tgt].name}`:'（対象未設定）';
-  a=`<div class="act">${isMine?`<button class="x" onclick="unassign(${ci},event)">×</button>`:''}<b>${c.card.n}</b>${tg}${fxLine(c.card)}<div>${diceHTML(c.card.d)}</div></div>`;
+ if(isMine||!decide||(NET.on&&pi===view)){
+  a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${S.p[1-pi].chars[st.tgt].name}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
  }
  const showAbn=!!c.showAbn,abnList=c.abn||[];
  const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
- return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?' <span class="sz">2枠</span>':''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
+ return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
  <div class="sts">${sts}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
@@ -835,7 +901,7 @@ const handHTML=(c,i,mode)=>{
  if(isCh(c)){
   const sel=mode==='play'?S.sel===i:S.pick.includes(i);
   const clk=mode==='setup'?`onclick="pickCh(${i})"`:'';
-  return `<div class="card chc${sel?' sel':''}" ${drag} ${clk}><b>${c.name}</b>${c.size>1?' <span class="sz">2枠</span>':''}${ttlHTML(c)} <span class="c">HP${c.hp}</span> <span class="sp">速度${c.spd[0]}-${c.spd[1]}</span> <small>帰属枠${c.slot}</small><ul class="pl">${c.ps.map((x,k)=>`<li class="${k?'':'top'}">${k?'':'▶ '}${x.n}：${pasText(x)}</li>`).join('')}</ul>${atHTML(c)}${mode==='play'?'<div class="fx">キャラに重ねると先頭のパッシブを帰属（カードは消滅）</div>':''}</div>`;
+  return `<div class="card chc${sel?' sel':''}" ${drag} ${clk}><b>${c.name}</b>${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${ttlHTML(c)} <span class="c">HP${c.hp}</span> <span class="sp">速度${c.spd[0]}-${c.spd[1]}</span> <small>帰属枠${c.slot}</small><ul class="pl">${c.ps.map((x,k)=>`<li class="${k?'':'top'}">${k?'':'▶ '}${x.n}：${pasText(x)}</li>`).join('')}</ul>${atHTML(c)}${mode==='play'?'<div class="fx">キャラに重ねると先頭のパッシブを帰属（カードは消滅）</div>':''}</div>`;
  }
  return `<div class="card${mode==='setup'?' off':''}${mode==='play'&&S.sel===i?' sel':''}" ${drag}><b>${c.n}</b> <span class="c">コスト${c.c}</span>${fxLine(c,false)}${diceRows(c)}</div>`;
 };
@@ -908,7 +974,7 @@ function renderRules(){
  <section><h2>2. 準備</h2>
   <ul>
    <li>デッキは <b>${C.DECK}枚</b>。技カードは同じ名前を${C.MAXC}枚まで、キャラカードは1枚ずつ、キャラカードは1枚以上入れます（ホームの「デッキ構築」で作ります）。</li>
-   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、大型キャラは2枠を使います。</li>
+   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、通常の大型キャラは2枠を使い、「蜜蝋の翼」を得たフィリップは3枠を占有します。</li>
    <li>選ばなかったキャラカードは山札に戻ります（あとで手札に来て、パッシブの帰属に使えます）。</li>
    <li>最初の手札は5枚、コストは${C.COST}です。</li>
   </ul></section>
@@ -924,7 +990,7 @@ function renderRules(){
 
  <section><h2>4. カードを使う</h2>
   <ul>
-   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。1キャラにつき1枚です。</li>
+   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、「蜜蝋の翼」を得たフィリップは3枚まで割り当てられます。</li>
    <li>割り当てたカードのコストの合計は、現在のコスト以内にします。割り当てたカードの「×」ボタンで割り当てを外して、付け替えられます。</li>
    <li>カードには<b>ダイス</b>が付いています：${die('a','3-8')}攻撃　${die('d','2-6')}防御　${die('e','4-9')}回避（数字は出目の範囲）。</li>
    <li>ダイスの<b>✧</b>は、そのダイスが当たったときの追加効果（的中時）、カードの「発動時」は使った時点で起きる効果です。</li>
@@ -956,24 +1022,12 @@ function renderRules(){
    <li>感情レベルが上がると、コストの上限が（${C.COST}＋レベル）になり、<b>コストが全回復</b>します。</li>
    <li>攻撃命中・マッチ勝利・撃破を「正の感情」、被弾・マッチ敗北・味方の撃破を「負の感情」として記録します。正負の比率によって、提示される幻想体カードの傾向が変わります。</li>
    <li>感情レベル上昇後、次の自分の行動決定時に候補3枚から1枚を選び、味方キャラ1体に付与します。候補はデッキ構築で選んだ階層のカードから出ます。</li>
-   <h3>6.5 幻想体カード</h3>
-    <h4>「幻想体カード」とは？<h4>
-     <p>
-       幻想体カードとは人々の感情の根源から抽出された「幻想体」の力を利用してキャラを強化するカードです。
-       カードごとに効果は様々。メリットもデメリットも存在します。中にはカードゲームを根底から覆すようなものまで…
-     </p>
-    <h4>扱い方</h4>
-     <p>
-       幻想体カードには「覚醒カード」と「崩壊カード」が存在します。
-       覚醒カードは正の感情を多く集めると出現し、崩壊カードは負の感情を多く集めると出現します。抽出したい幻想体カードがあるなら感情をコントロールする必要があるでしょう。
-       覚醒カードはメリット、崩壊カードはメリットとデメリットが表裏一体になったものが多いです。どちらを選ぶかはプレイヤー次第になります。
-       また、感情レベルで出現するカードが異なります。
   </ul></section>
 
  <section><h2>7. パッシブとキャラ</h2>
   <ul>
    <li>キャラは<b>パッシブ</b>（常に働く能力）を持ちます。数値を足すもの、ターン開始時に働くもの、条件で働くものなどがあります。</li>
-   <li>手札に来た<b>キャラカード</b>を味方キャラにドラッグすると、そのカードの一番上のパッシブを、そのキャラに<b>帰属</b>できます。すなわちパッシブを移すことができるということです。帰属したカードは消滅し、キャラの「帰属枠」が1つ減ります。帰属枠が0のキャラには帰属できません。</li>
+   <li>手札に来た<b>キャラカード</b>を味方キャラにドラッグすると、そのカードの一番上のパッシブを、そのキャラに<b>帰属</b>できます。帰属したカードは消滅し、キャラの「帰属枠」が1つ減ります。帰属枠が0のキャラには帰属できません。</li>
    <li>戦闘中のキャラにある「幻想体カード」ボタンで、パッシブ表示と幻想体カード表示を切り替えられます。</li>
   </ul></section>
 
@@ -1009,7 +1063,7 @@ function renderDeck(){
  const d=DK.d[DK.cur],er=dErr(d);
  const tile=c=>{
   const k=key(c),n=d[k]||0;
-  const body=isCh(c)?`<b>${c.name}</b>${c.size>1?' <span class="sz">2枠</span>':''}${ttlHTML(c)} <span class="c">HP${c.hp}</span> <span class="sp">速度${c.spd[0]}-${c.spd[1]}</span> <small>帰属枠${c.slot}</small><ul class="pl">${c.ps.map(id=>`<li>${PAS[id].n}：${pasText(PAS[id])}</li>`).join('')}</ul>${atHTML(c)}`
+  const body=isCh(c)?`<b>${c.name}</b>${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${ttlHTML(c)} <span class="c">HP${c.hp}</span> <span class="sp">速度${c.spd[0]}-${c.spd[1]}</span> <small>帰属枠${c.slot}</small><ul class="pl">${c.ps.map(id=>`<li>${PAS[id].n}：${pasText(PAS[id])}</li>`).join('')}</ul>${atHTML(c)}`
    :`<b>${c.n}</b> <span class="c">コスト${c.c}</span>${fxLine(c,false)}${diceRows(c)}`;
   return `<div class="tile${n?' in':''}">${body}<div class="cnt"><button class="sub" onclick="dkAdd('${k}',-1)">−</button><b>${n}</b><button class="sub" onclick="dkAdd('${k}',1)">＋</button></div></div>`;
  };
@@ -1051,7 +1105,7 @@ function drawArrows(){
  if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1])}
  else[0,1].forEach(pi=>{
   if(decide&&!(pi===view||(S.stage===1&&pi===S.order[0])))return;
-  S.p[pi].chars.forEach((c,ci)=>{if(c.card&&c.tgt!=null)add(pi,ci,1-pi,c.tgt)});
+  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach(st=>{if(st.card&&st.tgt!=null)add(pi,ci,1-pi,st.tgt)}));
  });
  svg.innerHTML=h;
 }
