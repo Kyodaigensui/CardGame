@@ -122,7 +122,7 @@ emostack:{
   t:()=>`最初からフィリップだけで出撃したとき、または味方が全員倒れて単独になったとき、「蜜蝋の翼」を追加し、最大HPの50%分回復する`,
  },
  waxenwings:{
-  t:()=>`ダイス値+2。相手が火傷中ならさらに+2、火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の全員に火傷3を付与。自身の被ダメージ1.2倍。フィリップだけが生存すると獲得し、場の3枠を占有して3回行動する`,
+  t:()=>`ダイス値+2。相手が火傷中ならさらに+2、火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の全員に火傷3を付与。自身の被ダメージ1.2倍。フィリップだけが生存すると獲得し、1ターンに2回行動できる`,
   turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach((p,owner)=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
  },
 };
