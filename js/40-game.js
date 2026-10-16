@@ -545,7 +545,7 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
   bonus+=2;if(opponent&&opponent.st&&(opponent.st.burn||0)>0)bonus+=2;
   if(d.t==='a'){
    const burnFx=fx=>Array.isArray(fx)&&fx.some(e=>Array.isArray(e)&&e[0]==='burn');
-   if(burnFx(d.fx)||burnFx(c.card&&c.card.hit)||(hasPasKind(c,'unstableEgo')&&c.abnState&&c.abnState.unstableEgoMode==='sword'))bonus+=3;
+   if(burnFx(d.fx)||burnFx(c.card&&c.card.hit))bonus+=3;
   }
  }
  if(c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
@@ -571,7 +571,10 @@ const checkPhillipAwakening=pi=>{
  const p=S&&S.p&&S.p[pi];if(!p)return false;
  const live=p.chars.filter(c=>c.alive);
  if(live.length!==1||live[0].name!=='フィリップ')return false;
- const c=live[0];if(!c.abnState)c.abnState={};
+ const c=live[0];
+ // 「不安定な自我の殻」を持つフィリップだけが、単独生存時に蜜蝋の翼を得る。
+ if(!hasPasKind(c,'unstableEgo'))return false;
+ if(!c.abnState)c.abnState={};
  if(c.abnState.phillipAwakened||hasPasKind(c,'waxenwings'))return false;
  c.abnState.phillipAwakened=true;
  const wing=PAS.waxenwings;if(!wing)return false;
@@ -627,7 +630,6 @@ function hit(pa,pb,B,dmg,A,die){
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
  const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
- if(dmg>0&&hasPasKind(B,'unstableEgo')&&B.abnState&&B.abnState.unstableEgoMode==='feather'){const cut=Math.min(5,dmg);dmg-=cut;L(`　「不安定な自我の殻」：羽の盾でダメージ-${cut}`)}
  const ar=(B.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.reduce)||0),0);
  if(ar&&dmg>0){const cut=Math.min(ar,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`)}
  if(dmg>0&&hasAbn(B,'blood')){dmg+=1;L(`　「血」：被ダメージ+1`)}
@@ -648,8 +650,6 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
  B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
- if(A&&hasPasKind(B,'unstableEgo')&&B.abnState.unstableEgoMode==='feather'&&A.alive){A.st.burn=(A.st.burn||0)+2;L(`　「不安定な自我の殻」：${A.name}に火傷+2`)}
- if(A&&hasPasKind(A,'unstableEgo')&&A.abnState&&A.abnState.unstableEgoMode==='sword'&&B.alive){B.st.burn=(B.st.burn||0)+4;L(`　「不安定な自我の殻」：${B.name}に火傷+4`)}
  // 金属の響き：的中した相手へ次ターンの速度・ダイス値低下を付与。
  if(A&&hasAbn(A,'metal_resonance')&&B.hp>0){B.abnState.speedDownNext=(B.abnState.speedDownNext||0)+1;if(!B.nx)B.nx=BF0();B.nx.rolldn=(B.nx.rolldn||0)+1;L(`　「金属の響き」：${B.name}に速度-1・次ターンのダイス値-1`)}
  // 棺：攻撃後にHPが半分以下になった敵は、40%で次ターン行動不能。

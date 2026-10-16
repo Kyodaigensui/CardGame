@@ -119,8 +119,7 @@ emostack:{
  ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
  ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
  unstableEgo:{
-  t:()=>`「羽の盾」と「ギラギラ燃える剣」を各2ターンで交互に切替。羽の盾中は攻撃から受けるダメージ-5、攻撃者に火傷2。剣中は攻撃命中時に相手へ火傷4`,
-  turn:(c,x)=>{if(!c.abnState)c.abnState={};const mode=((S.turn-1)%4)<2?'feather':'sword';c.abnState.unstableEgoMode=mode;L(`　${c.name}の「不安定な自我の殻」：${mode==='feather'?'羽の盾':'ギラギラ燃える剣'}状態`)},
+  t:()=>`最初からフィリップだけで出撃したとき、または味方が全員倒れて単独になったとき、「蜜蝋の翼」を追加し、最大HPの50%分回復する`,
  },
  waxenwings:{
   t:()=>`ダイス値+2。相手が火傷中ならさらに+2、火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の全員に火傷3を付与。自身の被ダメージ1.2倍。フィリップだけが生存すると獲得し、場の3枠を占有して3回行動する`,
