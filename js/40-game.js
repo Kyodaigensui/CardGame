@@ -5,7 +5,7 @@ const key=x=>x.n||x.name,byKey={};
 const ACTION_FIELDS=['card','tgt','used','hitFired','stock','redirBy','tgt0'];
 const actionStates=c=>c?(c._actionStates||[c]):[];
 const setActionSlot=(c,i)=>{if(c&&c._actionStates)c._actionSlot=Math.max(0,Math.min(c._actionStates.length-1,Number(i)||0))};
-const setupActionSlots=(c,count=3)=>{
+const setupActionSlots=(c,count=2)=>{
  if(!c||c._actionStates)return;
  const states=[{
   card:c.card||null,tgt:c.tgt==null?null:c.tgt,used:!!c.used,
@@ -579,9 +579,9 @@ const checkPhillipAwakening=pi=>{
  c.abnState.phillipAwakened=true;
  const wing=PAS.waxenwings;if(!wing)return false;
  c.ps.push({...wing});
- c.size=3;setupActionSlots(c,3);
+ setupActionSlots(c,2);
  const old=c.hp,heal=Math.ceil(c.max*0.5);c.hp=Math.min(c.max,c.hp+heal);
- L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。場の3枠を占有し、3回行動できる`);
+ L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。2回行動できる`);
  if(c.hp>old)L(`　「蜜蝋の翼」：HP+${c.hp-old}`);
  return true;
 };
