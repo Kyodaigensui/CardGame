@@ -569,6 +569,7 @@ function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
 
 const checkPhillipAwakening=pi=>{
  const p=S&&S.p&&S.p[pi];if(!p)return false;
+  if(!p.chars.some(c=>c.name==='サルヴァドール'))return false;
  const live=p.chars.filter(c=>c.alive);
  if(live.length!==1||live[0].name!=='フィリップ')return false;
  const c=live[0];
