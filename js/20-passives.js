@@ -55,7 +55,7 @@ const PAS={
  emostack:{n:'龍生九子',k:'emostack'},
  ailres:{n:'あなたの盾',k:'ailres',v:3},               // 火傷・出血・破裂すべて、1回ごとに v 減らす
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
- burncheck:{n:'火傷追撃',k:'burncheck',v:2},
+ burncheck:{n:'夜明け',k:'burncheck',v:2},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
