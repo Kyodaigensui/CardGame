@@ -55,8 +55,7 @@ const PAS={
  emostack:{n:'龍生九子',k:'emostack'},
  ailres:{n:'あなたの盾',k:'ailres',v:3},               // 火傷・出血・破裂すべて、1回ごとに v 減らす
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
- unstableego:{n:'不安定な自我の殻',k:'unstableEgo'},
- waxenwings:{n:'蜜蝋の翼',k:'waxenwings'},
+ burncheck:{n:'火傷追撃',k:'burncheck',v:2},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
@@ -112,19 +111,16 @@ emostack:{
   // c.tgt は「狙っている相手キャラの番号」。相手側のキャラを取り出して、その振動を見る
   dice:(c,x)=>{const o=S.p.findIndex(q=>q.chars.includes(c)),t=o<0||c.tgt==null?null:S.p[1-o].chars[c.tgt];return t&&t.st.vib>=x.min?x.v:0}
  },
+ burncheck:{
+  t:p=>`相手が火傷状態なら、ダイス値+${p.v}`,
+  dice:(c,x)=>{const o=S.p.findIndex(q=>q.chars.includes(c)),t=o<0||c.tgt==null?null:S.p[1-o].chars[c.tgt];return t&&(t.st.burn||0)>0?x.v:0}
+ },
  rangedres:{
   t:()=>`遠距離属性から受けるダメージ半減`
  },
   // 状態異常（火傷・出血・破裂）で受けるダメージを、1回ごとに v 減らす。kinds があれば、その種類だけ
  ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
  ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
- unstableEgo:{
-  t:()=>`単独生存かつ「サルヴァドール」死亡時、自身にパッシブ「蜜蝋の翼」を追加し、最大HPの50%分回復する`,
- },
- waxenwings:{
-  t:()=>`ダイス値+2。相手が火傷中ならさらに+2、火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の全員に火傷3を付与。自身の被ダメージ1.2倍。フィリップだけが生存すると獲得し、1ターンに2回行動できる`,
-  turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach((p,owner)=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
- },
 };
 // ---------- ③ 仕組み（ここから下は触らなくてOK） ----------
 const pasText=p=>PK[p.k].t(p);
