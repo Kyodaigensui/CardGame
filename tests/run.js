@@ -33,8 +33,7 @@ try{C0=makeCtx();ok('ゲームデータの読み込み',true)}catch(e){ok('ゲ�
  ok('Googleアカウント番号付きURLを認識',ev(u,'soloValidSheetUrl("https://script.google.com/macros/u/0/s/AKfycb-test/exec?authuser=0")'));
  ok('Google Workspace配下のURLを認識',ev(u,'soloValidSheetUrl("https://script.google.com/a/macros/example.jp/s/AKfycb-test/exec")'));
  ok('Apps Script編集画面のURLは連携URLとして受け付けない',!ev(u,'soloValidSheetUrl("https://script.google.com/home/projects/123/edit")'));
- u._els.soloCloudUrl={value:'https://script.google.com/macros/s/AKfycb-auto-save/exec'};
- ok('入力欄に貼り付けてプロフィール一覧更新を押すだけでURLを自動保存',ev(u,'soloCaptureSheetUrlFromInput()')&&ev(u,'soloSheetUrl()')==='https://script.google.com/macros/s/AKfycb-auto-save/exec');
+ ok('Apps Script URLはゲームコードに組み込み済みで入力不要',ev(u,'soloSheetUrl()')==='https://script.google.com/macros/s/AKfycbwX66N5uX1cIyFPUWzXgVejb3ybAKsYwubW-sgRqigENv1ep2EOvRv_0wXr8TmCZqI/exec');
 }
 const names=J(ev(C0,'({sk:SKILLS.map(s=>s.n),ch:CHARS.map(c=>c.name)})'));
 ok('カード名・キャラ名が重複していない',new Set([...names.sk,...names.ch]).size===names.sk.length+names.ch.length,'重複あり');

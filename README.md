@@ -112,3 +112,8 @@ node tests/run.js
 ## 追記
 
 js(javascriptの略)って女子小学生みたいだよね
+
+
+## Google Apps Script URL
+
+Google Apps ScriptのウェブアプリURLは `js/70-solo-abnormality.js` に組み込み済みです。ゲーム画面でURLを入力・保存する必要はありません。Apps Scriptの公開コードを変更した場合は、同じデプロイURLを維持して新バージョンを再デプロイしてください。
