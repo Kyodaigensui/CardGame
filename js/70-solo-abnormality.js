@@ -40,13 +40,37 @@ STN.cold = {n:'寒気', i:'❄', c:'#8bd5f5', t:'ターン終了時-1。ター�
 
 const soloEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const soloSheetUrl = () => { try { return String(localStorage.getItem(SOLO.sheetKey)||'').trim(); } catch(e) { return ''; } };
-const soloValidSheetUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[^\s]+\/exec(?:\?.*)?$/.test(String(u||''));
-function saveSoloSheetUrl(v) {
-  const u = String(v||'').trim();
-  try { localStorage.setItem(SOLO.sheetKey, u); } catch(e) {}
+// 標準URLに加えて、Google Workspace配下やログインアカウント番号付きURLも受け付ける。
+const soloNormalizeSheetUrl = v => String(v||'').trim().replace(/\/exec\/(?=[?#]|$)/, '/exec');
+const soloValidSheetUrl = u => {
+  const v = soloNormalizeSheetUrl(u);
+  return /^https:\/\/script\.google\.com\/(?:macros\/(?:u\/\d+\/)?s\/[^/?#]+\/exec|a\/macros\/[^/?#]+\/s\/[^/?#]+\/exec)(?:\?[^#]*)?(?:#.*)?$/.test(v);
+};
+function saveSoloSheetUrl(v, doRender=true) {
+  const u = soloNormalizeSheetUrl(v);
+  if (!soloValidSheetUrl(u)) {
+    SOLO.cloudProfileMessage = 'URLを認識できません。デプロイ画面の「ウェブアプリ URL」（https://script.google.com/macros/s/.../exec）をコピーしてください。';
+    if (doRender) render();
+    return false;
+  }
+  try { localStorage.setItem(SOLO.sheetKey, u); }
+  catch(e) {
+    SOLO.cloudProfileMessage = 'URLをこのブラウザに保存できません。ブラウザのサイトデータ／Cookieの保存制限を確認してください。';
+    if (doRender) render();
+    return false;
+  }
   SOLO.remoteRows = null; SOLO.remoteLoading = false; SOLO.remoteUrl = '';
   SOLO.cloudProfiles = []; SOLO.cloudProfileMessage = 'URLを保存しました。共有プロフィール一覧を更新してください。';
-  render();
+  if (doRender) render();
+  return true;
+}
+// 入力欄へURLを貼り付けた後、「一覧を更新」「共有保存」を押した場合も自動で保存する。
+function soloCaptureSheetUrlFromInput() {
+  const input = document.getElementById('soloCloudUrl') || document.getElementById('soloSheetUrl');
+  if (!input || !String(input.value||'').trim()) return soloValidSheetUrl(soloSheetUrl());
+  const value = soloNormalizeSheetUrl(input.value);
+  if (value === soloSheetUrl()) return soloValidSheetUrl(value);
+  return saveSoloSheetUrl(value, false);
 }
 function soloLocalRecords() {
   try { const a=JSON.parse(localStorage.getItem(SOLO.localKey)||'[]'); return Array.isArray(a)?a.filter(x=>x&&typeof x.name==='string'&&SOLO_BOSSES.some(b=>b.id===x.boss)&&Number.isInteger(+x.turns)&&+x.turns>0):[]; }
@@ -101,6 +125,11 @@ function soloJsonp(params, onData, onError) {
   document.body.appendChild(script);
 }
 function soloRefreshCloudProfiles(shouldRender=true) {
+  if (!soloCaptureSheetUrlFromInput()) {
+    if (!SOLO.cloudProfileMessage) SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。';
+    if (shouldRender) render();
+    return;
+  }
   if (!soloValidSheetUrl(soloSheetUrl())) {
     SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。';
     if (shouldRender) render();
@@ -155,6 +184,7 @@ function soloLoadCloudProfile(name) {
   }, err => { SOLO.cloudProfileMessage = err.message || 'プロフィールを読み込めませんでした。'; render(); });
 }
 function soloSaveCloudProfile() {
+  if (!soloCaptureSheetUrlFromInput()) { render(); return; }
   const url = soloSheetUrl();
   if (!soloValidSheetUrl(url)) { SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。'; render(); return; }
   if (!PF.name) { SOLO.cloudProfileMessage = '先にユーザー名を作成または選択してください。'; render(); return; }
@@ -411,7 +441,7 @@ function renderSoloMenu(){
     <div class="pf"><h2>Googleスプレッドシート連携</h2><p><small>Apps Scriptをウェブアプリとして公開したURL（末尾が /exec）を入力すると、討伐記録を共有ランキングへ送信できます。</small></p>
     <input id="soloSheetUrl" value="${soloEsc(url)}" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;box-sizing:border-box">
     <p><button class="sub" onclick="saveSoloSheetUrl(document.getElementById('soloSheetUrl').value)">URLを保存</button> <button class="sub" onclick="SCR='soloRank';render()">ランキングを見る</button></p>
-    <p class="msg">${soloValidSheetUrl(url)?'URL形式：OK':'未設定の場合も、このブラウザ内には記録されます。'}</p></div>
+    <p class="msg">${soloEsc(SOLO.cloudProfileMessage || (soloValidSheetUrl(url)?'URL形式：OK':'URL未設定の場合も、このブラウザ内には記録されます。'))}</p></div>
   </div>`;
 }
 function renderSoloRank(triggerLoad=true){
