@@ -67,6 +67,37 @@ for(const c of names.ch){ // 全キャラが戦場データにできる
   skipWorks=ev(c,"S.log.some(x=>x.includes('行動不能のため行動をスキップ'))");
  } catch(e) { skipWorks=false; }
  ok('幻想体戦で行動不能のキャラは選択が制限され、戦闘処理でも行動をスキップする',skipWorks&&blocked,ev(c,"JSON.stringify({phase:S.phase,stage:S.stage,order:S.order,log:S.log.slice(-8),player:S.p[0].chars.map(x=>({name:x.name,alive:x.alive,skip:x.abnState&&x.abnState.skipThisTurn,card:x.card&&x.card.n,tgt:x.tgt,used:x.used})),enemy:S.p[1].chars.map(x=>({name:x.name,alive:x.alive,card:x.card&&x.card.n,tgt:x.tgt}))})"));
+
+ // 行動不能は行動選択だけに適用し、幻想体カードの付与は妨げない。
+ const abnTarget=makeCtx();
+ try {
+  ev(abnTarget,`SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(validDeck)};DK.hiers[0]='総記の階';startSoloBattle('blood_bath');S.pick=[S.p[0].pool.findIndex(x=>isCh(x))];confirmSetup()`);
+  ev(abnTarget,`(()=>{const p=S.p[0],c=p.chars[0];c.abnState=c.abnState||{};c.abnState.skipThisTurn=true;p.pendingAbn=true;p.abnOffers=[{id:'test_abn',n:'テスト幻想体カード',desc:'テスト',hierarchy:'総記の階',mood:'mixed',fx:{}}];p.abnSelected=0;mine(0)})()`);
+ } catch(e) {}
+ ok('行動不能中でも幻想体カードを味方に付与できる',ev(abnTarget,"S.p[0].chars[0].abn.some(x=>x.id==='test_abn')&&!S.p[0].pendingAbn"));
+
+ // 血の風呂の2行動は同じキャラへ集中しないよう、同一ターン内の対象を分散する。
+ const targetDeck={'シャオ':1,'カーリー':1};for(const sk of names.sk){if(Object.keys(targetDeck).length>=15)break;targetDeck[sk]=1;}
+ const targetCtx=makeCtx();
+ let targetSpread=false;
+ try {
+  ev(targetCtx,`SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(targetDeck)};DK.hiers[0]='総記の階';startSoloBattle('blood_bath');S.pick=S.p[0].pool.map((x,i)=>isCh(x)?i:-1).filter(i=>i>=0);confirmSetup()`);
+  targetSpread=ev(targetCtx,"new Set(actionStates(S.p[1].chars[0]).map(st=>st.card&&st.tgt).filter(t=>t!=null)).size===2");
+ } catch(e) {}
+ ok('血の風呂の2つの行動はシャオとカーリーへ分散して狙う',targetSpread);
+
+ // 戦闘後処理が combat() で開始されたアニメーションを破棄しない。
+ const animCtx=makeCtx();let animPreserved=false;
+ try {
+  ev(animCtx,`SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(validDeck)};DK.hiers[0]='総記の階';startSoloBattle('blood_bath');S.pick=[S.p[0].pool.findIndex(x=>isCh(x))];confirmSetup()`);
+  animCtx.matchMedia=()=>({matches:false});
+  ev(animCtx,`(()=>{const p=S.p[0].chars[0];p.card=soloCard('テスト攻撃',0,[D('a',1,3)]);p.tgt=0;p.used=false;p.hitFired=[];p.stock=null;p.redirBy=null;p.tgt0=null;return true})()`);
+  ev(animCtx,'combat()');
+  animPreserved=ev(animCtx,'!!S.anim');
+ } catch(e) {}
+ ok('幻想体戦の後処理がダイスアニメーションを停止しない',animPreserved);
+ const cssText=fs.readFileSync(path.join(ROOT,'css/style.css'),'utf8');
+ ok('大型キャラの2枠表示と選択中の金色枠を見分けやすくする',!cssText.includes('.ch.big{grid-column:span 2;border-color:var(--gold)}'));
 }
 
 // ───── 幻想体戦：階層分類と歴史の階の4戦 ─────
@@ -387,6 +418,32 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('中継：25秒何も届かなければ切断として表示される',ev(p.A,'NET.lost')&&!ev(p.A,'canAct()'));}
 {const p=relayPair();relayStart(p);ev(p.G,'toHome()');p.B.pump();
  ok('中継：片方がホームへ戻ると、相手に切断が伝わり、接続が閉じられる',ev(p.A,'NET.lost')&&ev(p.G,'NET.clients.length')===0&&!ev(p.G,'NET.on'));}
+
+// ───── 状態異常・デバフ表示と実処理の整合性 ─────
+{
+ const c=makeCtx();
+ let statusHtml='';
+ try {
+  ev(c,`startMatch();(()=>{const mk=n=>mkField(mkC({name:n,slot:1,hp:50,spd:[1,1],ps:[]}));const x=mk('デバフ確認'),music=mk('音楽所持者'),blackening=mk('黒化所持者');x.abn=[{id:'gaze'}];x.abnState={skipThisTurn:true,skipNextTurn:true,iceLocked:true,iceShard:2,speedDownNow:1,speedDownNext:4,hiveMarks:{bee:3},requestMarks:{req:2},fairyDamageTaken:10};music.abn=[{id:'music'}];music.abnState={musicDmgTaken:4};blackening.abn=[{id:'blackening'}];S.p[0].chars=[x];S.p[1].chars=[music,blackening];return true})()`);
+  statusHtml=ev(c,'chHTML(0,0,0)');
+ } catch(e) { statusHtml=String(e); }
+ ok('行動不能・凍結・氷の欠片・速度低下・蜂の標的・依頼対象・被ダメージ増加がデバフ欄に表示される',
+  ['行動不能','凍結','氷の欠片','速度低下','蜂の標的','依頼対象','被ダメージ増加','眼差し','音楽の影響','黒化の影響'].every(x=>statusHtml.includes(x)),statusHtml.slice(0,900));
+}
+{
+ const c=makeCtx();let res={};
+ try {
+  res=JSON.parse(ev(c,`(()=>{startMatch();const mk=n=>mkField(mkC({name:n,slot:1,hp:80,spd:[1,1],ps:[]}));const A=mk('攻撃側'),B=mk('標的');S.p[0].chars=[A];S.p[1].chars=[B];A.abnState={};B.abnState={};S.turn=1;S.dm={};S.ev=[];S.turnDamageTeam=[false,false];A.card={n:'テスト攻撃',c:0,d:[]};B.abnState.hiveMarks={bee:4};const before=B.hp;hit(0,1,B,10,A,{t:'a',r:[1,1]});const marked=before-B.hp;const C=mk('標的なし'),D=mk('別の攻撃側');S.p[0].chars=[D];S.p[1].chars=[C];D.abnState={};C.abnState={};S.dm={};S.ev=[];S.turnDamageTeam=[false,false];D.abnState.hiveMarks={bee:4};D.card={n:'テスト攻撃',c:0,d:[]};const before2=C.hp;hit(0,1,C,10,D,{t:'a',r:[1,1]});return JSON.stringify({marked,unmarked:before2-C.hp,log:S.log.filter(x=>x.includes('蜂の標的'))})})()`));
+ } catch(e) {res={error:String(e)}}
+ ok('蜂の標的は標的キャラが受けるダメージを増やし、標的キャラの与ダメージは増やさない',res.marked===14&&res.unmarked===10,JSON.stringify(res));
+}
+{
+ const c=makeCtx();let res={};
+ try {
+  res=JSON.parse(ev(c,`(()=>{startMatch();const mk=n=>mkField(mkC({name:n,slot:1,hp:40,spd:[1,1],ps:[]}));const A=mk('A'),B=mk('B');S.p[0].chars=[A];S.p[1].chars=[B];B.abnState={};B.st.cold=1;const cold=hasStatusAbn(B);B.st.cold=0;B.st.spore=1;const spore=hasStatusAbn(B);B.st.spore=0;B.abnState.skipThisTurn=true;const incap=hasStatusAbn(B);let coldCond=false,sporeCond=false,incapCond=false;try{condOk(['foeSt','cold'],'test');condOk(['foeStGe','spore',2],'test');condOk(['foeSt','incap'],'test');B.st.cold=1;coldCond=condTest(['foeSt','cold'],{A,B,dmg:0});sporeCond=condTest(['foeStGe','spore',2],{A,B,dmg:0});incapCond=condTest(['foeSt','incap'],{A,B,dmg:0});}catch(e){}B.st.spore=2;sporeCond=condTest(['foeStGe','spore',2],{A,B,dmg:0});return JSON.stringify({cold,spore,incap,coldCond,sporeCond,incapCond})})()`));
+ } catch(e) {res={error:String(e)}}
+ ok('寒気・胞子・行動不能も状態異常判定に含まれ、寒気/胞子を条件として指定できる',res.cold&&res.spore&&res.incap&&res.coldCond&&res.sporeCond&&res.incapCond,JSON.stringify(res));
+}
 
 finish();
 function finish(){
