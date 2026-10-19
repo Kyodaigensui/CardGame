@@ -110,6 +110,12 @@ function netApplyDecide(m){
    else if(op[0]==='P'){S.pend=op[1];pickTgt(op[2])}
    else if(op[0]==='R')redir(op[1]);
    else if(op[0]==='U')unassign(op[1],{stopPropagation(){}});
+   else if(op[0]==='ABN'){
+    const p=S.p[act()],i=p.abnOffers.findIndex(card=>card.id===op[2]);
+    if(i<0)throw new Error('abn');
+    p.abnSelected=i;
+    if(!assignAbnormality(op[1]))throw new Error('abn');
+   }
    else throw new Error('op');
   }
   done();

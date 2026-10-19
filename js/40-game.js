@@ -153,7 +153,7 @@ function startMatch(){
  S={turn:0,p:[newP(PF.name||'プレイヤー1',DK.d[0],DK.hiers[0]),newP('プレイヤー2',DK.d[1],DK.hiers[1])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false};
  render();
 }
-const toHome=()=>{netClose();S=null;SCR='home';render()};
+const toHome=()=>{netClose();if(typeof SOLO!=='undefined')SOLO.active=false;S=null;SCR='home';render()};
 function leave(){if(!S.leave){S.leave=true;render()}else toHome()}
 const leaveBtn=()=>`<button class="sub" onclick="leave()">${S.leave?'本当に戻る（この対戦は破棄されます）':'ホームへ戻る'}</button>`;
 // ===== 初手：場に出すキャラを選ぶ =====
@@ -650,7 +650,7 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&hasPasKind(B,'waxenwings')){dmg=Math.ceil(dmg*1.2);L(`　「蜜蝋の翼」：被ダメージ1.2倍`)}
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
- B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
+ B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
  // 金属の響き：的中した相手へ次ターンの速度・ダイス値低下を付与。
  if(A&&hasAbn(A,'metal_resonance')&&B.hp>0){B.abnState.speedDownNext=(B.abnState.speedDownNext||0)+1;if(!B.nx)B.nx=BF0();B.nx.rolldn=(B.nx.rolldn||0)+1;L(`　「金属の響き」：${B.name}に速度-1・次ターンのダイス値-1`)}
  // 棺：攻撃後にHPが半分以下になった敵は、40%で次ターン行動不能。
@@ -687,7 +687,7 @@ function hit(pa,pb,B,dmg,A,die){
  // 棘の壁：攻撃者に固定ダメージと次ターンの速度低下を与える。
  if(hasAbn(B,'thorn_wall')&&A&&A.alive){const reflect=R(2,8),slow=R(1,3),dealt=Math.min(A.hp,reflect);A.hp-=dealt;if(!A.abnState)A.abnState={};A.abnState.speedDownNext=Math.max(A.abnState.speedDownNext||0,slow);L(`　「棘の壁」：${A.name}に${dealt}ダメージ、速度-${slow}`);if(slow===3){const old=B.hp;B.hp=Math.min(B.max,B.hp+dealt);L(`　「棘の壁」：${B.name}はHP${B.hp-old}回復`)}if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}
  // 青ざめた手：同じ相手への3回目の命中ごとに追加ダメージ
- if(hasAbn(A,'pale_hand')){if(!A.abnState)A.abnState={};if(A.abnState.paleTarget!==B){A.abnState.paleTarget=B;A.abnState.paleHits=0}A.abnState.paleHits=(A.abnState.paleHits||0)+1;if(A.abnState.paleHits>=3){const extra=R(3,10);A.abnState.paleHits=0;B.hp-=extra;S.dm[dk]=(S.dm[dk]||0)+extra;L(`　「青ざめた手」：${B.name}に追加ダメージ${extra}`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
+ if(hasAbn(A,'pale_hand')){if(!A.abnState)A.abnState={};const targetIndex=S.p[pb].chars.indexOf(B);if(A.abnState.paleTargetIndex!==targetIndex){A.abnState.paleTargetIndex=targetIndex;A.abnState.paleHits=0}A.abnState.paleHits=(A.abnState.paleHits||0)+1;if(A.abnState.paleHits>=3){const extra=R(3,10);A.abnState.paleHits=0;B.hp-=extra;S.dm[dk]=(S.dm[dk]||0)+extra;L(`　「青ざめた手」：${B.name}に追加ダメージ${extra}`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
  // 罪悪感：受けた攻撃ダメージの1/3を攻撃者へ反射（反射自体は再反射しない）
  if(hasAbn(B,'guilt')&&A&&A.alive){const reflected=Math.floor(dmg/3);if(reflected>0){A.hp=Math.max(0,A.hp-reflected);L(`　「罪悪感」：${A.name}に${reflected}反射ダメージ`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}}
  if(B.hp<=0){B.hp=0;B.alive=false;moodEvent(pa,'positive',2);moodEvent(pb,'negative');L(`　${B.name}は倒れた`);coin(pa,2);coin(pb,2);
@@ -736,7 +736,7 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   moodEvent(wp,'positive');moodEvent(lp,'negative');
   if(W===A)winA++;else winB++;
   if(hasAbn(W,'pattern_recognition')){if(!W.abnState)W.abnState={};W.abnState.patternWins=(W.abnState.patternWins||0)+1;if(W.abnState.patternWins>=3){W.abnState.patternWins-=3;const wpPlayer=S.p[wp],oldCost=wpPlayer.cost;wpPlayer.cost=Math.min(wpPlayer.max,wpPlayer.cost+1);const speed=R(1,2);W.abnState.speedUpNext=(W.abnState.speedUpNext||0)+speed;L(`　「パターン反復認識機能」：${W.name}が3回マッチ勝利、コスト${wpPlayer.cost-oldCost>0?'+1':'は最大'}、次ターン速度+${speed}`)}}
-  if(hasAbn(W,'frost_sword')&&Math.random()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
+  if(hasAbn(W,'frost_sword')&&rnd()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
   let dmg=0;
   if(wd.t==='a')dmg=ld.t==='d'?Math.max(0,wv-lv):wv;
   // 懐かしいあの日の抱擁：同じ相手との連続マッチ勝利ごとに発動率+20%。
@@ -851,7 +851,7 @@ function chHTML(pi,ci,view){
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
  if(fr&&has(fr.sh))cls+=' hurt';
  const hd=A?((A.i<0?A.hold0:fr.hold)[pi][ci]||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
- const sn=A?(A.i<0?A.st0:fr.sts)[pi][ci]:c,ST=sn.st,stk=['burn','bleed','rupt','vib'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
+ const sn=A?(A.i<0?A.st0:fr.sts)[pi][ci]:c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
  const evs=fr?fr.ev.filter(e=>e[0]===pi&&e[1]===ci).map(e=>e[2]):[];
  const badge=(k,v,nx)=>`<span class="stt${nx?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${nx?'（次のターンから）':''}：${STN[k].t}">${STN[k].i}${bk.includes(k)?(['guard','dmgdn','rolldn'].includes(k)?'-':'+'):''}${v}${nx?'<small>次</small>':''}</span>`;
  const sts=stk.filter(k=>ST[k]>0).map(k=>badge(k,ST[k])).join('')+bk.filter(k=>sn.bf[k]>0).map(k=>badge(k,sn.bf[k])).join('')+bk.filter(k=>sn.nx[k]>0).map(k=>badge(k,sn.nx[k],1)).join('');
@@ -874,7 +874,7 @@ function chHTML(pi,ci,view){
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
  return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
- <div class="sts">${sts}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
+ <div class="sts">${sts}${c.abnState&&c.abnState.iceLocked?'<span class="stt" style="--c:#89c8ff" title="氷の女王に凍結されている">❄ 凍結</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
 const costDots=(p,u)=>{const on=p.cost-u;let h='';for(let i=0;i<p.max;i++)h+=`<i class="dot${i<on?' on':i<p.cost?' rs':''}"></i>`;return `<span class="cost" title="コスト ${on}/${p.max}">コスト ${h} <small>${on}/${p.max}</small></span>`};
 const emoGauge = p => {

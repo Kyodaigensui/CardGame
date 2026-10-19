@@ -76,6 +76,7 @@ function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で�
    const same=w=>{if(snap(A)!==snap(B)){st.mism++;throw new Error('状態が一致しません：'+w)}};
    const decisions=c=>{
     const me=ev(c,'NET.me'),nch=ev(c,'S.p[NET.me].chars.length');
+    if(ev(c,'S.p[NET.me].pendingAbn')){const ci=ev(c,'S.p[NET.me].chars.findIndex(x=>x.alive)');if(ci>=0){ev(c,'pickAbnormality(0)');ev(c,`assignAbnormality(${ci})`);}}
     const enemy=()=>J(ev(c,'S.p[1-NET.me].chars.map((x,i)=>x.alive?i:-1).filter(i=>i>=0)'));
     const target=()=>{const e=enemy();if(!e.length)return;ev(c,`pickTgt(${pick(e)})`);if(ev(c,'!!S.ask'))ev(c,`redir(${Math.random()<.5})`)};
     for(let ci=0;ci<nch;ci++){
