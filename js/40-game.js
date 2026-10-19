@@ -548,6 +548,8 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
  else if(hasAbn(c,'music_addiction')&&(d.t==='d'||d.t==='e'))rollDie.r=[1,1];
  else if(hasAbn(c,'violence'))rollDie.r=[Math.max(0,d.r[0]-1),d.r[1]+3];
  const raw=roll(c,rollDie);let bonus=0;
+ // 妖精の祭典：女王妖精だけが残ると全ダイス値+30。
+ if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&c.name==='女王妖精'&&!S.p[1].chars.some(z=>z.name==='妖精の塊'&&z.alive))bonus+=30;
  for(const card of (c.abn||[])){
   const f=card.fx||{};bonus+=(f.all||0)+(d.t==='a'?(f.atk||0):0);
   if(f.guardDie&&(d.t==='d'||d.t==='e'))bonus+=R(f.guardDie[0],f.guardDie[1]);
@@ -633,6 +635,8 @@ function bleed(pi,ch){
 function hit(pa,pb,B,dmg,A,die){
  const targetDamagedBefore=!!(B.abnState&&B.abnState.damagedTurn===S.turn);
  let gluttonyHeal=0;
+ // 女王妖精：捕食回数に応じて、受ける攻撃ダメージが増える。
+ if(dmg>0&&typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&B&&B.name==='女王妖精'&&B.abnState&&(B.abnState.fairyDamageTaken||0)>0){dmg+=B.abnState.fairyDamageTaken;L(`　「妖精の祭典」：女王妖精の被ダメージ+${B.abnState.fairyDamageTaken}`)}
  if(dmg>0&&A&&die&&die.t==='a'){
   if(hasAbn(A,'charging')&&A.abnState&&A.abnState.chargingTurn===S.turn){const n=A.abnState.chargingDamage||0;dmg+=n;if(n)L(`　「充電」：与ダメージ+${n}`)}
   if(hasAbn(A,'seventh_bullet')){const n=R(1,7);dmg+=n;L(`　「7つ目の弾丸」：攻撃ダイスの追加ダメージ+${n}`)}
@@ -669,6 +673,8 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&hasAbn(B,'gaze')){dmg*=2;L(`　${B.name}の「眼差し」：被ダメージ2倍`)}
  if(dmg>0&&globalAbnHolders('blackening').length){dmg=Math.ceil(dmg*1.5);L(`　「黒化」：被ダメージ1.5倍`)}
  if(dmg>0&&hasPasKind(B,'waxenwings')){dmg=Math.ceil(dmg*1.2);L(`　「蜜蝋の翼」：被ダメージ1.2倍`)}
+ // 妖精の塊は女王妖精が生きている間、HP1で踏みとどまる。
+ if(dmg>0&&typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&B.name==='妖精の塊'&&S.p[1].chars.some(z=>z.name==='女王妖精'&&z.alive))dmg=Math.min(dmg,Math.max(0,B.hp-1));
  if(dmg<=0)return;
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
  B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
@@ -796,14 +802,17 @@ function combat(){
   S.dm={};
   let qi=1-a.pi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
+  // 女王蜂のHPが25%未満なら、働き蜂は敵ではなく女王蜂本人を攻撃する。
+  if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&a.pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen){const qOwn=S.p[a.pi].chars.find(z=>z.name==='女王蜂'&&z.alive);if(qOwn){qi=a.pi;Q=S.p[qi];t=qOwn;}else c.abnState.targetQueen=false;}
   c.used=true;
   if(!c.alive){setActionSlot(c,0);continue}
+  if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='happy_teddy'&&c.name==='幸せなテディ'&&c.card&&c.card.soloBoss==='teddy_hug'&&c.abnState)c.abnState.hugSpent=true;
   if(hasAbn(c,'seventh_bullet')&&c.card.d.some(d=>d.t==='a')){
    if(!c.abnState)c.abnState={};c.abnState.seventhBulletPages=(c.abnState.seventhBulletPages||0)+1;
    if(c.abnState.seventhBulletPages===7){const all=S.p.flatMap((pp,pi)=>pp.chars.map((z,ci)=>({pi,ci,c:z}))).filter(x=>x.c.alive&&x.c!==c);if(all.length){const picked=all[Math.floor(rnd()*all.length)];qi=picked.pi;Q=S.p[qi];t=picked.c;L(`　「7つ目の弾丸」：7回目の攻撃ページの対象がランダムに決定 → ${t.name}${qi===a.pi?'（味方）':''}`)}}
   }
   if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t){setActionSlot(c,0);continue}}
-  const tStates=actionStates(t),matchSlot=qi!==a.pi?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
+  const tStates=actionStates(t),matchSlot=qi!==a.pi&&!(t.abnState&&t.abnState.skipThisTurn)?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
   if(matchSlot>=0){
    setActionSlot(t,matchSlot);t.used=true;
    L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t);setActionSlot(t,0);
@@ -824,9 +833,11 @@ function combat(){
  S.p.forEach((p,pi)=>{if(!S.turnDamageTeam[pi]&&p.chars.some(c=>c.alive&&hasAbn(c,'heartbeat'))){p.chars.forEach(c=>{if(!c.alive)return;const n=Math.max(1,Math.ceil(c.max*0.25));c.hp-=n;L(`　「鼓動」：${c.name}は${n}ダメージ`);if(c.hp<=0){c.hp=0;c.alive=false;L(`　${c.name}は倒れた`)}})}});
  // 押し寄せる鼓動：付与から3ターン経過後に死亡
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive&&c.abnState&&c.abnState.surgingCountdown>0&&S.turn>(c.abnState.surgingAppliedTurn||0)){c.abnState.surgingCountdown--;if(c.abnState.surgingCountdown<=0){c.hp=0;c.alive=false;c.abnState.surgingActive=false;L(`　「押し寄せる鼓動」：${c.name}は3ターン経過し死亡`)}}}));
+ // 女王蜂の胞子：ターン終了時に現在値分の固定ダメージを与え、値を半減（切り捨て）。
+ if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee')S.p.forEach((p,pi)=>p.chars.forEach(c=>{const v=c.st&&c.st.spore||0;if(!c.alive||v<=0)return;direct(pi,c,v,'spore');c.st.spore=Math.floor(v/2);L(`　胞子：${c.name}の値は${c.st.spore}になった`);pf([],[ix(pi,c)],null)}));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{if(c.alive&&c.st.burn){direct(pi,c,c.st.burn,'burn');pf([],[ix(pi,c)],null)}}));
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
- S.p.forEach(p => resolveEmotion(p));
+ S.p.forEach((p,pi) => {if(!(typeof SOLO!=='undefined'&&SOLO.active&&pi===1))resolveEmotion(p)});
  pf([],[],null);
  S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
  const n=S.p.map(alive);
@@ -872,7 +883,7 @@ function chHTML(pi,ci,view){
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
  if(fr&&has(fr.sh))cls+=' hurt';
  const hd=A?((A.i<0?A.hold0:fr.hold)[pi][ci]||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
- const sn=A?(A.i<0?A.st0:fr.sts)[pi][ci]:c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
+ const sn=A?(A.i<0?A.st0:fr.sts)[pi][ci]:c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold','spore'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
  const evs=fr?fr.ev.filter(e=>e[0]===pi&&e[1]===ci).map(e=>e[2]):[];
  const badge=(k,v,nx)=>`<span class="stt${nx?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${nx?'（次のターンから）':''}：${STN[k].t}">${STN[k].i}${bk.includes(k)?(['guard','dmgdn','rolldn'].includes(k)?'-':'+'):''}${v}${nx?'<small>次</small>':''}</span>`;
  const sts=stk.filter(k=>ST[k]>0).map(k=>badge(k,ST[k])).join('')+bk.filter(k=>sn.bf[k]>0).map(k=>badge(k,sn.bf[k])).join('')+bk.filter(k=>sn.nx[k]>0).map(k=>badge(k,sn.nx[k],1)).join('');
@@ -888,14 +899,14 @@ function chHTML(pi,ci,view){
   (cls.includes('tgt')?`onclick="pickTgt(${ci})"`:'');
  let a='';
  if(isMine||!decide||(NET.on&&pi===view)){
-  a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${S.p[1-pi].chars[st.tgt].name}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
+  a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen?'女王蜂':(S.p[1-pi].chars[st.tgt]?S.p[1-pi].chars[st.tgt].name:'対象')}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
  }
  const showAbn=!!c.showAbn,abnList=c.abn||[];
  const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
  return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
- <div class="sts">${sts}${c.abnState&&c.abnState.iceLocked?'<span class="stt" style="--c:#89c8ff" title="氷の女王に凍結されている">❄ 凍結</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
+ <div class="sts">${sts}${c.abnState&&c.abnState.iceLocked?'<span class="stt" style="--c:#89c8ff" title="氷の女王に凍結されている">❄ 凍結</span>':''}${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&c.name==='妖精の塊'&&c.abnState&&c.abnState.preparedMeatTurn===S.turn?'<span class="stt" style="--c:#d9a441" title="ターン終了時にHP1なら女王妖精に捕食される">🍖 用意された肉</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
 const costDots=(p,u)=>{const on=p.cost-u;let h='';for(let i=0;i<p.max;i++)h+=`<i class="dot${i<on?' on':i<p.cost?' rs':''}"></i>`;return `<span class="cost" title="コスト ${on}/${p.max}">コスト ${h} <small>${on}/${p.max}</small></span>`};
 const emoGauge = p => {
