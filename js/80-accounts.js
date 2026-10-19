@@ -249,7 +249,6 @@ function soloAccountBackToLanding() {
   SCR = 'home'; render();
 }
 function soloAccountLandingHTML() {
-  const url = soloSheetUrl();
   return `<div class="home"><h1 style="font-size:1.8rem">カードゲーム</h1><p>遊び方を選んでください。幻想体戦・オンライン対戦はアカウントモード、一台で2人が交代する対戦は保存なしの一台モードです。</p>
     <section class="pf"><h2>アカウントモード</h2><p><small>ユーザー名・パスワードでログインすると、編成をGoogleスプレッドシートから読み込み、変更も自動保存します。パスワードはスプレッドシートに平文保存しません。</small></p>
       <p><label for="cgAccountName">ユーザー名（2〜12文字）</label><br><input id="cgAccountName" maxlength="12" autocomplete="username" value="${soloEsc(SOLO_ACCOUNT.formName)}" style="width:100%;box-sizing:border-box" placeholder="ユーザー名"></p>
@@ -257,10 +256,7 @@ function soloAccountLandingHTML() {
       <p><button class="go" onclick="soloAccountRegister()" ${SOLO_ACCOUNT.busy?'disabled':''}>新しいアカウントを作成</button> <button class="sub" onclick="soloAccountLogin()" ${SOLO_ACCOUNT.busy?'disabled':''}>ログイン</button></p>
       <p class="${soloEsc(SOLO_ACCOUNT.messageType)}">${soloEsc(SOLO_ACCOUNT.message || '初回はユーザー名とパスワードを決めて登録してください。')}</p>
     </section>
-    <section class="pf"><h2>Google連携設定</h2><p><small>Apps Scriptの「ウェブアプリ URL」（末尾が /exec）を指定します。公開済みApps Scriptのコードをアカウント対応版へ更新してください。</small></p>
-      <input id="cgAccountUrl" value="${soloEsc(url)}" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;box-sizing:border-box">
-      <p><button class="sub" onclick="soloAccountSaveUrl()">URLを保存</button></p>
-    </section>
+    <section class="pf"><h2>Google連携</h2><p><small>Google Apps ScriptのURLはゲーム本体に組み込み済みです。URLを入力する必要はありません。</small></p></section>
     <p><button class="go" onclick="soloEnterSingleDeviceMode()">一台モード（編成を保存しない）</button></p>
     <p><small>一台モードではプロフィール・編成は現在のページを開いている間だけ保持され、Googleスプレッドシートにもブラウザの保存領域にも書き込みません。ページを再読み込みすると消えます。</small></p><p><small>注意：パスワードを忘れた場合のメールによる再設定機能はありません。忘れないよう安全な場所に控えてください。</small></p>
   </div>`;

@@ -39,7 +39,9 @@ Object.assign(PK, {
 STN.cold = {n:'寒気', i:'❄', c:'#8bd5f5', t:'ターン終了時-1。ターン開始時4以上で速度-1・ダイス値-2、6以上で1ターン行動不能になり寒気をすべて失う。'};
 
 const soloEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const soloSheetUrl = () => { try { return String(localStorage.getItem(SOLO.sheetKey)||'').trim(); } catch(e) { return ''; } };
+// Google Apps Script URL is built into the game; no manual URL entry is needed.
+const SOLO_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwX66N5uX1cIyFPUWzXgVejb3ybAKsYwubW-sgRqigENv1ep2EOvRv_0wXr8TmCZqI/exec';
+const soloSheetUrl = () => SOLO_SCRIPT_URL;
 // 標準URLに加えて、Google Workspace配下やログインアカウント番号付きURLも受け付ける。
 const soloNormalizeSheetUrl = v => String(v||'').trim().replace(/\/exec\/(?=[?#]|$)/, '/exec');
 const soloValidSheetUrl = u => {
@@ -53,14 +55,13 @@ function saveSoloSheetUrl(v, doRender=true) {
     if (doRender) render();
     return false;
   }
-  try { localStorage.setItem(SOLO.sheetKey, u); }
-  catch(e) {
-    SOLO.cloudProfileMessage = 'URLをこのブラウザに保存できません。ブラウザのサイトデータ／Cookieの保存制限を確認してください。';
+  if (u !== SOLO_SCRIPT_URL) {
+    SOLO.cloudProfileMessage = '連携URLはゲーム本体に組み込まれているため、画面から変更できません。';
     if (doRender) render();
     return false;
   }
   SOLO.remoteRows = null; SOLO.remoteLoading = false; SOLO.remoteUrl = '';
-  SOLO.cloudProfiles = []; SOLO.cloudProfileMessage = 'URLを保存しました。アカウント登録またはログインに使えます。';
+  SOLO.cloudProfiles = []; SOLO.cloudProfileMessage = 'Google Apps Scriptの連携先はゲーム本体に設定済みです。';
   if (doRender) render();
   return true;
 }
@@ -331,7 +332,7 @@ function renderSoloMenu(){
     ${errors.length?`<p class="err">使用中デッキが未完成：${errors.map(soloEsc).join('、')}</p>`:''}
     <div class="pf"><h2>ボスを選ぶ</h2>${SOLO_BOSSES.map(b=>`<section style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0"><b>${soloEsc(b.name)}</b><p>${soloEsc(b.summary)}</p><button class="go" ${(!accountReady||errors.length)?'disabled':''} onclick="startSoloBattle('${b.id}')">挑戦する</button></section>`).join('')}</div>
     <div class="pf"><h2>ランキング</h2><p>アカウントごとの最少討伐ターン数を表示します。</p><p><button class="sub" onclick="SCR='soloRank';render()">ランキングを見る</button></p>
-    <p><small>連携先：${soloEsc(url?url.slice(0,56)+'…':'未設定')}</small></p></div>
+    <p><small>Google Apps Scriptの連携先はゲーム本体に設定済みです。</small></p></div>
   </div>`;
 }
 function renderSoloRank(triggerLoad=true){
