@@ -587,20 +587,23 @@ function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
 
 const checkPhillipAwakening=pi=>{
  const p=S&&S.p&&S.p[pi];if(!p)return false;
+ const sal=p.chars.find(c=>c.name==='サルヴァドール');
+ // サルヴァドールが実際に出撃して死亡しており、フィリップだけが生存している場合に限る。
+ if(!sal||sal.alive)return false;
  const live=p.chars.filter(c=>c.alive);
  if(live.length!==1||live[0].name!=='フィリップ')return false;
  const c=live[0];
- // 「不安定な自我の殻」を持つフィリップは、最初から単独で出撃する場合も、味方が倒れて単独になる場合も覚醒する。
  if(!hasPasKind(c,'unstableEgo'))return false;
  if(!c.abnState)c.abnState={};
  if(c.abnState.phillipAwakened||hasPasKind(c,'waxenwings'))return false;
  c.abnState.phillipAwakened=true;
  const wing=PAS.waxenwings;if(!wing)return false;
  c.ps.push({...wing});
- c.size=3;
- setupActionSlots(c,3);
+ // 覚醒しても枠数は通常の1枠のまま。増えるのは行動権のみ。
+ c.size=1;
+ setupActionSlots(c,2);
  const old=c.hp,heal=Math.ceil(c.max*0.5);c.hp=Math.min(c.max,c.hp+heal);
- L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。場の3枠を占有し、3回行動できる`);
+ L(`　「蜜蝋の翼」：サルヴァドール死亡後、フィリップが唯一の生存者となり覚醒。行動権2`);
  if(c.hp>old)L(`　「蜜蝋の翼」：HP+${c.hp-old}`);
  return true;
 };
@@ -993,7 +996,7 @@ function renderRules(){
  <section><h2>2. 準備</h2>
   <ul>
    <li>デッキは <b>${C.DECK}枚</b>。技カードは同じ名前を${C.MAXC}枚まで、キャラカードは1枚ずつ、キャラカードは1枚以上入れます（ホームの「デッキ構築」で作ります）。</li>
-   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、通常の大型キャラは2枠を使い、「蜜蝋の翼」を得たフィリップは3枠を占有します。</li>
+   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、通常の大型キャラは2枠を使い、「蜜蝋の翼」を得たフィリップも場の枠は1つのままです。</li>
    <li>選ばなかったキャラカードは山札に戻ります（あとで手札に来て、パッシブの帰属に使えます）。</li>
    <li>最初の手札は5枚、コストは${C.COST}です。</li>
   </ul></section>
@@ -1009,7 +1012,7 @@ function renderRules(){
 
  <section><h2>4. カードを使う</h2>
   <ul>
-   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、「蜜蝋の翼」を得たフィリップは3枚まで割り当てられます。</li>
+   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、「蜜蝋の翼」を得たフィリップは行動権2となり、最大2枚まで割り当てられます。</li>
    <li>割り当てたカードのコストの合計は、現在のコスト以内にします。割り当てたカードの「×」ボタンで割り当てを外して、付け替えられます。</li>
    <li>カードには<b>ダイス</b>が付いています：${die('a','3-8')}攻撃　${die('d','2-6')}防御　${die('e','4-9')}回避（数字は出目の範囲）。</li>
    <li>ダイスの<b>✧</b>は、そのダイスが当たったときの追加効果（的中時）、カードの「発動時」は使った時点で起きる効果です。</li>
