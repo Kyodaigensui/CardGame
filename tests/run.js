@@ -42,6 +42,94 @@ ok('ルール説明画面が開ける',(()=>{try{ev(C0,"SCR='rules';render()");r
 for(const c of names.ch){ // 全キャラが戦場データにできる
  ok('キャラ「'+c+'」を作れる',(()=>{try{ev(C0,`mkField(mkC(byKey[${JSON.stringify(c)}]))`);return true}catch(e){return false}})());
 }
+// ───── 幻想体戦：敵が先に決定し、行動不能が戦闘で処理される ─────
+{
+ const c=makeCtx();
+ const deck=(()=>{const d={};d['フィリップ']=1;const skills=names.sk.slice(0,14);skills.forEach((k,i)=>d[k]=(i%3)+1);return d})();
+ // 15枚を超えないよう、固定デッキを15枚に整える。
+ const validDeck=(()=>{const d={'フィリップ':1};let n=1;for(const k of names.sk){const take=Math.min(3,15-n);if(take<=0)break;d[k]=take;n+=take;}return d})();
+ const init=ev(c,`(()=>{SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(validDeck)};DK.hiers[0]='総記の階';return true})()`);
+ let soloStarted=false;
+ try {
+  ev(c,"startSoloBattle('blood_bath')");
+  const ci=ev(c,"S.p[0].pool.findIndex(x=>isCh(x))");
+  ev(c,`S.pick=[${ci}];confirmSetup()`);
+  soloStarted=ev(c,"S.phase==='decide'&&S.order[0]===1&&S.order[1]===0&&S.stage===1&&act()===0&&!!S.p[1].chars[0].card");
+ } catch(e) { soloStarted=false; }
+ ok('幻想体戦は速度に関係なく敵AIが先に決定し、プレイヤーが後から決定する',soloStarted);
+ let skipWorks=false,blocked=false;
+ try {
+  ev(c,`(()=>{const x=S.p[0].chars.find(z=>z.alive);x.abnState=x.abnState||{};x.abnState.skipThisTurn=true;x.max=9999;x.hp=9999;x.alive=true;return true})()`);
+  ev(c,'mine(0)');
+  blocked=ev(c,"S.msg.includes('行動不能')");
+  ev(c,`(()=>{const x=S.p[0].chars.find(z=>z.alive);setActionSlot(x,0);x.card={n:'テスト行動',c:0,d:[D('a',1,1)]};x.tgt=0;x.used=false;return true})()`);
+  ev(c,'done()');
+  skipWorks=ev(c,"S.log.some(x=>x.includes('行動不能のため行動をスキップ'))");
+ } catch(e) { skipWorks=false; }
+ ok('幻想体戦で行動不能のキャラは選択が制限され、戦闘処理でも行動をスキップする',skipWorks&&blocked,ev(c,"JSON.stringify({phase:S.phase,stage:S.stage,order:S.order,log:S.log.slice(-8),player:S.p[0].chars.map(x=>({name:x.name,alive:x.alive,skip:x.abnState&&x.abnState.skipThisTurn,card:x.card&&x.card.n,tgt:x.tgt,used:x.used})),enemy:S.p[1].chars.map(x=>({name:x.name,alive:x.alive,card:x.card&&x.card.n,tgt:x.tgt}))})"));
+}
+
+// ───── 幻想体戦：階層分類と歴史の階の4戦 ─────
+{
+ const deck=(()=>{const d={'フィリップ':1};let n=1;for(const k of names.sk){if(n>=15)break;d[k]=1;n++}return d})();
+ const menu=makeCtx();
+ ev(menu,"SCR='solo';render()");
+ ok('幻想体戦メニューが総記の階・歴史の階に分類される',/総記の階/.test(menu._els.app._h)&&/歴史の階/.test(menu._els.app._h));
+ ok('現在の3戦は総記の階、新しい4戦は歴史の階として登録される',
+  ev(menu,`SOLO_BOSSES.filter(x=>x.floor==='総記の階').map(x=>x.id).join(',')`)==='blood_bath,yearning_heart,ice_queen'&&
+  ev(menu,`SOLO_BOSSES.filter(x=>x.floor==='歴史の階').map(x=>x.id).join(',')`)==='burning_girl,happy_teddy,fairy_festival,queen_bee');
+ const setup=(id)=>{
+  const c=makeCtx();
+  ev(c,`SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(deck)};DK.hiers[0]='総記の階';startSoloBattle(${JSON.stringify(id)});S.pick=[S.p[0].pool.findIndex(x=>isCh(x))];confirmSetup()`);
+  return c;
+ };
+ const checkTeam=(id,expected)=>{
+  const c=setup(id);
+  const got=ev(c,"S.p[1].chars.map(x=>x.name).join('|')");
+  ok(`${id}の敵編成を生成できる`,got===expected,got);
+  return c;
+ };
+ const burn=checkTeam('burning_girl','燃え尽きた少女|最後のマッチの火|最後のマッチの火');
+ ok('燃え尽きた少女は最初の4ターン行動せず、5ターン目に自爆ページを準備する',
+  ev(burn,"S.p[1].chars[0].card===null")&&ev(burn,"S.turn=5;soloPlanEnemy();S.p[1].chars[0].card.n")==='4本目のマッチの火');
+ ev(burn,'done()');
+ ok('5ターン目の「4本目のマッチの火」使用後に燃え尽きた少女が自滅する',!ev(burn,"S.p[1].chars.find(x=>x.name==='燃え尽きた少女').alive"));
+ ok('燃え尽きた少女が自爆した時点で、最後のマッチの火が残っていても敵側の敗北になる',ev(burn,"S.over&&S.over.startsWith(S.p[0].name)&&S.p[1].chars.some(x=>x.name==='最後のマッチの火'&&x.alive)"),ev(burn,"JSON.stringify({over:S.over,phase:S.phase,enemies:S.p[1].chars.map(x=>({n:x.name,alive:x.alive}))})"));
+ const teddy=checkTeam('happy_teddy','幸せなテディ');
+ ok('幸せなテディは速度10固定、行動権2、コスト最大値2',ev(teddy,"S.p[1].chars[0].spd[0]===10&&S.p[1].chars[0].spd[1]===10&&S.p[1].chars[0].actionRights===2&&S.p[1].max===2"));
+ const fairy=checkTeam('fairy_festival','女王妖精|妖精の塊|妖精の塊');
+ ok('妖精の祭典は毎ターンの用意された肉をランダムな妖精の塊に付与する',ev(fairy,"S.p[1].chars.filter(x=>x.name==='妖精の塊').some(x=>x.abnState.preparedMeatTurn===S.turn)"));
+ const fed=checkTeam('fairy_festival','女王妖精|妖精の塊|妖精の塊');
+ ev(fed,`(()=>{const q=S.p[1].chars.find(x=>x.name==='女王妖精'),m=S.p[1].chars.find(x=>x.name==='妖精の塊'&&x.abnState.preparedMeatTurn===S.turn);q.hp=200;m.hp=1;return true})()`);
+ ev(fed,'done()');
+ ok('用意された肉を持つ妖精の塊がHP1なら捕食され、女王妖精が回復・被ダメージ+10を得る',ev(fed,"(()=>{const q=S.p[1].chars.find(x=>x.name==='女王妖精');return q.hp>200&&q.abnState.fairyDamageTaken===10&&S.p[1].chars.some(x=>x.name==='妖精の塊'&&!x.alive)})()"));
+ const bee=checkTeam('queen_bee','女王蜂|働き蜂|働き蜂');
+ ev(bee,'done()');
+ ok('女王蜂の働き蜂が胞子を付与し、ターン終了時の胞子ダメージを処理する',ev(bee,"S.log.some(x=>x.includes('胞子')&&x.includes('ダメージ'))&&S.p[0].chars[0].st.spore>0"),ev(bee,"JSON.stringify({spore:S.p[0].chars[0].st.spore,log:S.log.slice(-8)})"));
+ const beeSpawn=checkTeam('queen_bee','女王蜂|働き蜂|働き蜂');
+ ev(beeSpawn,`(()=>{const c=S.p[0].chars[0];c.hp=1;c.st.spore=2;c.abnState.sporesFromBee=true;return direct(0,c,3,'spore')})()`);
+ ok('胞子を持ったキャラが死亡すると働き蜂が場の枠を無視して生成される',ev(beeSpawn,"S.p[1].chars.filter(x=>x.name==='働き蜂').length===3"));
+ const beeFocus=checkTeam('queen_bee','女王蜂|働き蜂|働き蜂');
+ ev(beeFocus,"S.p[1].chars[0].hp=Math.floor(S.p[1].chars[0].max*.24);soloPlanEnemy()");
+ ok('女王蜂のHPが25%未満になると働き蜂が女王蜂を対象にする',ev(beeFocus,"S.p[1].chars.filter(x=>x.name==='働き蜂').every(x=>x.abnState.targetQueen&&x.tgt===0)"));
+ const teddyMatch=checkTeam('happy_teddy','幸せなテディ');
+ ev(teddyMatch,`(()=>{const p=S.p[0].chars[0],t=S.p[1].chars[0];p.card={n:'テスト攻撃',c:0,d:[D('a',10,10)]};p.tgt=0;p.used=false;p.hitFired=[];t.card=soloTeddyLight(0);t.tgt=0;t.used=false;t.hitFired=[];return true})()`);
+ ev(teddyMatch,'done()');
+ ok('幸せなテディはマッチ1回ごとに特殊ページのコストを1下げる',ev(teddyMatch,"S.p[1].chars[0].abnState.hugCost===4"));
+}
+
+// ───── フィリップ覚醒条件テスト ─────
+{
+ ok('フィリップのキャラカードがデッキ一覧に存在する',names.ch.includes('フィリップ'));
+ const ph=makeCtx();
+ ok('フィリップ固有パッシブが登録されている',!!ev(ph,"PAS.unstableego&&PAS.waxenwings&&PK.unstableEgo&&PK.waxenwings"));
+ const solo=ev(ph,`(()=>{const c=mkField(mkC(byKey['フィリップ']));c.hp=20;S={turn:1,p:[{chars:[c]}],log:[],inCombat:true};const done=checkPhillipAwakening(0);return {done,wing:hasPasKind(c,'waxenwings'),rights:c.actionRights,slots:actionStates(c).length}})()`);
+ ok('サルヴァドール未出場でフィリップ単独の場合は覚醒しない',!solo.done&&!solo.wing&&solo.rights==null&&solo.slots===1,JSON.stringify(solo));
+ const aliveSal=ev(ph,`(()=>{const s=mkField(mkC(byKey['サルヴァドール'])),c=mkField(mkC(byKey['フィリップ']));S={turn:1,p:[{chars:[s,c]}],log:[],inCombat:true};const done=checkPhillipAwakening(0);return {done,wing:hasPasKind(c,'waxenwings')}})()`);
+ ok('サルヴァドールが生存中はフィリップが唯一の生存者条件を満たさず覚醒しない',!aliveSal.done&&!aliveSal.wing,JSON.stringify(aliveSal));
+ const res=ev(ph,`(()=>{const s=mkField(mkC(byKey['サルヴァドール'])),c=mkField(mkC(byKey['フィリップ']));s.alive=false;s.hp=0;c.hp=20;S={turn:1,p:[{chars:[s,c]}],log:[],inCombat:true};const done=checkPhillipAwakening(0);return {done,alive:c.alive,hp:c.hp,max:c.max,size:c.size,rights:c.actionRights,wing:hasPasKind(c,'waxenwings'),slots:actionStates(c).length}})()`);
+ ok('サルヴァドール死亡時にフィリップが唯一の生存者なら1枠のまま行動権2とHP回復を得る',res.done&&res.wing&&res.size===1&&res.rights===2&&res.slots===2&&res.hp===Math.min(res.max,20+Math.ceil(res.max*.5)),JSON.stringify(res));
+}
 const mkDeck=()=>{const d={};const n=1+rnd(5);[...names.ch].sort(()=>Math.random()-.5).slice(0,n).forEach(c=>d[c]=1);let t=n;while(t<15){const s=pick(names.sk);if((d[s]||0)<3){d[s]=(d[s]||0)+1;t++}}return d};
 
 // ───── ② ホットシート（1台で交代）対戦の自動プレイ ─────
