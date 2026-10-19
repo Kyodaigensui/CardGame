@@ -1,67 +1,108 @@
 /**
- * CardGame Googleスプレッドシート連携
- * ランキングと公開プロフィール（ユーザー名・デッキ2つ・幻想体階層）を保存します。
- * スプレッドシートに紐づいた Apps Script としてウェブアプリにデプロイしてください。
- * 注意：プロフィールは公開共有データです。ログイン認証はありません。
+ * CardGame：アカウント・編成同期・幻想体戦ランキング
+ * スプレッドシートに紐づけた Apps Script をウェブアプリとしてデプロイします。
+ * パスワードは平文で保存しません。ブラウザからのPOSTはrequestIdで結果を照会します。
  */
-const RANKING_SHEET_NAME = 'ランキング';
-const RANKING_HEADERS = ['日時', 'プレイヤー名', '幻想体ID', '幻想体名', '討伐ターン数'];
-const PROFILE_SHEET_NAME = 'プロフィール';
-const PROFILE_HEADERS = ['ユーザー名', 'デッキ1(JSON)', 'デッキ2(JSON)', '幻想体階層(JSON)', '更新日時'];
-const RANKING_BOSSES = {
-  blood_bath: '血の風呂',
-  yearning_heart: '熱望する心臓',
-  ice_queen: '氷の女王'
-};
-const PROFILE_HIERARCHIES = ['総記の階', '歴史の階', '技術科学の階', '文学の階'];
-const MAX_ROWS_PER_BOSS = 50;
+const CG_ACCOUNT_SHEET = 'アカウント';
+const CG_ACCOUNT_HEADERS = ['アカウントID', 'ユーザー名', 'ソルト', 'パスワードハッシュ', 'デッキ1(JSON)', 'デッキ2(JSON)', '幻想体階層(JSON)', '作成日時', '更新日時'];
+const CG_RECORD_SHEET = '討伐記録';
+const CG_RECORD_HEADERS = ['日時', 'アカウントID', 'ユーザー名', '幻想体ID', '幻想体名', '討伐ターン数'];
+const CG_BOSSES = { blood_bath: '血の風呂', yearning_heart: '熱望する心臓', ice_queen: '氷の女王' };
+const CG_HIERARCHIES = ['総記の階', '歴史の階', '技術科学の階', '文学の階'];
+const CG_SESSION_SECONDS = 21600; // 6時間
+const CG_RESULT_SECONDS = 180;
+const CG_HASH_ROUNDS = 8000;
+const CG_LOGIN_MAX_FAILURES = 8;
+const CG_LOGIN_WINDOW_SECONDS = 3600;
 
-function getSheet_(name, headers) {
+function cgSheet_(name, headers) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) throw new Error('このスクリプトを連携用スプレッドシートに紐づけてください。');
+  if (!ss) throw new Error('このApps Scriptを保存先のGoogleスプレッドシートから「拡張機能 → Apps Script」で開いてください。');
   let sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
     sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   }
   return sheet;
 }
-function getRankingSheet_() { return getSheet_(RANKING_SHEET_NAME, RANKING_HEADERS); }
-function getProfileSheet_() { return getSheet_(PROFILE_SHEET_NAME, PROFILE_HEADERS); }
-
-function outputJson_(data, callback) {
-  const json = JSON.stringify(data);
-  // GitHub Pages側のクロスオリジン読み込みはJSONPで行います。
+function cgAccounts_() { return cgSheet_(CG_ACCOUNT_SHEET, CG_ACCOUNT_HEADERS); }
+function cgRecords_() { return cgSheet_(CG_RECORD_SHEET, CG_RECORD_HEADERS); }
+function cgOutput_(data, callback) {
+  const body = JSON.stringify(data);
   if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
-    return ContentService.createTextOutput(callback + '(' + json + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(callback + '(' + body + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
 }
-function cleanProfileName_(value) {
+function cgCleanName_(value) {
   return String(value || '').replace(/[<>&"'`\\\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
 }
-function safeParse_(value, fallback) {
-  try { return JSON.parse(String(value || '')); } catch (e) { return fallback; }
+function cgNameKey_(value) { return cgCleanName_(value).toLocaleLowerCase(); }
+function cgRequestId_(value) {
+  const id = String(value || '');
+  if (!/^[A-Za-z0-9_-]{20,80}$/.test(id)) throw new Error('リクエストIDが不正です。画面を更新してやり直してください。');
+  return id;
 }
-function profileRows_() {
-  const sheet = getProfileSheet_();
+function cgRequestKey_(id) { return 'result:' + id; }
+function cgPutResult_(id, result) {
+  if (!id) return;
+  try { CacheService.getScriptCache().put(cgRequestKey_(id), JSON.stringify(result), CG_RESULT_SECONDS); } catch (e) {}
+}
+function cgPasswordHash_(password, salt) {
+  let current = String(salt) + ':' + String(password);
+  for (let i = 0; i < CG_HASH_ROUNDS; i++) {
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, current, Utilities.Charset.UTF_8);
+    current = Utilities.base64Encode(bytes) + ':' + salt + ':' + i;
+  }
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, current, Utilities.Charset.UTF_8));
+}
+function cgEqual_(a, b) {
+  a = String(a || ''); b = String(b || '');
+  let diff = a.length ^ b.length;
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) diff |= (a.charCodeAt(i % Math.max(1, a.length)) || 0) ^ (b.charCodeAt(i % Math.max(1, b.length)) || 0);
+  return diff === 0;
+}
+function cgToken_() { return Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''); }
+function cgTokenHash_(token) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(token || ''), Utilities.Charset.UTF_8)).replace(/=+$/g, '');
+}
+function cgNewSession_(account) {
+  const token = cgToken_();
+  const session = { accountId: String(account.accountId), userName: String(account.userName), expiresAt: Date.now() + CG_SESSION_SECONDS * 1000 };
+  CacheService.getScriptCache().put('session:' + cgTokenHash_(token), JSON.stringify(session), CG_SESSION_SECONDS);
+  return { token: token, accountId: session.accountId, userName: session.userName };
+}
+function cgSession_(token) {
+  const raw = String(token || '');
+  if (raw.length < 32 || raw.length > 200) throw new Error('ログイン情報がありません。ログインし直してください。');
+  const encoded = CacheService.getScriptCache().get('session:' + cgTokenHash_(raw));
+  if (!encoded) throw new Error('ログインの有効期限が切れました。もう一度ログインしてください。');
+  const session = JSON.parse(encoded);
+  if (!session.accountId || Number(session.expiresAt) < Date.now()) throw new Error('ログインの有効期限が切れました。もう一度ログインしてください。');
+  return session;
+}
+function cgRows_() {
+  const sheet = cgAccounts_();
   const values = sheet.getDataRange().getValues();
-  return values.slice(1).map((row, i) => ({
-    rowNumber: i + 2,
-    name: cleanProfileName_(row[0]),
-    decks: [safeParse_(row[1], null), safeParse_(row[2], null)],
-    hierarchies: safeParse_(row[3], null),
-    updatedAt: row[4] instanceof Date ? row[4].toISOString() : String(row[4] || '')
-  })).filter(row => row.name);
+  return values.slice(1).map((r, i) => ({
+    row: i + 2,
+    accountId: String(r[0] || ''),
+    userName: cgCleanName_(r[1]),
+    salt: String(r[2] || ''),
+    passwordHash: String(r[3] || ''),
+    decks: [cgParse_(r[4], null), cgParse_(r[5], null)],
+    hierarchies: cgParse_(r[6], null),
+    createdAt: r[7] instanceof Date ? r[7].toISOString() : String(r[7] || ''),
+    updatedAt: r[8] instanceof Date ? r[8].toISOString() : String(r[8] || '')
+  })).filter(x => x.accountId && x.userName);
 }
-function findProfile_(name) {
-  const normalized = cleanProfileName_(name).toLocaleLowerCase();
-  if (!normalized) return null;
-  return profileRows_().find(row => row.name.toLocaleLowerCase() === normalized) || null;
-}
-function validateDeck_(deck) {
+function cgParse_(v, fallback) { try { return JSON.parse(String(v || '')); } catch (e) { return fallback; } }
+function cgFindByName_(name) { const key = cgNameKey_(name); return cgRows_().find(x => cgNameKey_(x.userName) === key) || null; }
+function cgFindById_(id) { return cgRows_().find(x => x.accountId === String(id)) || null; }
+function cgValidateDeck_(deck) {
   if (!deck || typeof deck !== 'object' || Array.isArray(deck)) return false;
   const keys = Object.keys(deck);
   if (keys.length > 100) return false;
@@ -73,90 +114,138 @@ function validateDeck_(deck) {
   }
   return total === 15;
 }
-function validateProfile_(profile) {
-  if (!profile || typeof profile !== 'object') throw new Error('プロフィールデータがありません。');
-  const name = cleanProfileName_(profile.name);
-  if (!name) throw new Error('ユーザー名が空です。');
-  if (/^[=+\-@]/.test(name)) throw new Error('ユーザー名の先頭に =、+、-、@ は使えません。');
-  if (!Array.isArray(profile.decks) || profile.decks.length !== 2 || !profile.decks.every(validateDeck_)) {
-    throw new Error('デッキが正しくありません（2つとも15枚必要です）。');
+function cgValidateProfile_(profile, userName) {
+  if (!profile || typeof profile !== 'object') throw new Error('編成データがありません。');
+  if (!Array.isArray(profile.decks) || profile.decks.length !== 2 || !profile.decks.every(cgValidateDeck_)) {
+    throw new Error('デッキ1・デッキ2を、それぞれ15枚にしてから保存してください。');
   }
-  const hs = Array.isArray(profile.hierarchies) ? profile.hierarchies : [];
-  const hierarchies = [0, 1].map(i => PROFILE_HIERARCHIES.includes(hs[i]) ? hs[i] : PROFILE_HIERARCHIES[0]);
-  const jsonLength = JSON.stringify(profile.decks).length + JSON.stringify(hierarchies).length;
-  if (jsonLength > 30000) throw new Error('プロフィールのデータが大きすぎます。');
-  return { name, decks: profile.decks, hierarchies };
+  const supplied = Array.isArray(profile.hierarchies) ? profile.hierarchies : [];
+  const hierarchies = [0, 1].map(i => CG_HIERARCHIES.includes(supplied[i]) ? supplied[i] : CG_HIERARCHIES[0]);
+  if (JSON.stringify(profile.decks).length + JSON.stringify(hierarchies).length > 30000) throw new Error('編成データが大きすぎます。');
+  return { userName: cgCleanName_(userName), decks: profile.decks, hierarchies: hierarchies };
 }
-
+function cgProfileResult_(account) {
+  return { userName: account.userName, decks: account.decks, hierarchies: Array.isArray(account.hierarchies) ? account.hierarchies : [CG_HIERARCHIES[0], CG_HIERARCHIES[0]], updatedAt: account.updatedAt || '' };
+}
+function cgCreateAccount_(payload) {
+  const userName = cgCleanName_(payload.userName || payload.name);
+  if (userName.length < 2) throw new Error('ユーザー名は2〜12文字で入力してください。');
+  if (/^[=+\-@]/.test(userName)) throw new Error('ユーザー名の先頭に =、+、-、@ は使えません。');
+  const password = String(payload.password || '');
+  if (password.length < 8 || password.length > 100) throw new Error('パスワードは8〜100文字にしてください。');
+  const profile = cgValidateProfile_(payload.profile || {}, userName);
+  const salt = Utilities.getUuid() + Utilities.getUuid();
+  const passwordHash = cgPasswordHash_(password, salt);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let rowData;
+  try {
+    if (cgFindByName_(userName)) throw new Error('そのユーザー名はすでに使われています。別の名前を入力してください。');
+    const now = new Date();
+    const accountId = Utilities.getUuid();
+    rowData = { accountId: accountId, userName: userName, decks: profile.decks, hierarchies: profile.hierarchies, createdAt: now.toISOString(), updatedAt: now.toISOString() };
+    cgAccounts_().appendRow([accountId, userName, salt, passwordHash, JSON.stringify(profile.decks[0]), JSON.stringify(profile.decks[1]), JSON.stringify(profile.hierarchies), now, now]);
+  } finally { lock.releaseLock(); }
+  const session = cgNewSession_(rowData);
+  return { ok: true, token: session.token, accountId: session.accountId, userName: session.userName, profile: cgProfileResult_(rowData) };
+}
+function cgLogin_(payload) {
+  const userName = cgCleanName_(payload.userName || payload.name);
+  const password = String(payload.password || '');
+  if (!userName || !password) throw new Error('ユーザー名とパスワードを入力してください。');
+  const key = 'login-fail:' + cgTokenHash_(cgNameKey_(userName));
+  const cache = CacheService.getScriptCache();
+  const attempts = Number(cache.get(key) || 0);
+  if (attempts >= CG_LOGIN_MAX_FAILURES) throw new Error('ログイン試行が多すぎます。1時間ほど待ってから再試行してください。');
+  const account = cgFindByName_(userName);
+  if (!account || !cgEqual_(cgPasswordHash_(password, account.salt), account.passwordHash)) {
+    cache.put(key, String(attempts + 1), CG_LOGIN_WINDOW_SECONDS);
+    throw new Error('ユーザー名またはパスワードが違います。ログイン失敗が続くと一時的に制限されます。');
+  }
+  cache.remove(key);
+  const session = cgNewSession_(account);
+  return { ok: true, token: session.token, accountId: session.accountId, userName: session.userName, profile: cgProfileResult_(account) };
+}
+function cgSaveProfile_(payload) {
+  const session = cgSession_(payload.token);
+  const account = cgFindById_(session.accountId);
+  if (!account) throw new Error('アカウントが見つかりません。もう一度登録してください。');
+  const profile = cgValidateProfile_(payload.profile || {}, account.userName);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let now;
+  try {
+    now = new Date();
+    cgAccounts_().getRange(account.row, 5, 1, 5).setValues([[JSON.stringify(profile.decks[0]), JSON.stringify(profile.decks[1]), JSON.stringify(profile.hierarchies), account.createdAt ? new Date(account.createdAt) : now, now]]);
+  } finally { lock.releaseLock(); }
+  return { ok: true, userName: account.userName, updatedAt: now.toISOString() };
+}
+function cgGetProfile_(payload) {
+  const session = cgSession_(payload.token);
+  const account = cgFindById_(session.accountId);
+  if (!account) throw new Error('アカウントが見つかりません。もう一度登録してください。');
+  return { ok: true, accountId: account.accountId, userName: account.userName, profile: cgProfileResult_(account) };
+}
+function cgSubmitRank_(payload) {
+  const session = cgSession_(payload.token);
+  const account = cgFindById_(session.accountId);
+  if (!account) throw new Error('アカウントが見つかりません。もう一度ログインしてください。');
+  const boss = String(payload.boss || '');
+  const turns = Number(payload.turns);
+  if (!Object.prototype.hasOwnProperty.call(CG_BOSSES, boss)) throw new Error('幻想体IDが不正です。');
+  if (!Number.isInteger(turns) || turns < 1 || turns > 9999) throw new Error('ターン数が不正です。');
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try { cgRecords_().appendRow([new Date(), account.accountId, account.userName, boss, CG_BOSSES[boss], turns]); }
+  finally { lock.releaseLock(); }
+  return { ok: true, userName: account.userName, boss: boss, turns: turns };
+}
+function cgRanking_() {
+  const values = cgRecords_().getDataRange().getValues();
+  const best = {};
+  values.slice(1).forEach(row => {
+    const date = row[0] instanceof Date ? row[0].toISOString() : String(row[0] || '');
+    const accountId = String(row[1] || ''), name = String(row[2] || ''), boss = String(row[3] || ''), turns = Number(row[5]);
+    if (!accountId || !name || !Object.prototype.hasOwnProperty.call(CG_BOSSES, boss) || !Number.isInteger(turns) || turns < 1) return;
+    const key = accountId + ':' + boss;
+    const old = best[key];
+    if (!old || turns < old.turns || (turns === old.turns && date < old.date)) best[key] = { date: date, accountId: accountId, name: name, boss: boss, bossName: CG_BOSSES[boss], turns: turns };
+  });
+  return Object.keys(best).map(k => best[k]).sort((a, b) => a.boss.localeCompare(b.boss) || a.turns - b.turns || a.date.localeCompare(b.date)).slice(0, 300);
+}
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = String(params.action || 'ranking');
   try {
-    if (action === 'profiles') {
-      const rows = profileRows_().map(row => ({ name: row.name, updatedAt: row.updatedAt }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-      return outputJson_({ ok: true, rows }, params.callback || '');
+    if (action === 'health') return cgOutput_({ ok: true, version: 'accounts-v1' }, params.callback || '');
+    if (action === 'result') {
+      const id = cgRequestId_(params.requestId || params.id);
+      const cached = CacheService.getScriptCache().get(cgRequestKey_(id));
+      return cgOutput_(cached ? JSON.parse(cached) : { ok: false, pending: true }, params.callback || '');
     }
-    if (action === 'profile') {
-      const row = findProfile_(params.name);
-      if (!row) return outputJson_({ ok: false, error: 'プロフィールが見つかりません。' }, params.callback || '');
-      return outputJson_({ ok: true, profile: {
-        name: row.name, decks: row.decks, hierarchies: row.hierarchies, updatedAt: row.updatedAt
-      } }, params.callback || '');
-    }
-    if (action !== 'ranking') {
-      return outputJson_({ ok: false, error: 'Unsupported action' }, params.callback || '');
-    }
-    const values = getRankingSheet_().getDataRange().getValues();
-    const rows = values.slice(1).map(row => ({
-      date: row[0] instanceof Date ? row[0].toISOString() : String(row[0] || ''),
-      name: String(row[1] || ''), boss: String(row[2] || ''), bossName: String(row[3] || ''), turns: Number(row[4])
-    })).filter(row => RANKING_BOSSES[row.boss] && Number.isInteger(row.turns) && row.turns > 0 && row.name);
-    const best = [];
-    Object.keys(RANKING_BOSSES).forEach(boss => {
-      rows.filter(row => row.boss === boss)
-        .sort((a, b) => a.turns - b.turns || String(a.date).localeCompare(String(b.date)))
-        .slice(0, MAX_ROWS_PER_BOSS).forEach(row => best.push(row));
-    });
-    return outputJson_({ ok: true, rows: best }, params.callback || '');
-  } catch (err) {
-    return outputJson_({ ok: false, error: String(err && err.message || err) }, params.callback || '');
-  }
+    if (action === 'ranking') return cgOutput_({ ok: true, rows: cgRanking_() }, params.callback || '');
+    return cgOutput_({ ok: false, error: '未対応の操作です。' }, params.callback || '');
+  } catch (err) { return cgOutput_({ ok: false, error: String(err && err.message || err) }, params.callback || ''); }
 }
-
 function doPost(e) {
+  let requestId = '';
   try {
     const raw = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
     const payload = JSON.parse(raw);
-    if (!payload || typeof payload !== 'object') throw new Error('送信データが不正です。');
-
-    if (payload.action === 'saveProfile') {
-      const profile = validateProfile_(payload.profile || payload);
-      const lock = LockService.getScriptLock();
-      lock.waitLock(5000);
-      try {
-        const sheet = getProfileSheet_();
-        const existing = findProfile_(profile.name);
-        const row = [profile.name, JSON.stringify(profile.decks[0]), JSON.stringify(profile.decks[1]), JSON.stringify(profile.hierarchies), new Date()];
-        if (existing) sheet.getRange(existing.rowNumber, 1, 1, PROFILE_HEADERS.length).setValues([row]);
-        else sheet.appendRow(row);
-      } finally { lock.releaseLock(); }
-      return outputJson_({ ok: true, name: profile.name, updatedAt: new Date().toISOString() });
+    requestId = cgRequestId_(payload.requestId);
+    const prior = CacheService.getScriptCache().get(cgRequestKey_(requestId));
+    if (prior) return cgOutput_({ ok: true, requestId: requestId });
+    let result;
+    switch (String(payload.action || '')) {
+      case 'register': result = cgCreateAccount_(payload); break;
+      case 'login': result = cgLogin_(payload); break;
+      case 'getProfile': result = cgGetProfile_(payload); break;
+      case 'saveProfile': result = cgSaveProfile_(payload); break;
+      case 'submitRank': result = cgSubmitRank_(payload); break;
+      default: throw new Error('未対応の操作です。');
     }
-
-    if (payload.action !== 'submit') throw new Error('Unsupported action');
-    const name = cleanProfileName_(payload.name).replace(/^[=+\-@]+/, '').slice(0, 12);
-    const boss = String(payload.boss || '');
-    const turns = Number(payload.turns);
-    if (!name) throw new Error('プレイヤー名が空です');
-    if (!Object.prototype.hasOwnProperty.call(RANKING_BOSSES, boss)) throw new Error('幻想体IDが不正です');
-    if (!Number.isInteger(turns) || turns < 1 || turns > 9999) throw new Error('ターン数が不正です');
-    const lock = LockService.getScriptLock();
-    lock.waitLock(5000);
-    try { getRankingSheet_().appendRow([new Date(), name, boss, RANKING_BOSSES[boss], turns]); }
-    finally { lock.releaseLock(); }
-    return outputJson_({ ok: true });
+    cgPutResult_(requestId, result);
+    return cgOutput_({ ok: true, requestId: requestId });
   } catch (err) {
-    return outputJson_({ ok: false, error: String(err && err.message || err) });
+    const result = { ok: false, error: String(err && err.message || err) };
+    if (requestId) cgPutResult_(requestId, result);
+    return cgOutput_({ ok: false, requestId: requestId, error: result.error });
   }
 }

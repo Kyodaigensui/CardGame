@@ -76,8 +76,22 @@ const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.sli
 // ===== プレイヤー名とデッキの保存 =====
 // 名前ごとにデッキ2つを、このブラウザ（localStorage）へ保存する。別の端末・別のブラウザへは自動では引き継がれない（バックアップで持ち運べる）
 const cleanName=s=>String(s==null?'':s).replace(/[<>&"'`\\\u0000-\u001f]/g,'').replace(/\s+/g,' ').trim().slice(0,12);   // 画面に出す名前：記号を除いて12文字まで
-const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
-const lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
+// 一台モードではプロフィールをメモリ内だけで扱い、ブラウザやスプレッドシートへ永続保存しない。
+let CG_NO_PERSIST=false;
+const CG_TEMP_PROFILE_STORE={};
+const CG_PROFILE_KEYS=new Set(['cg_profiles','cg_cur','cg_decks']);
+const lsGet=k=>{
+ try{
+  if(CG_NO_PERSIST&&CG_PROFILE_KEYS.has(k))return Object.prototype.hasOwnProperty.call(CG_TEMP_PROFILE_STORE,k)?CG_TEMP_PROFILE_STORE[k]:null;
+  return localStorage.getItem(k);
+ }catch(e){return null}
+};
+const lsSet=(k,v)=>{
+ try{
+  if(CG_NO_PERSIST&&CG_PROFILE_KEYS.has(k)){CG_TEMP_PROFILE_STORE[k]=String(v);return true;}
+  localStorage.setItem(k,v);return true;
+ }catch(e){return false}
+};
 const readProfiles=()=>{let p=null;try{p=JSON.parse(lsGet('cg_profiles'))}catch(e){}return Array.isArray(p)?p.filter(x=>x&&typeof x.name==='string'):[]};
 const writeProfiles=l=>lsSet('cg_profiles',JSON.stringify(l));
 const fixDecks=d=>{   // 保存デッキの確認：存在しないカードは除き、枚数が合わなければ初期デッキに戻す
@@ -97,6 +111,10 @@ const loadHierarchies=()=>{
 };
 let SCR='home',DK={d:loadDecks(),cur:0,warn:false,sort:'cost',hiers:loadHierarchies()};   // sort：cost＝コスト順 / file＝登録順
 const saveDecks=()=>{
+ // アカウントモード中は編成をGoogleスプレッドシートへ自動保存し、ブラウザ内の公開プロフィールには書かない。
+ if(typeof SOLO_ACCOUNT!=='undefined'&&SOLO_ACCOUNT&&SOLO_ACCOUNT.mode==='account'&&SOLO_ACCOUNT.token){
+  soloAccountScheduleSave();return;
+ }
  if(!PF.name){DK.warn=true;return}
  const l=readProfiles(),e={name:PF.name,decks:DK.d,hierarchies:validHiers(DK.hiers)},i=l.findIndex(x=>x.name===PF.name);
  if(i>=0)l[i]=e;else l.push(e);

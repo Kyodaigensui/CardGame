@@ -9,11 +9,11 @@ const SOLO = {
   remoteRows: null,
   remoteLoading: false,
   remoteUrl: '',
-  localKey: 'cg_solo_records_v1',
   sheetKey: 'cg_solo_sheet_endpoint',
   cloudProfiles: [],
   cloudProfilesLoading: false,
-  cloudProfileMessage: ''
+  cloudProfileMessage: '',
+  recordStatus: ''
 };
 const SOLO_BOSSES = [
   {id:'blood_bath', name:'血の風呂', summary:'2回行動。ダイス値低下、3連撃による行動不能、3ダイス防御を使う。'},
@@ -60,7 +60,7 @@ function saveSoloSheetUrl(v, doRender=true) {
     return false;
   }
   SOLO.remoteRows = null; SOLO.remoteLoading = false; SOLO.remoteUrl = '';
-  SOLO.cloudProfiles = []; SOLO.cloudProfileMessage = 'URLを保存しました。共有プロフィール一覧を更新してください。';
+  SOLO.cloudProfiles = []; SOLO.cloudProfileMessage = 'URLを保存しました。アカウント登録またはログインに使えます。';
   if (doRender) render();
   return true;
 }
@@ -72,32 +72,19 @@ function soloCaptureSheetUrlFromInput() {
   if (value === soloSheetUrl()) return soloValidSheetUrl(value);
   return saveSoloSheetUrl(value, false);
 }
-function soloLocalRecords() {
-  try { const a=JSON.parse(localStorage.getItem(SOLO.localKey)||'[]'); return Array.isArray(a)?a.filter(x=>x&&typeof x.name==='string'&&SOLO_BOSSES.some(b=>b.id===x.boss)&&Number.isInteger(+x.turns)&&+x.turns>0):[]; }
-  catch(e) { return []; }
-}
-function soloSaveLocalRecord(row) {
-  const a=soloLocalRecords();
-  a.push({...row, source:'local'});
-  a.sort((x,y)=>(+x.turns)-(+y.turns)||String(x.date||'').localeCompare(String(y.date||'')));
-  try { localStorage.setItem(SOLO.localKey, JSON.stringify(a.slice(0,300))); } catch(e) {}
-}
-function soloSubmitSheetRecord(row) {
-  const url=soloSheetUrl();
-  if(!soloValidSheetUrl(url)||typeof fetch!=='function') return;
-  // no-cors + text/plain avoids a browser CORS preflight. Response cannot be read; the sheet is the final source of truth.
-  fetch(url, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=UTF-8'}, body:JSON.stringify({action:'submit',name:row.name,boss:row.boss,turns:row.turns})}).catch(()=>{});
-}
 function soloRequestRemoteRows() {
   const url=soloSheetUrl();
-  if(!soloValidSheetUrl(url) || SOLO.remoteLoading || SOLO.remoteUrl===url || typeof document.createElement!=='function' || !document.body || typeof document.body.appendChild!=='function') return;
+  if(!soloValidSheetUrl(url) || SOLO.remoteLoading) return;
   SOLO.remoteLoading=true; SOLO.remoteUrl=url;
-  const cb='__cgSoloRankCallback';
-  window[cb]=data=>{SOLO.remoteLoading=false;SOLO.remoteRows=data&&data.ok&&Array.isArray(data.rows)?data.rows:[];renderSoloRank(false);};
-  const s=document.createElement('script');
-  s.src=url+(url.includes('?')?'&':'?')+'action=ranking&callback='+cb+'&v='+Date.now();
-  s.onerror=()=>{SOLO.remoteLoading=false;SOLO.remoteRows=[];renderSoloRank(false);};
-  document.body.appendChild(s);
+  soloJsonp({action:'ranking'}, data=>{
+    SOLO.remoteLoading=false;
+    SOLO.remoteRows=data&&data.ok&&Array.isArray(data.rows)?data.rows:[];
+    SOLO.cloudProfileMessage=data&&data.ok?'':(data&&data.error||'ランキングの取得に失敗しました。');
+    renderSoloRank(false);
+  }, err=>{
+    SOLO.remoteLoading=false;SOLO.remoteRows=[];SOLO.cloudProfileMessage=err.message||'ランキングを取得できませんでした。';
+    renderSoloRank(false);
+  });
 }
 
 let SOLO_JSONP_SEQ = 0;
@@ -112,133 +99,30 @@ function soloJsonp(params, onData, onError) {
     .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(k === 'callback' ? cb : params[k]))
     .join('&');
   const script = document.createElement('script');
+  script.async = true;
   let finished = false;
+  let timeoutId = null;
   const cleanup = () => {
     if (finished) return;
     finished = true;
+    if (timeoutId !== null) clearTimeout(timeoutId);
     try { delete window[cb]; } catch (e) { window[cb] = undefined; }
     if (script.parentNode && script.parentNode.removeChild) script.parentNode.removeChild(script);
   };
   window[cb] = data => { cleanup(); if (onData) onData(data); };
-  script.onerror = () => { cleanup(); if (onError) onError(new Error('Googleスプレッドシートから応答がありません。URLと公開設定を確認してください。')); };
+  script.onerror = () => {
+    cleanup();
+    if (onError) onError(new Error('Google Apps Scriptの読み込みに失敗しました。ウェブアプリURL（/exec）と公開設定を確認してください。'));
+  };
+  // Googleのログイン画面へ転送された場合など、script.onerror もJSONP callbackも呼ばれず
+  // 読み込み表示が永遠に残ることがあるため、必ずタイムアウトさせる。
+  timeoutId = setTimeout(() => {
+    cleanup();
+    if (onError) onError(new Error('Apps Scriptから15秒以内に応答がありませんでした。/exec URLを使い、デプロイを最新バージョンに更新し、「アクセスできるユーザー」を「全員」に設定してください。Googleアカウントのログイン画面が出る設定では共有できません。'));
+  }, 15000);
   script.src = url + (url.includes('?') ? '&' : '?') + query;
   document.body.appendChild(script);
 }
-function soloRefreshCloudProfiles(shouldRender=true) {
-  if (!soloCaptureSheetUrlFromInput()) {
-    if (!SOLO.cloudProfileMessage) SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。';
-    if (shouldRender) render();
-    return;
-  }
-  if (!soloValidSheetUrl(soloSheetUrl())) {
-    SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。';
-    if (shouldRender) render();
-    return;
-  }
-  if (SOLO.cloudProfilesLoading) return;
-  SOLO.cloudProfilesLoading = true;
-  SOLO.cloudProfileMessage = '共有プロフィール一覧を読み込んでいます…';
-  soloJsonp({action:'profiles'}, data => {
-    SOLO.cloudProfilesLoading = false;
-    SOLO.cloudProfiles = data && data.ok && Array.isArray(data.rows) ? data.rows.filter(x=>x&&typeof x.name==='string') : [];
-    SOLO.cloudProfileMessage = data && data.ok ? `共有プロフィール ${SOLO.cloudProfiles.length} 件` : (data&&data.error||'一覧を読み込めませんでした。');
-    if (shouldRender && SCR === 'home') render();
-  }, err => {
-    SOLO.cloudProfilesLoading = false;
-    SOLO.cloudProfileMessage = err.message || '一覧を読み込めませんでした。';
-    if (shouldRender && SCR === 'home') render();
-  });
-}
-function soloCloudProfileValid(profile) {
-  if (!profile || !Array.isArray(profile.decks) || profile.decks.length !== 2) return false;
-  try {
-    return !dErr(profile.decks[0]).length && !dErr(profile.decks[1]).length && Array.isArray(profile.hierarchies);
-  } catch (e) { return false; }
-}
-function soloLoadCloudProfile(name) {
-  name = String(name || '').trim();
-  if (!name) { SOLO.cloudProfileMessage = '読み込むユーザー名を選んでください。'; render(); return; }
-  SOLO.cloudProfileMessage = `「${name}」を読み込んでいます…`; render();
-  soloJsonp({action:'profile', name}, data => {
-    if (!data || !data.ok || !soloCloudProfileValid(data.profile)) {
-      SOLO.cloudProfileMessage = data && data.error ? data.error : 'プロフィールのデータが不正です。'; render(); return;
-    }
-    const profile = data.profile;
-    const profileName = cleanName(profile.name);
-    const decks = fixDecks(profile.decks);
-    const hierarchies = validHiers(profile.hierarchies);
-    const list = readProfiles();
-    const i = list.findIndex(x=>x.name===profileName);
-    if (i >= 0 && JSON.stringify({decks:list[i].decks,hierarchies:validHiers(list[i].hierarchies)}) !== JSON.stringify({decks,hierarchies})) {
-      if (!confirm(`この端末の「${profileName}」のデッキを、スプレッドシートの内容で上書きしますか？`)) {
-        SOLO.cloudProfileMessage = '読み込みをキャンセルしました。'; render(); return;
-      }
-    }
-    const entry = {name:profileName,decks,hierarchies};
-    if (i >= 0) list[i] = entry; else list.push(entry);
-    if (!writeProfiles(list)) { SOLO.cloudProfileMessage='この端末にプロフィールを保存できませんでした。'; render(); return; }
-    lsSet('cg_cur', profileName);
-    DK.d = loadDecks(); DK.cur = 0; DK.hiers = loadHierarchies(); DK.warn = false; PF.msg = '';
-    SOLO.cloudProfileMessage = `「${profileName}」のユーザー名・デッキ2つ・階層を読み込みました。`;
-    render();
-  }, err => { SOLO.cloudProfileMessage = err.message || 'プロフィールを読み込めませんでした。'; render(); });
-}
-function soloSaveCloudProfile() {
-  if (!soloCaptureSheetUrlFromInput()) { render(); return; }
-  const url = soloSheetUrl();
-  if (!soloValidSheetUrl(url)) { SOLO.cloudProfileMessage = '先にGoogle Apps ScriptのURLを設定してください。'; render(); return; }
-  if (!PF.name) { SOLO.cloudProfileMessage = '先にユーザー名を作成または選択してください。'; render(); return; }
-  saveDecks();
-  const profile = {name:PF.name,decks:DK.d,hierarchies:validHiers(DK.hiers)};
-  if (!dErr(profile.decks[0]).length && !dErr(profile.decks[1]).length) {
-    // no-cors のPOSTはブラウザから応答本文を読めないため、送信後にJSONPで保存結果を照合します。
-    if (typeof fetch !== 'function') { SOLO.cloudProfileMessage='このブラウザは同期に必要な通信機能に対応していません。'; render(); return; }
-    SOLO.cloudProfileMessage = 'スプレッドシートへ保存しています…'; render();
-    fetch(url, {method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'saveProfile',profile})})
-      .then(() => setTimeout(() => soloVerifyCloudProfile(profile, 0), 900))
-      .catch(() => { SOLO.cloudProfileMessage='送信に失敗しました。URLと公開設定を確認してください。'; render(); });
-  } else { SOLO.cloudProfileMessage='デッキ1・デッキ2を両方15枚にしてから共有保存してください。'; render(); }
-}
-function soloVerifyCloudProfile(expected, attempt) {
-  soloJsonp({action:'profile',name:expected.name}, data => {
-    if (data && data.ok && data.profile && soloCloudProfileValid(data.profile)) {
-      const actual = {name:cleanName(data.profile.name),decks:fixDecks(data.profile.decks),hierarchies:validHiers(data.profile.hierarchies)};
-      const same = actual.name === expected.name && JSON.stringify(actual.decks) === JSON.stringify(expected.decks) && JSON.stringify(actual.hierarchies) === JSON.stringify(expected.hierarchies);
-      if (same) {
-        SOLO.cloudProfileMessage = `「${expected.name}」のユーザー名・デッキ2つ・階層をスプレッドシートへ保存しました。`;
-        soloRefreshCloudProfiles(false);
-      } else if (attempt < 2) {
-        setTimeout(() => soloVerifyCloudProfile(expected, attempt + 1), 900);
-        return;
-      } else SOLO.cloudProfileMessage = '保存を確認できませんでした。公開設定・デプロイの更新を確認してください。';
-    } else if (attempt < 2) {
-      setTimeout(() => soloVerifyCloudProfile(expected, attempt + 1), 900);
-      return;
-    } else SOLO.cloudProfileMessage = 'スプレッドシートにプロフィールが見つかりません。Apps Scriptのエラーと公開設定を確認してください。';
-    if (SCR === 'home') render();
-  }, err => {
-    if (attempt < 2) { setTimeout(() => soloVerifyCloudProfile(expected, attempt + 1), 900); return; }
-    SOLO.cloudProfileMessage = err.message || '保存結果を確認できませんでした。';
-    if (SCR === 'home') render();
-  });
-}
-function soloCloudProfilePanelHTML() {
-  const url = soloSheetUrl();
-  const profiles = Array.isArray(SOLO.cloudProfiles) ? SOLO.cloudProfiles : [];
-  const current = PF.name || '';
-  return `<section class="pf"><h2>Googleスプレッドシート：ユーザー名・編成の共有</h2>
-    <p><small>ここでいう編成は、デッキ1・デッキ2と各デッキの幻想体カード階層です。同じURLを設定した別端末から読み込めます。</small></p>
-    <p><label for="soloCloudUrl">Apps Script ウェブアプリURL（末尾 /exec）</label><br><input id="soloCloudUrl" value="${soloEsc(url)}" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;box-sizing:border-box"></p>
-    <p><button class="sub" onclick="saveSoloSheetUrl(document.getElementById('soloCloudUrl').value)">URLを保存</button>
-    <button class="sub" onclick="soloRefreshCloudProfiles(true)" ${SOLO.cloudProfilesLoading?'disabled':''}>共有プロフィール一覧を更新</button></p>
-    <p>共有プロフィール：<select id="soloCloudProfileName" style="max-width:100%">${profiles.map(x=>`<option value="${soloEsc(x.name)}"${x.name===current?' selected':''}>${soloEsc(x.name)}${x.updatedAt?'（更新 '+soloEsc(String(x.updatedAt).slice(0,10))+'）':''}</option>`).join('')}</select></p>
-    <p><button class="sub" onclick="soloLoadCloudProfile(document.getElementById('soloCloudProfileName').value)" ${profiles.length?'':'disabled'}>選んだプロフィールを読み込む</button>
-    <button class="go" onclick="soloSaveCloudProfile()" ${current?'':'disabled'}>現在のユーザー名・編成を共有保存</button></p>
-    <p class="msg">${soloEsc(SOLO.cloudProfileMessage || (profiles.length?`共有プロフィール ${profiles.length} 件`:'URLを設定して一覧を更新してください。'))}</p>
-    <p class="err"><small>注意：これは公開プロフィール方式で、ログイン認証はありません。共有シートを使える人は他人のユーザー名・編成を上書きできるため、パスワードなどの秘密情報や、保護が必要な名前には使わないでください。</small></p>
-  </section>`;
-}
-
 function soloBossById(id) { return SOLO_BOSSES.find(x=>x.id===id)||SOLO_BOSSES[0]; }
 function soloBaseChar(name,title,hp,spd,passive,at) {
   const base={name,title,slot:0,hp,spd,ps:[PAS[passive]],at:at||[]};
@@ -307,9 +191,10 @@ function soloPlanEnemy() {
 
 function startSoloBattle(id) {
   if(NET.on) { PF.msg='幻想体戦はオンライン対戦を終了してから開始してください。'; render(); return; }
-  if(!PF.name) { PF.msg='先にホームでプレイヤー名を作成してください。'; SCR='home'; render(); return; }
+  if(typeof SOLO_ACCOUNT==='undefined'||SOLO_ACCOUNT.mode!=='account'||!SOLO_ACCOUNT.token||!SOLO_ACCOUNT.userName) { SOLO.cloudProfileMessage='幻想体戦と共有ランキングを使うには、アカウントモードでログインしてください。'; SCR='home'; render(); return; }
+  if(!PF.name) { PF.msg='アカウント情報が読み込まれていません。再ログインしてください。'; SCR='home'; render(); return; }
   if(dErr(DK.d[DK.cur]).length) { alert('使用するデッキを完成させてください。'); SCR='deck'; render(); return; }
-  SOLO.active=true;SOLO.bossId=soloBossById(id).id;SOLO.turns=0;
+  SOLO.active=true;SOLO.bossId=soloBossById(id).id;SOLO.turns=0;SOLO.recordStatus='';
   const boss=soloBossById(SOLO.bossId);
   S={turn:0,p:[newP(PF.name,DK.d[DK.cur],DK.hiers[DK.cur]),newP(boss.name,{},DK.hiers[DK.cur])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,solo:true};
   S.p[1].chars=soloMakeBossTeam(SOLO.bossId);S.p[1].cost=S.p[1].max=6;
@@ -403,11 +288,16 @@ combat=function(){
   }
   const alivePlayer=alive(S.p[0])>0,aliveBoss=alive(S.p[1])>0;
   if(!aliveBoss&&alivePlayer&&S.over&&String(S.over).includes('勝利')) {
-    const row={name:PF.name||S.p[0].name,boss:SOLO.bossId,turns:Math.max(1,S.turn),date:new Date().toISOString()};
-    const prior=soloLocalRecords().some(x=>x.boss===row.boss&&x.name===row.name&&+x.turns===row.turns&&x.date===row.date);
-    if(!prior){soloSaveLocalRecord(row);soloSubmitSheetRecord(row);}
-    SOLO.turns=row.turns;
+    const row={name:SOLO_ACCOUNT.userName||PF.name||S.p[0].name,boss:SOLO.bossId,turns:Math.max(1,S.turn),date:new Date().toISOString()};
+    SOLO.turns=row.turns;SOLO.recordStatus='ランキングへ記録を送信しています…';
     S.soloRecordSaved=true;
+    soloSubmitSheetRecord(row).then(()=>{
+      SOLO.recordStatus='討伐記録をランキングへ登録しました。';
+      if(S&&SOLO.active&&S.phase==='result')render();
+    }).catch(err=>{
+      SOLO.recordStatus='討伐には成功しましたが、ランキングへの保存に失敗しました：'+(err&&err.message||'通信エラー');
+      if(S&&SOLO.active&&S.phase==='result')render();
+    });
   }
   render();
 };
@@ -425,35 +315,34 @@ renderHome=function(){
   __soloOriginalRenderHome();
   if(!document.getElementById('app'))return;
   const app=document.getElementById('app');
-  app.innerHTML=app.innerHTML.replace('<p><button class="go" onclick="SCR=\'rules\';render()">ルール説明</button></p>', '<p><button class="go" onclick="SCR=\'solo\';render()">幻想体戦（ソロ）</button></p><p><button class="go" onclick="SCR=\'rules\';render()">ルール説明</button></p>');
-  app.innerHTML=app.innerHTML.replace(/<\/div>\s*$/, soloCloudProfilePanelHTML() + '</div>');
+  app.innerHTML=app.innerHTML.replace('Library of Ruina風・2人交代制の対戦','一台モード：同じ端末で2人が交代して対戦（編成はこのタブ内だけで、一台モードからGoogleへ保存しません）');
+  app.innerHTML=app.innerHTML.replace(/<section class="pf"><h2>Googleスプレッドシート：ユーザー名・編成の共有<\/h2>[\s\S]*?<\/section>/, '');
+  app.innerHTML=app.innerHTML.replace('<p><button class="go" onclick="SCR=\'rules\';render()">ルール説明</button></p>', '<p><button class="go" onclick="SCR=\'rules\';render()">ルール説明</button></p>');
 };
 
 function renderSoloMenu(){
   const currentDeck=DK.d[DK.cur]||{};
   const errors=dErr(currentDeck);
   const url=soloSheetUrl();
+  const accountReady=typeof SOLO_ACCOUNT!=='undefined'&&SOLO_ACCOUNT.mode==='account'&&!!SOLO_ACCOUNT.token;
   document.getElementById('stat').innerHTML='<button class="sub" onclick="toHome()">ホームへ戻る</button>';
-  document.getElementById('app').innerHTML=`<div class="home"><h1>幻想体戦</h1><p>ソロ用のボス戦です。ホームのプレイヤー名と、デッキ構築で選択中のデッキ${DK.cur+1}を使います。</p>
-    ${!PF.name?'<p class="err">先にホームでプレイヤー名を作成してください。</p>':''}
+  document.getElementById('app').innerHTML=`<div class="home"><h1>幻想体戦</h1><p>アカウント「${soloEsc(accountReady?SOLO_ACCOUNT.userName:'未ログイン')}」の保存済み編成を使います。</p>
+    ${!accountReady?'<p class="err">幻想体戦はアカウントモード専用です。ホームで登録またはログインしてください。</p>':''}
     ${errors.length?`<p class="err">使用中デッキが未完成：${errors.map(soloEsc).join('、')}</p>`:''}
-    <div class="pf"><h2>ボスを選ぶ</h2>${SOLO_BOSSES.map(b=>`<section style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0"><b>${soloEsc(b.name)}</b><p>${soloEsc(b.summary)}</p><button class="go" ${(!PF.name||errors.length)?'disabled':''} onclick="startSoloBattle('${b.id}')">挑戦する</button></section>`).join('')}</div>
-    <div class="pf"><h2>Googleスプレッドシート連携</h2><p><small>Apps Scriptをウェブアプリとして公開したURL（末尾が /exec）を入力すると、討伐記録を共有ランキングへ送信できます。</small></p>
-    <input id="soloSheetUrl" value="${soloEsc(url)}" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;box-sizing:border-box">
-    <p><button class="sub" onclick="saveSoloSheetUrl(document.getElementById('soloSheetUrl').value)">URLを保存</button> <button class="sub" onclick="SCR='soloRank';render()">ランキングを見る</button></p>
-    <p class="msg">${soloEsc(SOLO.cloudProfileMessage || (soloValidSheetUrl(url)?'URL形式：OK':'URL未設定の場合も、このブラウザ内には記録されます。'))}</p></div>
+    <div class="pf"><h2>ボスを選ぶ</h2>${SOLO_BOSSES.map(b=>`<section style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0"><b>${soloEsc(b.name)}</b><p>${soloEsc(b.summary)}</p><button class="go" ${(!accountReady||errors.length)?'disabled':''} onclick="startSoloBattle('${b.id}')">挑戦する</button></section>`).join('')}</div>
+    <div class="pf"><h2>ランキング</h2><p>アカウントごとの最少討伐ターン数を表示します。</p><p><button class="sub" onclick="SCR='soloRank';render()">ランキングを見る</button></p>
+    <p><small>連携先：${soloEsc(url?url.slice(0,56)+'…':'未設定')}</small></p></div>
   </div>`;
 }
 function renderSoloRank(triggerLoad=true){
-  const local=soloLocalRecords(),remote=Array.isArray(SOLO.remoteRows)?SOLO.remoteRows:[];
+  const remote=Array.isArray(SOLO.remoteRows)?SOLO.remoteRows:[];
   document.getElementById('stat').innerHTML='<button class="sub" onclick="SCR=\'solo\';render()">幻想体戦へ戻る</button> <button class="sub" onclick="toHome()">ホームへ戻る</button>';
   const tables=SOLO_BOSSES.map(b=>{
-    const loc=local.filter(r=>r.boss===b.id).sort((x,y)=>(+x.turns)-(+y.turns)||String(x.date||'').localeCompare(String(y.date||''))).slice(0,10);
-    const rem=remote.filter(r=>r.boss===b.id).sort((x,y)=>(+x.turns)-(+y.turns)||String(x.date||'').localeCompare(String(y.date||''))).slice(0,10);
-    const table=(rows,empty)=>rows.length?`<table style="width:100%;border-collapse:collapse"><thead><tr><th>位</th><th>名前</th><th>ターン</th><th>日時</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${soloEsc(r.name)}</td><td>${soloEsc(r.turns)}</td><td>${soloEsc(String(r.date||'').slice(0,10))}</td></tr>`).join('')}</tbody></table>`:`<p class="msg">${empty}</p>`;
-    return `<section class="pf"><h2>${soloEsc(b.name)}</h2><h3>このブラウザの記録</h3>${table(loc,'まだ記録がありません。')}<h3>Googleスプレッドシートの共有記録</h3>${table(rem,soloValidSheetUrl(soloSheetUrl())?(SOLO.remoteLoading?'読み込み中…':'共有記録を取得できません。URLと公開設定を確認してください。'):'連携URLが未設定です。')}</section>`;
+    const rows=remote.filter(r=>r.boss===b.id).sort((x,y)=>(+x.turns)-(+y.turns)||String(x.date||'').localeCompare(String(y.date||''))).slice(0,50);
+    const table=rows.length?`<table style="width:100%;border-collapse:collapse"><thead><tr><th>位</th><th>アカウント</th><th>ターン</th><th>日時</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${soloEsc(r.name)}</td><td>${soloEsc(r.turns)}</td><td>${soloEsc(String(r.date||'').slice(0,10))}</td></tr>`).join('')}</tbody></table>`:`<p class="msg">${!soloValidSheetUrl(soloSheetUrl())?'Apps ScriptのURLが未設定です。ホームから設定してください。':(SOLO.remoteLoading?'ランキングを読み込み中…':(SOLO.cloudProfileMessage||'まだ討伐記録がありません。'))}</p>`;
+    return `<section class="pf"><h2>${soloEsc(b.name)}</h2>${table}</section>`;
   }).join('');
-  document.getElementById('app').innerHTML=`<div class="home"><h1>幻想体戦ランキング</h1><p><small>討伐ターン数が少ない順です。ブラウザ内記録は端末ごと、共有記録はGoogleスプレッドシートから取得します。</small></p>${tables}<p><button class="sub" onclick="SCR='solo';render()">幻想体戦へ戻る</button></p></div>`;
+  document.getElementById('app').innerHTML=`<div class="home"><h1>幻想体戦ランキング</h1><p><small>同じアカウントの記録はボスごとに最少ターン数を採用し、少ない順に表示します。</small></p>${tables}<p><button class="sub" onclick="soloRequestRemoteRows()">ランキングを更新</button> <button class="sub" onclick="SCR='solo';render()">幻想体戦へ戻る</button></p></div>`;
   if(triggerLoad)soloRequestRemoteRows();
 }
 const __soloOriginalRender=render;
@@ -469,5 +358,5 @@ renderMatch=function(){
   const app=document.getElementById('app');if(!app)return;
   app.innerHTML=app.innerHTML.replace('<button class="go" onclick="startMatch()">同じデッキでもう一度</button>',`<button class="go" onclick="startSoloBattle('${SOLO.bossId}')">もう一度挑戦</button>`);
   app.innerHTML=app.innerHTML.replace('<button class="sub" onclick="toHome()">ホームへ戻る</button>', '<button class="sub" onclick="SCR=\'solo\';S=null;SOLO.active=false;render()">幻想体選択へ</button> <button class="sub" onclick="toHome()">ホームへ戻る</button>');
-  if(S.soloRecordSaved)app.innerHTML=app.innerHTML.replace('</h1>',`</h1><p class="msg">${soloEsc(soloBossById(SOLO.bossId).name)}を${SOLO.turns}ターンで討伐しました。ランキングに記録しました。</p>`);
+  if(S.soloRecordSaved)app.innerHTML=app.innerHTML.replace('</h1>',`</h1><p class="msg">${soloEsc(soloBossById(SOLO.bossId).name)}を${SOLO.turns}ターンで討伐しました。${soloEsc(SOLO.recordStatus||'ランキングへ記録を送信しています…')}</p>`);
 };

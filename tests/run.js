@@ -13,7 +13,7 @@ const FILES=[...html.matchAll(/<script src="(?!https?:)([^"]+)"/g)].map(m=>path.
 const mkEl=()=>({style:{},value:'',classList:{add(){},remove(){}},getBoundingClientRect:()=>({left:0,top:0,width:0,height:0,bottom:0}),scrollTop:0,scrollHeight:0,querySelectorAll:()=>[],appendChild(){},scrollIntoView(){},_h:'',set innerHTML(v){this._h=v},get innerHTML(){return this._h}});
 function makeCtx(store){   // store を渡すと、同じ保存領域を使う別のページ（＝再読み込み）を作れる
  store=store||{};const els={};
- const ctx={document:{getElementById:id=>els[id]||(els[id]=mkEl()),querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>mkEl(),body:{className:''}},localStorage:{getItem:k=>(k in store?store[k]:null),setItem:(k,v)=>{store[k]=String(v)}},addEventListener(){},console,Math,JSON,setTimeout:()=>0,clearTimeout(){},setInterval:()=>0,clearInterval(){},requestAnimationFrame:()=>0,alert(){},confirm:()=>true,matchMedia:()=>({matches:true}),scrollTo(){},URLSearchParams};
+ const ctx={document:{getElementById:id=>els[id]||(els[id]=mkEl()),querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>mkEl(),body:{className:''}},localStorage:{getItem:k=>(k in store?store[k]:null),setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>{delete store[k]}},addEventListener(){},console,Math,JSON,setTimeout:()=>0,clearTimeout(){},setInterval:()=>0,clearInterval(){},requestAnimationFrame:()=>0,alert(){},confirm:()=>true,matchMedia:()=>({matches:true}),scrollTo(){},URLSearchParams};
  ctx.window=ctx;vm.createContext(ctx);
  for(const f of FILES)vm.runInContext(fs.readFileSync(f,'utf8'),ctx,{filename:f});
  ctx._els=els;ctx._store=store;return ctx;
@@ -27,6 +27,15 @@ const ok=(name,cond,extra)=>{if(cond)pass++;else{fail++;bad.push(name+(extra?'  
 // ───── ① データ検証（読み込みに成功した時点で、パッシブの種類・属性・効果・条件の書き間違いは検出済み） ─────
 let C0;
 try{C0=makeCtx();ok('ゲームデータの読み込み',true)}catch(e){ok('ゲームデータの読み込み',false,e.message);finish()}
+// ───── URL保存時の回帰テスト：貼り付け後に「一覧を更新／共有保存」でも自動保存する ─────
+{const u=makeCtx();
+ ok('Apps Script標準の /exec URLを認識',ev(u,'soloValidSheetUrl("https://script.google.com/macros/s/AKfycb-test/exec")'));
+ ok('Googleアカウント番号付きURLを認識',ev(u,'soloValidSheetUrl("https://script.google.com/macros/u/0/s/AKfycb-test/exec?authuser=0")'));
+ ok('Google Workspace配下のURLを認識',ev(u,'soloValidSheetUrl("https://script.google.com/a/macros/example.jp/s/AKfycb-test/exec")'));
+ ok('Apps Script編集画面のURLは連携URLとして受け付けない',!ev(u,'soloValidSheetUrl("https://script.google.com/home/projects/123/edit")'));
+ u._els.soloCloudUrl={value:'https://script.google.com/macros/s/AKfycb-auto-save/exec'};
+ ok('入力欄に貼り付けてプロフィール一覧更新を押すだけでURLを自動保存',ev(u,'soloCaptureSheetUrlFromInput()')&&ev(u,'soloSheetUrl()')==='https://script.google.com/macros/s/AKfycb-auto-save/exec');
+}
 const names=J(ev(C0,'({sk:SKILLS.map(s=>s.n),ch:CHARS.map(c=>c.name)})'));
 ok('カード名・キャラ名が重複していない',new Set([...names.sk,...names.ch]).size===names.sk.length+names.ch.length,'重複あり');
 ok('デッキ構築画面が開ける',(()=>{try{ev(C0,"SCR='deck';render()");return true}catch(e){return false}})());
@@ -143,10 +152,23 @@ function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で�
 {const L=makeCtx();ev(L,"SCR='lobby';NET.code='ABC123';render()");
  ok('ロビーに版の目印（ver.）が出る',/ver\.[0-9a-z]{3,6}/.test(L._els.app._h));
  ok('ロビー画面が開ける（通信ライブラリなしでは部屋を作れない表示）',/id="roomcode"/.test(L._els.app._h)&&/disabled onclick="netHost/.test(L._els.app._h));}
+// ───── ④b アカウント／一台モードの分離 ─────
+{const store={},c=makeCtx(store);
+ const profile=J(ev(c,'({decks:[defDeck(POOL1),defDeck(POOL2)],hierarchies:[ABN_HIERARCHIES[0],ABN_HIERARCHIES[1]]})'));
+ ev(c,'soloAccountActivate('+JSON.stringify({token:'test-session-token-'.padEnd(40,'x'),accountId:'test-account',userName:'クラウド太郎',profile})+')');
+ ok('アカウントモードはログインした名前と編成を表示',ev(c,'SOLO_ACCOUNT.mode')==='account'&&ev(c,'PF.name')==='クラウド太郎'&&/クラウド太郎/.test(c._els.app._h));
+ ev(c,'saveDecks()');
+ ok('アカウントモードはブラウザのプロフィール一覧へ編成を書かない',!('cg_profiles' in store)&&!('cg_cur' in store));
+ ev(c,'soloEnterSingleDeviceMode()');
+ ok('一台モードへ切り替えるとアカウント編成を使わず未ログインにする',ev(c,'SOLO_ACCOUNT.mode')==='single'&&ev(c,'PF.name')===null&&ev(c,'CG_NO_PERSIST')===true&&!/onclick="SCR='lobby'/.test(c._els.app._h),JSON.stringify({mode:ev(c,'SOLO_ACCOUNT.mode'),name:ev(c,'PF.name'),noPersist:ev(c,'CG_NO_PERSIST'),html:c._els.app._h.slice(0,500)}));
+ ok('一台モードへ移るとアカウントの端末ログイントークンも消える',!('cg_account_token' in store));
+ c._els.pfname={value:'一時アカウント'};ev(c,'pfCreate()');
+ ok('一台モードで作った名前・編成はlocalStorageへ書かれない',!('cg_profiles' in store)&&!('cg_cur' in store));
+}
 
 // ───── ⑤ プレイヤー名とデッキの紐づけ ─────
 {const store={};let c=makeCtx(store);
- ok('名前が未設定のときは名前入力の画面',/プレイヤー名を決めてください/.test((ev(c,'render()'),c._els.app._h))&&!/対戦開始/.test(c._els.app._h));
+ ok('初期画面にアカウント登録・ログインと一台モードの選択肢が出る',/アカウントモード/.test((ev(c,'render()'),c._els.app._h))&&/cgAccountName/.test(c._els.app._h)&&/一台モード/.test(c._els.app._h)&&!/対戦開始/.test(c._els.app._h));
  c._els.pfname={value:'<b>太郎</b>'};ev(c,'pfCreate()');
  ok('名前を決めると保存され、記号は取り除かれる',ev(c,'PF.name')==='b太郎/b'.replace('/','')||ev(c,'PF.name')==='b太郎b'||!/[<>]/.test(ev(c,'PF.name')));
  const nm=ev(c,'PF.name');
@@ -168,6 +190,11 @@ function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で�
  const s2={cg_decks:JSON.stringify([{[names.ch[0]]:1,[names.sk[0]]:3,[names.sk[1]]:3,[names.sk[2]]:3,[names.sk[3]]:3,[names.sk[4]]:2}, J(ev(C0,'defDeck(POOL2)'))])};
  const c3=makeCtx(s2);c3._els.pfname={value:'旧データ'};ev(c3,'pfCreate()');
  ok('旧バージョンのデッキを最初の名前に引き継ぐ',ev(c3,'dTot(DK.d[0])')===15&&ev(c3,'DK.d[0]['+JSON.stringify(names.sk[0])+']')===3);
+ {const tempStore={};const tmp=makeCtx(tempStore);ev(tmp,'soloEnterSingleDeviceMode()');tmp._els.pfname={value:'一時ユーザー'};ev(tmp,'pfCreate()');
+  ok('一台モードのプロフィールはメモリ内で使える',ev(tmp,'PF.name')==='一時ユーザー'&&ev(tmp,'CG_NO_PERSIST')===true&&ev(tmp,'readProfiles().some(x=>x.name===\"一時ユーザー\")'));
+  ok('一台モードではプロフィールをlocalStorageへ保存しない',!('cg_profiles' in tempStore)&&!('cg_cur' in tempStore));
+  const tmpReload=makeCtx(tempStore);ok('一台モードの名前は再読み込みすると残らない',ev(tmpReload,'PF.name')===null);
+ }
  ok('名前の長さ・記号の制限',ev(c3,'cleanName("あ".repeat(30))').length===12&&!/[<>&"\'`]/.test(ev(c3,'cleanName(`<img src=x onerror="a">\'`)')));
 }
 {const p=pair();const d=mkDeck();connect(p,d,d);
@@ -185,8 +212,8 @@ function playOnline(A,B,pump,st){   // 接続できた2つのブラウザ役で�
  const c=p.B;
  ev(c,'(()=>{const hp=snap(),hold=holdSnap(),sts=stSnap();hold[0][0]=[{t:"d",r:[2,5],s:false}];hold[1][0]=[{t:"d",r:[2,5],s:false}];const fr={hp,hold,sts,dm:{},ev:[],lu:[[0,0],[1,0]],sh:[],ar:null};S.anim={i:0,frames:[fr],hp0:hp,hold0:hold,st0:sts}})()');
  const h=(pi,v)=>ev(c,`chHTML(${pi},0,${v})`);
- ok('P1視点：自分(下側)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(0,0))&&/ch up/.test(h(0,0))&&/ghosts bot/.test(h(1,0))&&/ch dn/.test(h(1,0)));
- ok('P2視点：自分(下側＝プレイヤー2)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(1,1))&&/ch up/.test(h(1,1))&&/ghosts bot/.test(h(0,1))&&/ch dn/.test(h(0,1)));}
+ ok('P1視点：自分(下側)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(0,0))&&/class="ch(?: [^"]*)?\bup\b/.test(h(0,0))&&/ghosts bot/.test(h(1,0))&&/class="ch(?: [^"]*)?\bdn\b/.test(h(1,0)));
+ ok('P2視点：自分(下側＝プレイヤー2)の薄いダイスは上へ・突進は上へ／相手(上側)は下へ',/ghosts top/.test(h(1,1))&&/class="ch(?: [^"]*)?\bup\b/.test(h(1,1))&&/ghosts bot/.test(h(0,1))&&/class="ch(?: [^"]*)?\bdn\b/.test(h(0,1)));}
 
 // ───── ⑦ 条件「相手の状態異常の値がN以上」 ─────
 {const c=makeCtx();
