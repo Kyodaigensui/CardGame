@@ -456,6 +456,16 @@ const STN={
  bleed:{n:'出血',i:'🩸',c:'#e0455a',t:'行動のたびに数値分のダメージを受ける。ターン終了時に数値が約2/3に減る'},
  rupt:{n:'破裂',i:'💥',c:'#b17cf0',t:'ダメージを受けるたびに数値分の追加ダメージを受ける。ターン終了時に数値が約2/3に減る'},
  vib:{n:'振動',i:'〰',c:'#5cc8f5',t:'「振動爆発」を持つダイスでダメージを受けると、数値÷2枚の手札が山札に戻り、振動は消える'},
+ incap:{n:'行動不能',i:'⛔',c:'#e05252',t:'このターン行動を決定・実行できない'},
+ freeze:{n:'凍結',i:'❄',c:'#89c8ff',t:'氷の女王が生存している間、行動できない'},
+ iceShard:{n:'氷の欠片',i:'🧊',c:'#78c7ff',t:'3以上になると次のターン行動不能になり、氷の欠片をすべて失う'},
+ speedDown:{n:'速度低下',i:'🐢',c:'#80b8d9',t:'速度が低下している。次ターン分は「次」の表示が付く'},
+ hiveMark:{n:'蜂の標的',i:'🐝',c:'#d9bd4c',t:'標的キャラの被ダメージが数値分増える'},
+ requestMark:{n:'依頼対象',i:'🎯',c:'#e0709a',t:'このキャラが受けるダメージが数値分増える'},
+ takenPlus:{n:'被ダメージ増加',i:'💔',c:'#e0709a',t:'特定の幻想体カード効果により受けるダメージが増えている'},
+ globalMusic:{n:'音楽の影響',i:'🎵',c:'#d9a93f',t:'音楽の効果で全キャラクターの被ダメージが増えている'},
+ globalBlackening:{n:'黒化の影響',i:'🌑',c:'#a17bd8',t:'黒化の効果で全キャラクターの被ダメージが1.5倍になっている'},
+ gazeTaken:{n:'眼差し',i:'👁',c:'#b17cf0',t:'与ダメージ・被ダメージが2倍になる'},
  malice:{n:'悪意',i:'☠',c:'#8f344f',t:'悪意による固定ダメージ'},
  fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ'},
  dmgup:{n:'ダメージ上昇',i:'⚔',c:'#d9a93f',t:'このターン、与えるダメージが数値分上がる'},
@@ -488,24 +498,39 @@ const FXA={draw:(p,pi,ch,v)=>draw(p,v),cost:(p,pi,ch,v)=>{p.cost=Math.min(p.max,
 //   ['dmg',8]              8以上のダメージを与えたとき
 //   ['foeHp',10]           相手の残りHPが10以下のとき
 //   ['selfHp',10]          自分のHPが10以下のとき
-//   ['foeSt','burn']       相手が火傷(burn)/出血(bleed)/破裂(rupt)/振動(vib)状態のとき
-//   ['foeStGe','vib',5]    相手の状態異常の値が5以上のとき（状態＝burn/bleed/rupt/vib）
+//   ['foeSt','burn']       相手が火傷/出血/破裂/振動/寒気/胞子や行動不能などのデバフを持つとき
+//   ['foeStGe','vib',5]    相手の状態異常・デバフの値が5以上のとき
 //   {and:['kill',['dmg',8]]}  複数条件をすべて満たすとき
 // 例："斬撃":{hit:[['draw',1],['coin',2,'kill']]}   ← ドローは的中で、コイン+2は倒したときだけ
 // 条件を増やすときは COND に1行足す（t＝表示文、f＝判定。x={A:使用者,B:相手,dmg:与ダメージ}）
-const STK={burn:'火傷',bleed:'出血',rupt:'破裂',vib:'振動'};
+const STK={burn:'火傷',bleed:'出血',rupt:'破裂',vib:'振動',cold:'寒気',spore:'胞子',incap:'行動不能',freeze:'凍結',iceShard:'氷の欠片',speedDown:'速度低下',hiveMark:'蜂の標的',requestMark:'依頼対象',takenPlus:'被ダメージ増加',globalMusic:'音楽の影響',globalBlackening:'黒化の影響',gazeTaken:'眼差し'};
+const statusValue=(c,k)=>{
+ if(c&&c.st&&Number(c.st[k])>0)return Number(c.st[k]);
+ const a=c&&c.abnState||{};
+ if(k==='incap')return a.skipThisTurn||a.skipNextTurn?1:0;
+ if(k==='freeze')return a.iceLocked?1:0;
+ if(k==='iceShard')return Number(a.iceShard)||0;
+ if(k==='speedDown')return Math.max(Number(a.speedDownNow)||0,Number(a.speedDownNext)||0);
+ if(k==='hiveMark')return Object.values(a.hiveMarks||{}).reduce((n,v)=>n+(Number(v)||0),0);
+ if(k==='requestMark')return Object.values(a.requestMarks||{}).reduce((n,v)=>n+(Number(v)||0),0);
+ if(k==='takenPlus')return Number(a.fairyDamageTaken)||0;
+ if(k==='gazeTaken')return (c.abn||[]).some(x=>x&&x.id==='gaze')?1:0;
+ if(k==='globalMusic')return globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
+ if(k==='globalBlackening')return globalAbnHolders('blackening').length?1:0;
+ return 0;
+};
 const COND={
  kill:{t:()=>'敵を倒したとき',f:x=>!x.B.alive},
  dmg:{t:n=>`${n}以上のダメージを与えたとき`,f:(x,n)=>x.dmg>=n},
  foeHp:{t:n=>`相手の残りHPが${n}以下のとき`,f:(x,n)=>x.B.alive&&x.B.hp<=n},
  selfHp:{t:n=>`自分のHPが${n}以下のとき`,f:(x,n)=>x.A.hp<=n},
- foeSt:{t:k=>`相手が${STK[k]}状態のとき`,f:(x,k)=>(x.B.st[k]||0)>0},
- foeStGe:{t:(k,n)=>`相手の${STK[k]}が${n}以上のとき`,f:(x,k,n)=>(x.B.st[k]||0)>=n}
+ foeSt:{t:k=>`相手が${STK[k]}状態のとき`,f:(x,k)=>statusValue(x.B,k)>0},
+ foeStGe:{t:(k,n)=>`相手の${STK[k]}が${n}以上のとき`,f:(x,k,n)=>statusValue(x.B,k)>=n}
 };
 const condKey=c=>Array.isArray(c)?c:[c];
 const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,...a])=>COND[k].f(x,...a))(condKey(c));
 const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,...a])=>COND[k].t(...a))(condKey(c));
-const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
+const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib/cold/spore/incap/freeze/iceShard/speedDown/hiveMark/requestMark/takenPlus/globalMusic/globalBlackening/gazeTaken のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
 const fxText=(l,showCond=true)=>l.map(([k,v,c])=>(showCond&&c?`［${condText(c)}］`:'')+FXT[k](v)).join('、');
 const fxLine=(s,dl=true)=>(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
 function fx(pi,ch,list,label,tc,ctx){
@@ -610,7 +635,12 @@ const checkPhillipAwakening=pi=>{
  return true;
 };
 function globalAbnHolders(id){const out=[];if(S&&S.p)S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>{if(hasAbn(c,id))out.push({pi,ci,c})}));return out}
-function hasStatusAbn(c){return !!(c&&c.st&&['burn','bleed','rupt','vib'].some(k=>(c.st[k]||0)>0))}
+function hasStatusAbn(c){
+ if(!c)return false;
+ if(c.st&&['burn','bleed','rupt','vib','cold','spore'].some(k=>(c.st[k]||0)>0))return true;
+ const a=c.abnState||{};
+ return !!(a.skipThisTurn||a.skipNextTurn||a.iceLocked||(a.iceShard||0)>0||(a.speedDownNow||0)>0||(a.speedDownNext||0)>0||Object.values(a.hiveMarks||{}).some(v=>Number(v)>0)||Object.values(a.requestMarks||{}).some(v=>Number(v)>0)||(a.fairyDamageTaken||0)>0);
+}
 function requestMarks(c){return c&&c.abnState&&c.abnState.requestMarks?c.abnState.requestMarks:{}}
 function abnormalityDamageTaken(B){
  if(!B||!B.alive)return;
@@ -644,7 +674,6 @@ function hit(pa,pb,B,dmg,A,die){
   if(pa!==pb&&hasAbn(A,'rest')){const foes=S.p[1-pa].chars.filter(x=>x.alive);if(foes.length&&B.alive&&B.hp<=Math.min(...foes.map(x=>x.hp))){const n=R(2,7);dmg+=n;L(`　「安息」：最も体力の少ない敵への追加ダメージ+${n}`)}}
  }
 
- if(dmg>0&&A&&A.abnState&&A.abnState.hiveMarks){const mark=Object.values(A.abnState.hiveMarks).reduce((n,v)=>n+v,0);if(mark){dmg+=mark;L(`　「蜂の標的」：${A.name}の被ダメージ+${mark}`)}}
  if(dmg>0&&hasAbn(A,'gluttony')&&targetDamagedBefore){const extra=R(1,3);dmg+=extra;gluttonyHeal=R(2,5);L(`　「食い意地」：ダメージ+${extra}（HP回復${gluttonyHeal}予定）`)}
  if(dmg>0&&hasAbn(A,'vines')&&A.abnState&&A.abnState.vineTarget===B){const extra=R(2,4);dmg+=extra;L(`　「蔓」：${B.name}への追加ダメージ+${extra}`)}
  const up=A.bf.dmgup-A.bf.dmgdn;
@@ -666,7 +695,8 @@ function hit(pa,pb,B,dmg,A,die){
   const cut=Math.min(rangeCut,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`);
  }
  if(dmg>0&&B.abnState&&B.abnState.surgingActive){const cut=Math.min(4,dmg);dmg-=cut;L(`　「押し寄せる鼓動」：被ダメージ-${cut}`)}
- // 「依頼対象」は以後の被ダメージを増やす。「哀悼」「音楽」は記載どおり全キャラクターへ適用。
+ // 「蜂の標的」「依頼対象」は対象キャラの被ダメージを増やす。「哀悼」「音楽」は全キャラクターへ適用。
+ if(dmg>0&&B&&B.abnState&&B.abnState.hiveMarks){const n=Object.values(B.abnState.hiveMarks).reduce((a,v)=>a+(Number(v)||0),0);if(n){dmg+=n;L(`　「蜂の標的」：${B.name}の被ダメージ+${n}`)}}
  if(dmg>0){const marks=requestMarks(B),n=Object.values(marks).reduce((a,v)=>a+(Number(v)||0),0);if(n){dmg+=n;L(`　「依頼対象」：被ダメージ+${n}`)}}
  if(dmg>0&&hasStatusAbn(B)&&globalAbnHolders('mourning').length){const n=R(2,7);dmg+=n;L(`　「哀悼」：状態異常中の${B.name}は被ダメージ+${n}`)}
  if(dmg>0){const music=globalAbnHolders('music');const n=music.reduce((sum,x)=>sum+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(n){dmg+=n;L(`　「音楽」：被ダメージ+${n}`)}}
@@ -887,6 +917,24 @@ function chHTML(pi,ci,view){
  const evs=fr?fr.ev.filter(e=>e[0]===pi&&e[1]===ci).map(e=>e[2]):[];
  const badge=(k,v,nx)=>`<span class="stt${nx?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${nx?'（次のターンから）':''}：${STN[k].t}">${STN[k].i}${bk.includes(k)?(['guard','dmgdn','rolldn'].includes(k)?'-':'+'):''}${v}${nx?'<small>次</small>':''}</span>`;
  const sts=stk.filter(k=>ST[k]>0).map(k=>badge(k,ST[k])).join('')+bk.filter(k=>sn.bf[k]>0).map(k=>badge(k,sn.bf[k])).join('')+bk.filter(k=>sn.nx[k]>0).map(k=>badge(k,sn.nx[k],1)).join('');
+ const ad=c.abnState||{},special=[];
+ const specialBadge=(k,label,value='',next=false)=>`<span class="stt${next?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${next?'（次のターン）':''}：${STN[k].t}">${STN[k].i} ${label}${value!==''?` ${value}`:''}${next?'<small>次</small>':''}</span>`;
+ if(ad.skipThisTurn)special.push(specialBadge('incap','行動不能'));
+ if(ad.skipNextTurn)special.push(specialBadge('incap','行動不能','',true));
+ if(ad.iceLocked)special.push(specialBadge('freeze','凍結'));
+ if((ad.iceShard||0)>0)special.push(specialBadge('iceShard','氷の欠片',ad.iceShard));
+ if((ad.speedDownNow||0)>0)special.push(specialBadge('speedDown','速度低下',`-${ad.speedDownNow}`));
+ if((ad.speedDownNext||0)>0)special.push(specialBadge('speedDown','速度低下',`-${ad.speedDownNext}`,true));
+ const hiveMark=Object.values(ad.hiveMarks||{}).reduce((n,v)=>n+(Number(v)||0),0);
+ if(hiveMark>0)special.push(specialBadge('hiveMark','蜂の標的',`被ダメージ+${hiveMark}`));
+ const requestMark=Object.values(ad.requestMarks||{}).reduce((n,v)=>n+(Number(v)||0),0);
+ if(requestMark>0)special.push(specialBadge('requestMark','依頼対象',`被ダメージ+${requestMark}`));
+ if((ad.fairyDamageTaken||0)>0)special.push(specialBadge('takenPlus','被ダメージ増加',`+${ad.fairyDamageTaken}`));
+ if(hasAbn(c,'gaze'))special.push(specialBadge('gazeTaken','与・被ダメージ×2'));
+ const globalMusicTaken=globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
+ if(globalMusicTaken>0)special.push(specialBadge('globalMusic','音楽の影響',`被ダメージ+${globalMusicTaken}`));
+ if(globalAbnHolders('blackening').length)special.push(specialBadge('globalBlackening','黒化の影響','被ダメージ×1.5'));
+ const extraStatuses=special.join('');
  const aur=dead?'':stk.filter(k=>ST[k]>0).map(k=>`<i class="aur ${k}"></i>`).join('');
  const trg=evs.find(e=>e.k),dbase=(dmv||0)-evs.reduce((x,e)=>x+e.a,0);
  if(trg)cls+=' trg';
@@ -906,7 +954,7 @@ function chHTML(pi,ci,view){
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
  return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
- <div class="sts">${sts}${c.abnState&&c.abnState.iceLocked?'<span class="stt" style="--c:#89c8ff" title="氷の女王に凍結されている">❄ 凍結</span>':''}${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&c.name==='妖精の塊'&&c.abnState&&c.abnState.preparedMeatTurn===S.turn?'<span class="stt" style="--c:#d9a441" title="ターン終了時にHP1なら女王妖精に捕食される">🍖 用意された肉</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
+ <div class="sts">${sts}${extraStatuses}${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&c.name==='妖精の塊'&&c.abnState&&c.abnState.preparedMeatTurn===S.turn?'<span class="stt" style="--c:#d9a441" title="ターン終了時にHP1なら女王妖精に捕食される">🍖 用意された肉</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
 const costDots=(p,u)=>{const on=p.cost-u;let h='';for(let i=0;i<p.max;i++)h+=`<i class="dot${i<on?' on':i<p.cost?' rs':''}"></i>`;return `<span class="cost" title="コスト ${on}/${p.max}">コスト ${h} <small>${on}/${p.max}</small></span>`};
 const emoGauge = p => {
@@ -1017,7 +1065,7 @@ function renderRules(){
    <li><b>速度ダイス</b>：各キャラが速度ダイスを振ります（キャラごとの速度範囲＋パッシブ）。</li>
    <li><b>行動の決定</b>：速度の<b>平均が低い</b>プレイヤーから先にカードを割り当て、攻撃対象を決めます。もう一方のプレイヤーは、先に決めた側の割り当てを見たうえで決められます。</li>
    <li><b>戦闘</b>：両者が決め終わると、速度の高いキャラから順に行動します。</li>
-   <li><b>ターン終了</b>：火傷のダメージを受け、火傷・出血・破裂の数値が減ります。</li>
+   <li><b>ターン終了</b>：火傷などの継続効果を処理し、対象の状態異常値を減衰させます。</li>
    <li><b>次のターンの準備</b>：使ったカードは山札に混ざります。生きているキャラ数＋1枚ドローし、コストも同じだけ回復します（上限まで）。</li>
   </ol></section>
 
@@ -1065,8 +1113,10 @@ function renderRules(){
   </ul></section>
 
  <section><h2>8. 状態異常とバフ・デバフ</h2>
-  <h3>状態異常（ターンをまたいで残る）</h3>
-  <ul>${['burn','bleed','rupt','vib'].map(st).join('')}</ul>
+  <h3>数値を持つ状態異常</h3>
+  <ul>${['burn','bleed','rupt','vib','cold','spore'].map(st).join('')}</ul>
+  <h3>行動阻害・被ダメージ増加などの特殊デバフ</h3>
+  <ul>${['incap','freeze','iceShard','speedDown','hiveMark','requestMark','takenPlus','globalMusic','globalBlackening','gazeTaken'].map(st).join('')}</ul>
   <h3>バフ・デバフ（1ターンだけ。多くは「次のターン」から効く）</h3>
   <ul>${['dmgup','guard','roll','atk','rolldn','vuln','dmgdn'].map(st).join('')}</ul></section>
 
