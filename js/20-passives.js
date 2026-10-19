@@ -56,6 +56,8 @@ const PAS={
  ailres:{n:'あなたの盾',k:'ailres',v:3},               // 火傷・出血・破裂すべて、1回ごとに v 減らす
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
  burncheck:{n:'夜明け',k:'burncheck',v:2},
+ unstableego:{n:'不安定な自我の殻',k:'unstableEgo'},
+ waxenwings:{n:'蜜蝋の翼',k:'waxenwings'},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
@@ -121,6 +123,13 @@ emostack:{
   // 状態異常（火傷・出血・破裂）で受けるダメージを、1回ごとに v 減らす。kinds があれば、その種類だけ
  ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
  ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
+ unstableEgo:{
+  t:()=>`フィリップが単独で出撃するか、味方が全員倒れて単独になったとき、「蜜蝋の翼」を得て、最大HPの50%分回復する`,
+ },
+ waxenwings:{
+  t:()=>`ダイス値+2。相手が火傷中ならさらに+2。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。単独覚醒後は場の3枠を占有し、3回行動する`,
+  turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach(p=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
+ },
 };
 // ---------- ③ 仕組み（ここから下は触らなくてOK） ----------
 const pasText=p=>PK[p.k].t(p);

@@ -587,20 +587,20 @@ function hasAbn(c,id){return !!(c&&c.abn||[]).some(x=>x.id===id)}
 
 const checkPhillipAwakening=pi=>{
  const p=S&&S.p&&S.p[pi];if(!p)return false;
-  if(!p.chars.some(c=>c.name==='サルヴァドール'))return false;
  const live=p.chars.filter(c=>c.alive);
  if(live.length!==1||live[0].name!=='フィリップ')return false;
  const c=live[0];
- // 「不安定な自我の殻」を持つフィリップだけが、単独生存時に蜜蝋の翼を得る。
+ // 「不安定な自我の殻」を持つフィリップは、最初から単独で出撃する場合も、味方が倒れて単独になる場合も覚醒する。
  if(!hasPasKind(c,'unstableEgo'))return false;
  if(!c.abnState)c.abnState={};
  if(c.abnState.phillipAwakened||hasPasKind(c,'waxenwings'))return false;
  c.abnState.phillipAwakened=true;
  const wing=PAS.waxenwings;if(!wing)return false;
  c.ps.push({...wing});
- setupActionSlots(c,2);
+ c.size=3;
+ setupActionSlots(c,3);
  const old=c.hp,heal=Math.ceil(c.max*0.5);c.hp=Math.min(c.max,c.hp+heal);
- L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。2回行動できる`);
+ L(`　「蜜蝋の翼」：${c.name}は単独生存で覚醒。場の3枠を占有し、3回行動できる`);
  if(c.hp>old)L(`　「蜜蝋の翼」：HP+${c.hp-old}`);
  return true;
 };
