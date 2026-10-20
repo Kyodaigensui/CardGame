@@ -10,7 +10,7 @@ main{max-width:980px;margin:0 auto;padding:10px 14px 30px}
 .row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .ch{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px;min-height:130px;position:relative}
 .ch.dead{opacity:.35}
-.ch.big{grid-column:span 2;border-color:var(--gold)}
+.ch.big{grid-column:span 2}
 .ch.big .nm span:first-child{font-size:1.1rem}
 .ttl{display:block;font-size:.7rem;font-weight:400;color:var(--dim);line-height:1.2;margin:1px 0 2px}
 .sz{background:var(--gold);color:#111;border-radius:3px;padding:0 5px;font-size:.75rem;font-weight:bold}
@@ -131,3 +131,19 @@ body.deckmode{height:100vh;display:flex;flex-direction:column;overflow:auto}
 
 .pf{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;margin:10px auto;max-width:520px;text-align:left}
 .pf summary{cursor:pointer;color:var(--dim);margin-top:4px}
+
+
+/* 戦闘中は renderMatch() が毎フレームDOMを作り直すため、transitionだけでは
+   攻撃者の移動を再生できない。各フレームで新しく追加された要素でも動く
+   keyframes にして、行動モーションを確実に表示する。 */
+.ch.up,.ch.dn{transform:translateY(0)}
+.ch.up{animation:cgStrikeUp .42s ease-out}
+.ch.dn{animation:cgStrikeDown .42s ease-out}
+.ch.up.hurt{animation:cgStrikeUp .42s ease-out,shake .4s}
+.ch.dn.hurt{animation:cgStrikeDown .42s ease-out,shake .4s}
+.ch.up.trg{animation:cgStrikeUp .42s ease-out,trg .7s}
+.ch.dn.trg{animation:cgStrikeDown .42s ease-out,trg .7s}
+.ch.up.hurt.trg{animation:cgStrikeUp .42s ease-out,shake .4s,trg .7s}
+.ch.dn.hurt.trg{animation:cgStrikeDown .42s ease-out,shake .4s,trg .7s}
+@keyframes cgStrikeUp{0%,100%{transform:translateY(0)}38%{transform:translateY(-22px)}}
+@keyframes cgStrikeDown{0%,100%{transform:translateY(0)}38%{transform:translateY(22px)}}
