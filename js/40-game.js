@@ -1028,7 +1028,7 @@ function renderMatch(){
   <div class="handwrap"><div class="hand">${p.hand.map((c,i)=>handHTML(c,i,can?'play':'view')).join('')}</div></div>`;
   if(can)h=`<div class="topbar"><button class="go" onclick="done()">${S.stage===0?(NET.on?'決定（相手の番へ）':'決定（相手に交代）'):'決定して戦闘開始'}</button></div>`+askHTML()+h;   // 誤操作を防ぐため一番上に配置
  }else{
-  h+=S.anim?`<button class="sub" style="margin-top:10px" onclick="skipAnim()">スキップ</button>`:S.over?`<h1 style="margin:12px 0">${S.over}</h1>${NET.on?(NET.rm[NET.me]?'<span class="msg">相手の返事を待っています…</span>':'<button class="go" onclick="netRematch()">もう一度対戦</button>'):'<button class="go" onclick="startMatch()">同じデッキでもう一度</button>'} <button class="sub" onclick="toHome()">ホームへ戻る</button>`:`<button class="go" style="margin-top:10px" onclick="nextTurn()">次のターンへ</button>`;
+  h+=S.anim?`<button class="sub" style="margin-top:10px" title="戦闘演出を最後まで再生せずに結果へ進みます" onclick="skipAnim()">演出をスキップ</button>`:S.over?`<h1 style="margin:12px 0">${S.over}</h1>${NET.on?(NET.rm[NET.me]?'<span class="msg">相手の返事を待っています…</span>':'<button class="go" onclick="netRematch()">もう一度対戦</button>'):'<button class="go" onclick="startMatch()">同じデッキでもう一度</button>'} <button class="sub" onclick="toHome()">ホームへ戻る</button>`:`<button class="go" style="margin-top:10px" onclick="nextTurn()">次のターンへ</button>`;
  }
  h+=`<div class="log" id="log">${logLines().join('<br>')}</div>${legendHTML()}<p><small>試作版：攻守の数値や感情の条件は、コード先頭のデータで調整できます。</small></p>`;
  if(NET.on&&(NET.lost||NET.err))h=`<div class="msg err">${NET.err||'相手との接続が切れました。'}　<button class="sub" onclick="toHome()">ホームへ戻る</button></div>`+h;
