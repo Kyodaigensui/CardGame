@@ -204,9 +204,25 @@ function soloPlanEnemy() {
       if(last.length)beeFocus=last[Math.floor(rnd()*last.length)];
     }
   }
+  // 明示的な集中狙いは専用ルールを優先。それ以外はHP割合が低い相手を狙いやすくしつつ、確率で分散する。
+  // 同一ターン内に複数行動する敵は、すでに狙った相手を避ける傾向も加える。
+  const plannedTargetCounts=new Map(targets.map(x=>[x.i,0]));
+  const weightedTarget=(list)=>{
+    if(!list.length)return targets[0].i;
+    const weights=list.map(x=>{
+      const ratio=x.c.max>0?Math.max(0,Math.min(1,x.c.hp/x.c.max)):1;
+      const count=plannedTargetCounts.get(x.i)||0;
+      return (1+(1-ratio)*2)/(1+count*1.5);
+    });
+    const total=weights.reduce((a,b)=>a+b,0);let roll=rnd()*total;
+    for(let i=0;i<list.length;i++){roll-=weights[i];if(roll<0)return list[i].i;}
+    return list[list.length-1].i;
+  };
   const chooseTarget=(c)=>{
     if(SOLO.bossId==='ice_queen') {
-      const cold=targets.slice().sort((a,b)=>(b.c.st.cold||0)-(a.c.st.cold||0)||a.c.hp-b.c.hp);return cold[0].i;
+      const maxCold=Math.max(...targets.map(x=>x.c.st.cold||0));
+      const cold=targets.filter(x=>(x.c.st.cold||0)===maxCold);
+      return weightedTarget(cold);
     }
     if(SOLO.bossId==='queen_bee'&&c.name==='働き蜂') {
       const queen=enemy.chars.find(z=>z.name==='女王蜂');
@@ -214,7 +230,16 @@ function soloPlanEnemy() {
       c.abnState.targetQueen=false;
       if(beeFocus)return S.p[0].chars.indexOf(beeFocus);
     }
-    return targets.slice().sort((a,b)=>a.c.hp-b.c.hp)[0].i;
+    if(SOLO.bossId==='blood_bath') {
+      const living=targets.filter(x=>x.c.alive);
+      if(!living.length)return targets[0].i;
+      const least=Math.min(...living.map(x=>plannedTargetCounts.get(x.i)||0));
+      const choices=living.filter(x=>(plannedTargetCounts.get(x.i)||0)===least);
+      const chosenIndex=weightedTarget(choices);
+      plannedTargetCounts.set(chosenIndex,(plannedTargetCounts.get(chosenIndex)||0)+1);
+      return chosenIndex;
+    }
+    return weightedTarget(targets);
   };
   enemy.chars.forEach((c,ci)=>{
     if(!c.alive)return;
@@ -411,7 +436,8 @@ const __soloOriginalCombat=combat;
 combat=function(){
   __soloOriginalCombat();
   if(!SOLO.active||!S)return;
-  if(S.anim){clearTimeout(S.anim.t);S.anim=null;}
+  // __soloOriginalCombat() が開始したダイスアニメーションはここで止めない。
+  // 敵固有効果と勝敗判定だけを追加し、既存のアニメーションタイマーを維持する。
   if(S.p[1]){S.p[1].pendingAbn=false;S.p[1].abnOffers=[];S.p[1].abnSelected=null;S.p[1].coin=0;S.p[1].cost=S.p[1].max=(SOLO.bossId==='happy_teddy'?2:6);}
   if(SOLO.bossId==='ice_queen') {
     S.p[0].chars.forEach(c=>{if(c.st&&c.st.cold>0)c.st.cold=Math.max(0,c.st.cold-1);});
@@ -462,7 +488,10 @@ combat=function(){
 // 凍結中の味方へカードを割り当てない。
 const __soloOriginalMine=mine;
 mine=function(ci){
-  const c=SOLO.active&&S&&S.p[0].chars[ci];
+  const p=SOLO.active&&S&&S.p[0];
+  const c=p&&p.chars[ci];
+  // 幻想体カードの付与は行動ではないため、行動不能・凍結中の味方にも付与できる。
+  if(p&&p.pendingAbn)return __soloOriginalMine(ci);
   if(c&&c.abnState&&c.abnState.iceLocked){S.msg=`${c.name}は氷漬けで行動できません。氷の女王を倒してください。`;render();return;}
   if(c&&c.abnState&&c.abnState.skipThisTurn){S.msg=`${c.name}は行動不能のため、このターンは行動を選べません。`;render();return;}
   return __soloOriginalMine(ci);
