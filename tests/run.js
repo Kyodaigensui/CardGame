@@ -90,12 +90,18 @@ for(const c of names.ch){ // 全キャラが戦場データにできる
  const animCtx=makeCtx();let animPreserved=false;
  try {
   ev(animCtx,`SOLO_ACCOUNT.mode='account';SOLO_ACCOUNT.token='test-token';SOLO_ACCOUNT.userName='テスト';SOLO_ACCOUNT.loggedIn=true;PF.name='テスト';DK.cur=0;DK.d[0]=${JSON.stringify(validDeck)};DK.hiers[0]='総記の階';startSoloBattle('blood_bath');S.pick=[S.p[0].pool.findIndex(x=>isCh(x))];confirmSetup()`);
-  animCtx.matchMedia=()=>({matches:false});
   ev(animCtx,`(()=>{const p=S.p[0].chars[0];p.card=soloCard('テスト攻撃',0,[D('a',1,3)]);p.tgt=0;p.used=false;p.hitFired=[];p.stock=null;p.redirBy=null;p.tgt0=null;return true})()`);
   ev(animCtx,'combat()');
-  animPreserved=ev(animCtx,'!!S.anim');
+  animPreserved=ev(animCtx,'!!S.anim&&S.anim.i===0&&S.anim.frames.length>0');
  } catch(e) {}
- ok('幻想体戦の後処理がダイスアニメーションを停止しない',animPreserved);
+ ok('幻想体戦は最初の攻撃フレームを即時表示し、動きを減らすOS設定でも自動スキップしない',animPreserved);
+ // 戦闘中に働き蜂が生成されても、生成前フレームに存在しないキャラの表示でアニメーションを止めない。
+ const spawnAnimCtx=makeCtx();let spawnAnimSafe=false;
+ try {
+  ev(spawnAnimCtx,`startMatch();const mk=n=>mkField(mkC({name:n,slot:1,hp:40,spd:[1,1],ps:[]}));S.p[1].chars=[mk('既存の敵')];const hp0=snap(),hold0=holdSnap(),st0=stSnap();S.anim={frames:[{hp:hp0,hold:hold0,sts:st0,dm:{},ev:[],lu:[],sh:[],ar:null,ms:400}],i:0,hp0,hold0,st0};S.p[1].chars.push(mk('途中出現の働き蜂'))`);
+  spawnAnimSafe=ev(spawnAnimCtx,`chHTML(1,1,0).includes('途中出現の働き蜂')`);
+ } catch(e) {spawnAnimSafe=false;}
+ ok('戦闘中に生成されたキャラがいても、履歴不足による描画エラーでアニメーションが止まらない',spawnAnimSafe);
  const cssText=fs.readFileSync(path.join(ROOT,'css/style.css'),'utf8');
  ok('大型キャラの2枠表示と選択中の金色枠を見分けやすくする',!cssText.includes('.ch.big{grid-column:span 2;border-color:var(--gold)}'));
 }
