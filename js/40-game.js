@@ -874,16 +874,26 @@ function combat(){
  if(!n[0]||!n[1]){S.over=n[0]===n[1]?'引き分け':n[0]?`${S.p[0].name}の勝利、おめ`:`${S.p[1].name}の勝利、おめ`;L(`★ ${S.over}`)}
  S.inCombat=false;S.phase='result';S.cover=null;play(frames,base,hp0,hold0,st0);
 }
+// 戦闘演出は最初のフレームから表示する。OSの「視差効果を減らす」設定が
+// 有効でも演出全体を無条件に飛ばさず、短い間隔で再生する（手動スキップは可能）。
+function animFrameDelay(A){
+ const frame=A.frames[A.i]||{},ms=Number(frame.ms)||750;
+ return A.reducedMotion?Math.max(180,Math.min(320,Math.round(ms*0.25))):Math.max(180,ms);
+}
 function play(frames,base,hp0,hold0,st0){
- if(!frames.length||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){S.anim=null;render();return}
- const A=S.anim={frames,base,hp0,hold0,st0,i:-1,t:null};render();
- A.t=setTimeout(()=>step(A),600);
+ if(!frames.length){S.anim=null;render();return}
+ const reduced=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+ const A=S.anim={frames,base,hp0,hold0,st0,i:0,t:null,reducedMotion:reduced};
+ // render()の表示更新で例外が起きてもアニメーション進行用タイマーが失われないよう先に予約する。
+ A.t=setTimeout(()=>step(A),animFrameDelay(A));
+ render();
 }
 function step(A){
  if(!S||S.anim!==A)return;
  A.i++;
  if(A.i>=A.frames.length){S.anim=null;render();return}
- render();A.t=setTimeout(()=>step(A),A.frames[A.i].ms);
+ A.t=setTimeout(()=>step(A),animFrameDelay(A));
+ render();
 }
 function skipAnim(){if(S&&S.anim){clearTimeout(S.anim.t);S.anim=null;render()}}
 const logLines=()=>{const A=S.anim;return A?S.log.slice(0,A.i<0?A.base:A.frames[A.i].to):S.log};
@@ -906,14 +916,19 @@ const diceRows=c=>`<div>${c.d.map(x=>`<div class=\"drow\"><span class=\"die ${x.
 function chHTML(pi,ci,view){
  const p=S.p[pi],c=p.chars[ci],decide=S.phase==='decide',isMine=decide&&pi===view&&(!NET.on||act()===NET.me);
  const showCard=!decide||isMine||(S.stage===1&&pi===S.order[0]);
- const A=S.anim,fr=A&&A.i>=0?A.frames[A.i]:null,hv=A?(A.i<0?A.hp0:fr.hp)[pi][ci]:c.hp,dead=A?hv<=0:!c.alive,dmv=fr&&fr.dm[`${pi}-${ci}`];
+ const A=S.anim,fr=A&&A.i>=0?A.frames[A.i]:null;
+ // 働き蜂などが戦闘途中に生成された場合、生成前のフレームにはそのキャラの
+ // HP・手札・状態スナップショットがない。欠けた履歴を使って描画が例外終了しないよう、
+ // そのキャラの現在値にフォールバックする。
+ const frameAt=(grid,fallback)=>grid&&grid[pi]&&grid[pi][ci]!==undefined?grid[pi][ci]:fallback;
+ const hv=A?frameAt(A.i<0?A.hp0:fr&&fr.hp,c.hp):c.hp,dead=A?hv<=0:!c.alive,dmv=fr&&fr.dm?fr.dm[`${pi}-${ci}`]:undefined;
  let cls='ch'+(c.size>1?' big':'')+(dead?' dead':'');
  const has=l=>l.some(x=>x[0]===pi&&x[1]===ci);
  const low=pi===view;   // 画面の下側に出ているのは自分側（オンラインのP2視点では pi=1 が下）
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
  if(fr&&has(fr.sh))cls+=' hurt';
- const hd=A?((A.i<0?A.hold0:fr.hold)[pi][ci]||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
- const sn=A?(A.i<0?A.st0:fr.sts)[pi][ci]:c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold','spore'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
+ const hd=A?(frameAt(A.i<0?A.hold0:fr&&fr.hold,[])||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
+ const sn=A?(frameAt(A.i<0?A.st0:fr&&fr.sts,c)||c):c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold','spore'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
  const evs=fr?fr.ev.filter(e=>e[0]===pi&&e[1]===ci).map(e=>e[2]):[];
  const badge=(k,v,nx)=>`<span class="stt${nx?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${nx?'（次のターンから）':''}：${STN[k].t}">${STN[k].i}${bk.includes(k)?(['guard','dmgdn','rolldn'].includes(k)?'-':'+'):''}${v}${nx?'<small>次</small>':''}</span>`;
  const sts=stk.filter(k=>ST[k]>0).map(k=>badge(k,ST[k])).join('')+bk.filter(k=>sn.bf[k]>0).map(k=>badge(k,sn.bf[k])).join('')+bk.filter(k=>sn.nx[k]>0).map(k=>badge(k,sn.nx[k],1)).join('');
