@@ -334,7 +334,7 @@ function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()
 function chooseTarget(ci,slot,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()||NET.on)return;const c=S.p[act()].chars[ci],st=actionStates(c)[slot];if(!c||!st||!st.card)return;S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 function pickTgt(ci){
  if(!canAct()||S.p[act()].pendingAbn)return;
- if(S.pend==null||!S.p[1-act()].chars[ci].alive)return;
+ if(S.pend==null||!S.p[1-act()].chars[ci].alive||(S.p[1-act()].chars[ci].abnState&&S.p[1-act()].chars[ci].abnState.soloUntargetable))return;
  const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
  logOp(['P',yi,ci]);undoRedir(yi);
  // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
@@ -957,7 +957,7 @@ function chHTML(pi,ci,view){
  const sc=isMine&&S.sel!=null?p.hand[S.sel]:null;
  if(sc&&!isCh(sc)&&sc.req&&!c.at.includes(sc.req))cls+=' dimc';   // 使えないキャラを暗くする
  if(isMine&&c.alive)cls+=' mine'+(S.pend===ci?' pend':'');
- if(decide&&pi!==view&&S.pend!=null&&c.alive)cls+=' tgt';
+ if(decide&&pi!==view&&S.pend!=null&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable))cls+=' tgt';
  const ev=isMine?`onclick="mine(${ci})" ondragover="event.preventDefault()" ondrop="event.preventDefault();assign(${ci},+event.dataTransfer.getData('text/plain'))"`:
   (cls.includes('tgt')?`onclick="pickTgt(${ci})"`:'');
  let a='';
@@ -1149,6 +1149,10 @@ function dkAdd(k,v){
  if(n)d[k]=n;else delete d[k];saveDecks();render();
 }
 function dkReset(){DK.d[DK.cur]=defDeck(DK.cur?POOL2:POOL1);saveDecks();render()}
+function dkClear(){
+ if(!confirm(`デッキ${DK.cur+1}に入っているカードをすべて解除しますか？\nこの操作は「初期デッキに戻す」と違い、空のデッキになります。`))return;
+ DK.d[DK.cur]={};saveDecks();render();
+}
 function dkOut(){document.getElementById('code').value=JSON.stringify(DK.d[DK.cur])}
 function dkIn(){
  try{const o=JSON.parse(document.getElementById('code').value),d={};
@@ -1185,7 +1189,7 @@ function renderDeck(){
    <div class="dkscroll" id="dkR">${inDeck.length?`<div class="hand">${inDeck.map(tile).join('')}</div>`:'<div class="dkempty">左の一覧から、カードを＋で追加してください。</div>'}</div>
   </section>
  </div>
- <p><button class="sub" onclick="dkReset()">初期デッキに戻す</button> <button class="sub" onclick="dkOut()">コードを書き出す</button> <button class="sub" onclick="dkIn()">コードを読み込む</button></p>
+ <p class="dktools"><button class="sub" onclick="dkReset()">初期デッキに戻す</button> <button class="sub" onclick="dkClear()">カード一括解除</button> <button class="sub" onclick="dkOut()">コードを書き出す</button> <button class="sub" onclick="dkIn()">コードを読み込む</button></p>
  <textarea id="code" rows="3" style="width:100%;background:#10131f;color:var(--ink);border:1px solid var(--line)"></textarea>`;
  const rs=(id,v)=>{const e=document.getElementById(id);if(e)e.scrollTop=v};rs('dkL',sL);rs('dkR',sR);
 }

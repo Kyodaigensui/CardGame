@@ -22,7 +22,10 @@ const SOLO_BOSSES = [
   {id:'burning_girl', name:'燃え尽きた少女', floor:'歴史の階', summary:'2体の「最後のマッチの火」を倒すと本体のHPが半減。5ターン目に自爆ページを使う。'},
   {id:'happy_teddy', name:'幸せなテディ', floor:'歴史の階', summary:'速度10固定・2回行動・コスト最大値2。マッチごとに「懐かしいあの日の抱擁」のコストが下がる。'},
   {id:'fairy_festival', name:'妖精の祭典', floor:'歴史の階', summary:'女王妖精と2体の妖精の塊。塊を捕食するたび女王が強化される。女王撃破で勝利。'},
-  {id:'queen_bee', name:'女王蜂', floor:'歴史の階', summary:'働き蜂が胞子を付与し、胞子を持つキャラが死亡すると働き蜂が増える。女王蜂撃破で勝利。'}
+  {id:'queen_bee', name:'女王蜂', floor:'歴史の階', summary:'働き蜂が胞子を付与し、胞子を持つキャラが死亡すると働き蜂が増える。女王蜂撃破で勝利。'},
+  {id:'abandoned_murderer', name:'捨てられた殺人者', floor:'技術科学の階', summary:'行動権2・与ダメージ+10。コスト0の3ダイス防御とコスト2の強力な3ダイス攻撃を使い、状態異常中はダイス値-4。'},
+  {id:'anything_helps', name:'何でもお手伝いします', floor:'技術科学の階', summary:'低HPの3体。3ダイス防御で次ターンのダイス値+4、単ダイス攻撃でダメージを与え、1ターンに10以上与えるとコスト1回復。'},
+  {id:'singing_machine', name:'歌う機械', floor:'技術科学の階', summary:'3ターンごとに作動。囚われた職員の攻撃で味方が機械に入ることがあり、機械内に誰かいる間は全員の被ダメージ+10・ダイス値+5。囚われた職員を2体倒すと勝利。'}
 ];
 
 // パッシブ欄の説明専用表示。PKには説明文だけを置き、ギミックの処理自体は下の専用ロジックが担当。
@@ -37,20 +40,30 @@ Object.assign(PAS, {
   solo_fairy_queen_desc: {n:'女王妖精のギミック', k:'solo_fairy_queen_desc'},
   solo_fairy_lump_desc: {n:'妖精の塊のギミック', k:'solo_fairy_lump_desc'},
   solo_bee_queen_desc: {n:'女王蜂のギミック', k:'solo_bee_queen_desc'},
-  solo_worker_bee_desc: {n:'働き蜂のギミック', k:'solo_worker_bee_desc'}
+  solo_worker_bee_desc: {n:'働き蜂のギミック', k:'solo_worker_bee_desc'},
+  solo_murderer_desc: {n:'捨てられた殺人者のギミック', k:'solo_murderer_desc'},
+  solo_helper_desc: {n:'何でもお手伝いしますのギミック', k:'solo_helper_desc'},
+  solo_machine_desc: {n:'歌う機械のギミック', k:'solo_machine_desc'},
+  solo_staff_desc: {n:'囚われた職員のギミック', k:'solo_staff_desc'},
+  solo_ice_cage_desc: {n:'撃破時に凍結した味方が復活する', k:'solo_ice_cage_desc'}
 });
 Object.assign(PK, {
   solo_blood_desc: {t:()=> '行動権2。単ダイス命中時に対象の次ターンのダイス値-3。3ダイス攻撃の全ダイスが命中すると対象は次ターン行動不能。3ダイス防御も使用する。'},
   solo_heart_desc: {t:()=> '単ダイス攻撃が命中すると、ほかの生存する味方の次ターンのダイス値+2。弱い防御ページも使用する。'},
   solo_lung_desc: {t:()=> '3ダイス攻撃を使用する。心臓の強化が重なるとダイス値が上がる。'},
-  solo_queen_desc: {t:()=> '戦闘開始時、中央の味方以外を凍結。女王を倒すと凍結した味方はHP75%で解放される。攻撃命中で寒気+1。寒気はターン終了時-1、ターン開始時4以上なら速度-1・ダイス値-2、6以上なら1ターン行動不能になり寒気をすべて失う。'},
+  solo_queen_desc: {t:()=> '戦闘開始時、中央の味方以外を「氷の檻」に変える。氷の檻を撃破すると元の味方がHP75%で復活する。攻撃命中で寒気+1。寒気はターン終了時-1、ターン開始時4以上なら速度-1・ダイス値-2、6以上なら1ターン行動不能になり寒気をすべて失う。'},
+  solo_ice_cage_desc: {t:()=> '撃破時に、閉じ込められた味方がHP75%で味方として復活する。'},
   solo_burning_desc: {t:()=> '4ターンは行動せず、5ターン目に「4本目のマッチの火」を使用して自滅する。最後のマッチの火が倒されるたび、現在HPが半分になる。'},
   solo_match_desc: {t:()=> '回避ダイスを使う。攻撃ページ使用時、自身のHPを少し失う。倒されると燃え尽きた少女の現在HPが半分になる。'},
   solo_teddy_desc: {t:()=> '速度10固定、行動権2、コスト最大値2。マッチが発生するたび「懐かしいあの日の抱擁」のコストが1下がる。'},
   solo_fairy_queen_desc: {t:()=> '3ダイス防御と出血を付与する3ダイス攻撃を使用。毎ターン妖精の塊1体に用意された肉を付与し、HP1なら捕食して回復・被ダメージ+10。ほかに敵がいない間はダイス値+30。死亡すると勝利。'},
   solo_fairy_lump_desc: {t:()=> '低威力の出血攻撃を使う。女王妖精が生存中はHPが1未満にならず、用意された肉がありHP1ならターン終了時に捕食される。'},
   solo_bee_queen_desc: {t:()=> '3ダイスの防御ページのみを使用。HPが25%未満になると働き蜂は女王蜂を攻撃する。死亡すると勝利。'},
-  solo_worker_bee_desc: {t:()=> '胞子を付与する3ダイス攻撃、または女王蜂を回復する低威力攻撃を使う。胞子はターン終了時に数値分のダメージを与えて半減し、胞子を持つ対象が死亡すると働き蜂が増える。'}
+  solo_worker_bee_desc: {t:()=> '胞子を付与する3ダイス攻撃、または女王蜂を回復する低威力攻撃を使う。胞子はターン終了時に数値分のダメージを与えて半減し、胞子を持つ対象が死亡すると働き蜂が増える。'},
+  solo_murderer_desc: {t:()=> '行動権2。与える攻撃ダメージ+10。コスト0の弱い3ダイス防御と、コスト2の強力な3ダイス攻撃を使用する。状態異常中は全ダイス値-4。'},
+  solo_helper_desc: {t:()=> 'コスト上限6。コスト0の3ダイス防御を使うと次のターンのダイス値+4。1ターンに10以上の攻撃ダメージを与えるとコストを1回復する。'},
+  solo_machine_desc: {t:()=> '攻撃対象に選択できない。3ターンごとに作動し、囚われた職員の単ダイス攻撃が味方に命中するとそのキャラクターを内部へ送る。内部にキャラクターがいる間、全員の被ダメージ+10・ダイス値+5。'},
+  solo_staff_desc: {t:()=> '通常は中程度の2ダイス攻撃を使用する。歌う機械が作動するターンは、最初の対象を機械へ放り込む単ダイス攻撃を使用する。'}
 });
 
 // 寒気は通常の状態異常とは別管理にし、画面表示だけ既存の状態異常欄へ載せます。
@@ -167,6 +180,15 @@ function soloMakeBossTeam(id) {
   } else if(id==='queen_bee') {
     chars=[soloBaseChar('女王蜂','幻想体',300,[3,6],'solo_bee_queen_desc'),soloBaseChar('働き蜂','幻想体',105,[2,5],'solo_worker_bee_desc'),soloBaseChar('働き蜂','幻想体',105,[2,5],'solo_worker_bee_desc')];
     chars[0].abnState.beeAttackedThisTurn=[];chars[0].abnState.beeAttackedLastTurn=[];
+  } else if(id==='abandoned_murderer') {
+    const murderer=soloBaseChar('捨てられた殺人者','幻想体',205,[2,6],'solo_murderer_desc');
+    setupActionSlots(murderer,2);murderer.abnState.soloDamagePlus=10;chars=[murderer];
+  } else if(id==='anything_helps') {
+    chars=[1,2,3].map(()=>soloBaseChar('何でもお手伝いします','幻想体',52,[2,5],'solo_helper_desc'));
+  } else if(id==='singing_machine') {
+    const machine=soloBaseChar('歌う機械','幻想体',9999,[1,1],'solo_machine_desc');
+    machine.abnState.soloUntargetable=true;
+    chars=[machine,soloBaseChar('囚われた職員','幻想体',118,[2,5],'solo_staff_desc'),soloBaseChar('囚われた職員','幻想体',118,[2,5],'solo_staff_desc')];
   }
   return chars;
 }
@@ -192,6 +214,13 @@ const soloFairyLumpCard=()=>soloCard('妖精の塊：小さな爪',0,[D('a',2,5,
 const soloBeeQueenCard=()=>soloCard('女王蜂：防御陣形',0,[D('d',4,7),D('d',4,7),D('d',4,8)]);
 const soloWorkerSpore=()=>soloCard('働き蜂：胞子の連撃',0,[D('a',3,6),D('a',3,6),D('a',3,6)],{soloBoss:'bee_spore'});
 const soloWorkerHeal=()=>soloCard('働き蜂：女王への献身',0,[D('a',1,3),D('a',1,3)],{soloBoss:'bee_heal'});
+const soloMurdererGuard=()=>soloCard('捨てられた殺人者：鈍い防御',0,[D('d',1,2),D('d',1,2),D('d',1,2)],{soloBoss:'murderer_guard'});
+const soloMurdererAttack=()=>soloCard('捨てられた殺人者：処刑',2,[D('a',6,10),D('a',6,10),D('a',7,11)],{soloBoss:'murderer_attack'});
+const soloHelperGuard=()=>soloCard('何でもお手伝いします：お手伝い',0,[D('d',3,6),D('d',3,6),D('d',3,6)],{soloBoss:'helper_guard'});
+const soloHelperAttack=()=>soloCard('何でもお手伝いします：作業用の一撃',2,[D('a',4,7)],{soloBoss:'helper_attack'});
+const soloStaffAttack=(active)=>active
+  ?soloCard('囚われた職員：機械へ放り込む',0,[D('a',4,7)],{soloBoss:'song_staff_single'})
+  :soloCard('囚われた職員：抵抗',0,[D('a',3,6),D('a',3,6)],{soloBoss:'song_staff_double'});
 function soloPlanEnemy() {
   if(!SOLO.active||!S||S.phase!=='decide')return;
   const enemy=S.p[1], targets=S.p[0].chars.map((c,i)=>({c,i})).filter(x=>x.c.alive);
@@ -207,6 +236,7 @@ function soloPlanEnemy() {
   // 明示的な集中狙いは専用ルールを優先。それ以外はHP割合が低い相手を狙いやすくしつつ、確率で分散する。
   // 同一ターン内に複数行動する敵は、すでに狙った相手を避ける傾向も加える。
   const plannedTargetCounts=new Map(targets.map(x=>[x.i,0]));
+  const songFocusIndex=SOLO.bossId==='singing_machine'&&targets.length?targets[Math.floor(rnd()*targets.length)].i:null;
   const weightedTarget=(list)=>{
     if(!list.length)return targets[0].i;
     const weights=list.map(x=>{
@@ -218,7 +248,9 @@ function soloPlanEnemy() {
     for(let i=0;i<list.length;i++){roll-=weights[i];if(roll<0)return list[i].i;}
     return list[list.length-1].i;
   };
+  let budget=Math.max(0,enemy.cost||0);
   const chooseTarget=(c)=>{
+    if(SOLO.bossId==='singing_machine'&&c.name==='囚われた職員'&&songFocusIndex!=null)return songFocusIndex;
     if(SOLO.bossId==='ice_queen') {
       const maxCold=Math.max(...targets.map(x=>x.c.st.cold||0));
       const cold=targets.filter(x=>(x.c.st.cold||0)===maxCold);
@@ -243,6 +275,8 @@ function soloPlanEnemy() {
   };
   enemy.chars.forEach((c,ci)=>{
     if(!c.alive)return;
+    // 氷の女王に凍らされて敵側へ移った味方は、攻撃せず標的としてのみ存在する。
+    if(SOLO.bossId==='ice_queen'&&c.abnState&&c.abnState.frozenConverted)return;
     const slotCount=actionStates(c).length||1;
     for(let slot=0;slot<slotCount;slot++) {
       setActionSlot(c,slot);
@@ -260,13 +294,22 @@ function soloPlanEnemy() {
       else if(SOLO.bossId==='queen_bee') {
         if(c.name==='女王蜂')card=soloBeeQueenCard();
         else card=S.turn%3===0?soloWorkerHeal():soloWorkerSpore();
+      } else if(SOLO.bossId==='abandoned_murderer') {
+        card=slot===0?soloMurdererAttack():soloMurdererGuard();
+      } else if(SOLO.bossId==='anything_helps') {
+        card=(S.turn%2===0||budget<2)?soloHelperGuard():soloHelperAttack();
+      } else if(SOLO.bossId==='singing_machine') {
+        if(c.name==='歌う機械')card=null;
+        else card=soloStaffAttack(!!(S.soloSongMachine&&S.soloSongMachine.activeTurn===S.turn));
       }
+      if(card)budget=Math.max(0,budget-card.c);
       c.card=card;c.tgt=card?chooseTarget(c):null;c.used=false;c.hitFired=[];c.stock=null;c.redirBy=null;c.tgt0=null;
       if(!c._soloHitCounts)c._soloHitCounts={};c._soloHitCounts[slot]=0;
     }
     setActionSlot(c,0);
   });
   if(SOLO.bossId==='happy_teddy'){enemy.max=2;enemy.cost=2;}
+  else if(SOLO.bossId==='abandoned_murderer'){enemy.max=2;enemy.cost=2;}
   else {enemy.cost=enemy.max=6;}
 }
 
@@ -278,7 +321,8 @@ function startSoloBattle(id) {
   SOLO.active=true;SOLO.bossId=soloBossById(id).id;SOLO.turns=0;SOLO.recordStatus='';
   const boss=soloBossById(SOLO.bossId);
   S={turn:0,p:[newP(PF.name,DK.d[DK.cur],DK.hiers[DK.cur]),newP(boss.name,{},boss.floor||DK.hiers[DK.cur])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,solo:true};
-  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);S.p[1].cost=S.p[1].max=SOLO.bossId==='happy_teddy'?2:6;
+  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);const lowCostBoss=['happy_teddy','abandoned_murderer'].includes(SOLO.bossId);S.p[1].cost=S.p[1].max=lowCostBoss?2:6;
+  if(SOLO.bossId==='singing_machine')S.soloSongMachine={activeTurn:0,occupant:null,capturedThisTurn:false,killedEmployees:0};
   SCR='match';render();
 }
 
@@ -290,8 +334,18 @@ confirmSetup=function(){
   applySetup(0,S.pick);S.pick=[];S.msg='';S.sp=0;
   if(SOLO.bossId==='ice_queen') {
     const allies=S.p[0].chars,center=Math.floor(allies.length/2);
-    allies.forEach((c,i)=>{if(!c.abnState)c.abnState={};if(i!==center){c.abnState.iceLocked=true;c.abnState.skipThisTurn=true;}});
-    L('氷の女王：中央以外の味方が凍結した。女王を倒すと解放される。');
+    const frozen=[];
+    allies.forEach((c,i)=>{if(i!==center){
+      if(!c.abnState)c.abnState={};
+      c.abnState.frozenOriginal={name:c.name,title:c.title,max:c.max,hp:c.hp,ps:Array.isArray(c.ps)?c.ps.slice():[],at:Array.isArray(c.at)?c.at.slice():[],spd:Array.isArray(c.spd)?c.spd.slice():c.spd};
+      c.abnState.iceLocked=true;c.abnState.skipThisTurn=true;c.abnState.frozenConverted=true;
+      c.name='氷の檻';c.title='幻想体';c.max=12;c.hp=12;c.ps=[PAS.solo_ice_cage_desc];c.at=[];
+      frozen.push(c);
+    }});
+    // 凍結した味方を低HPの「氷の檻」に変え、撃破時パッシブで元の味方を復活させる。
+    S.p[0].chars=S.p[0].chars.filter(c=>!frozen.includes(c));
+    frozen.forEach(c=>{c.alive=true;S.p[1].chars.push(c);});
+    L('氷の女王：中央以外の味方は低HPの「氷の檻」に変えられた。氷の檻のパッシブ：撃破時に閉じ込められた味方が復活する。');
   }
   startTurn();
 };
@@ -299,6 +353,7 @@ confirmSetup=function(){
 // ソロ戦では敵AIが先に行動を決め、速度に関係なくプレイヤーが後から行動を決定します。
 const __soloOriginalStartTurn=startTurn;
 startTurn=function(){
+  if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine){soloReleaseSongMachineIfDue();}
   if(SOLO.active&&S&&S.p&&S.p[1]) {
     if(SOLO.bossId==='queen_bee'){
       const q=S.p[1].chars.find(c=>c.name==='女王蜂');
@@ -308,6 +363,13 @@ startTurn=function(){
   }
   __soloOriginalStartTurn();
   if(SOLO.active&&S&&S.phase==='decide') {
+    if(SOLO.bossId==='singing_machine'&&S.soloSongMachine){
+      const machine=S.p[1].chars.find(c=>c.name==='歌う機械');
+      S.soloSongMachine.activeTurn=(S.turn%3===0&&!(S.soloSongMachine.occupant))?S.turn:0;
+      S.soloSongMachine.capturedThisTurn=false;
+      if(machine&&machine.abnState)machine.abnState.singingActive=!!S.soloSongMachine.activeTurn;
+      if(S.soloSongMachine.activeTurn)L(`歌う機械が作動する（ターン${S.turn}）。囚われた職員の単ダイス攻撃に注意。`);
+    }
     S.order=[1,0];S.stage=0;S.cover=null;
     // 敵側の行動を先に自動決定。stage=1にしてプレイヤーの決定画面へ移る。
     soloPlanEnemy();S.stage=1;S.cover=null;
@@ -339,9 +401,51 @@ done=function(){
   return;
 };
 
-// ボス固有の死亡処理。幻想体戦だけで使い、通常対戦のルールは変えない。
+// 歌う機械へキャラクターを入れ、次の1ターンは場から離脱させる。
+function soloSendIntoSingingMachine(c,pi,reason){
+  if(!S||!S.soloSongMachine||S.soloSongMachine.occupant||!c||!c.alive)return false;
+  const machine=S.soloSongMachine;
+  if(!c.abnState)c.abnState={};
+  c.abnState.inSingingMachine=true;
+  c.alive=false;
+  machine.occupant={c,pi,returnTurn:S.turn+2,enteredTurn:S.turn};
+  machine.capturedThisTurn=true;
+  L(`${reason||c.name+'は歌う機械に放り込まれた'}。次のターンは場から離脱する。歌う機械の内部効果：全員の被ダメージ+10・ダイス値+5。`);
+  return true;
+}
+function soloReleaseSongMachineIfDue(){
+  if(!S||!S.soloSongMachine||!S.soloSongMachine.occupant)return;
+  const machine=S.soloSongMachine,slot=machine.occupant;
+  // startTurnはターン番号を増やす前に呼ぶため、ここで「次のターンの次」に帰還させる。
+  if(S.turn+1<(slot.returnTurn||S.turn+2))return;
+  machine.occupant=null;
+  const c=slot.c,pi=slot.pi;
+  if(!c)return;
+  if(!c.abnState)c.abnState={};
+  c.abnState.inSingingMachine=false;
+  const loss=Math.ceil(c.max*0.30),before=c.hp;
+  c.hp=Math.max(0,c.hp-loss);c.alive=c.hp>0;
+  if(c.alive)L(`${c.name}が歌う機械から出てきた。HP${before}→${c.hp}（最大HPの30%分を失った）。`);
+  else {L(`${c.name}は歌う機械から出る際、HPを失い倒れた。`);soloHandleDeath(c);}
+}
 function soloHandleDeath(c){
   if(!SOLO.active||!S||!c)return;
+  if(SOLO.bossId==='singing_machine'&&c.name==='囚われた職員'&&S.soloSongMachine){
+    if(!c.abnState)c.abnState={};
+    if(!c.abnState.songEmployeeDeathCounted){c.abnState.songEmployeeDeathCounted=true;S.soloSongMachine.killedEmployees=(S.soloSongMachine.killedEmployees||0)+1;L(`囚われた職員の撃破数：${S.soloSongMachine.killedEmployees}/2。`);}
+  }
+  // 凍結して敵側へ移った味方は、倒された瞬間にHP75%で味方陣へ復帰する。
+  if(SOLO.bossId==='ice_queen'&&c.abnState&&c.abnState.frozenConverted){
+    S.p[1].chars=S.p[1].chars.filter(z=>z!==c);
+    const original=c.abnState.frozenOriginal||{};
+    c.name=original.name||c.name;c.title=original.title||c.title;c.max=original.max||c.max;
+    c.ps=original.ps||c.ps;c.at=original.at||c.at;c.spd=original.spd||c.spd;
+    c.abnState.frozenConverted=false;c.abnState.iceLocked=false;c.abnState.skipThisTurn=false;c.abnState.skipNextTurn=false;delete c.abnState.frozenOriginal;
+    c.st.cold=0;c.hp=Math.max(1,Math.ceil(c.max*0.75));c.alive=true;
+    if(!S.p[0].chars.includes(c))S.p[0].chars.push(c);
+    L(`氷の檻が破壊された！ ${c.name}がHP75%で味方として復活した。`);
+    return;
+  }
   if(SOLO.bossId==='fairy_festival'&&c.name==='妖精の塊'){
     const queen=S.p[1].chars.find(z=>z.name==='女王妖精');
     if(queen&&queen.alive){c.hp=1;c.alive=true;return;}
@@ -372,6 +476,8 @@ function soloSpawnWorkerBee(reason){
 // 既存命中処理に幻想体戦専用ギミックを追加。
 const __soloOriginalHit=hit;
 hit=function(pa,pb,B,dmg,A,die){
+  if(SOLO.active&&S&&SOLO.bossId==='abandoned_murderer'&&pa===1&&A&&A.name==='捨てられた殺人者'&&die&&die.t==='a'&&dmg>0){dmg+=10;L('捨てられた殺人者のパッシブ：与ダメージ+10。');}
+  if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.occupant&&dmg>0){dmg+=10;L(`歌う機械の内部効果：${B&&B.name||'対象'}の被ダメージ+10`);}
   if(SOLO.active&&S&&SOLO.bossId==='queen_bee'&&B&&B.name==='女王蜂'&&pa===0&&pb===1&&A){
     const queen=S.p[1].chars.find(z=>z.name==='女王蜂');
     if(queen&&queen.abnState){if(!queen.abnState.beeAttackedThisTurn)queen.abnState.beeAttackedThisTurn=[];if(!queen.abnState.beeAttackedThisTurn.includes(A))queen.abnState.beeAttackedThisTurn.push(A);}
@@ -380,6 +486,18 @@ hit=function(pa,pb,B,dmg,A,die){
   __soloOriginalHit(pa,pb,B,dmg,A,die);
   if(!SOLO.active||!S||!A||!B)return;
   const card=A.card||{};
+  const actualDamage=before!=null&&B?Math.max(0,before-B.hp):0;
+  if(SOLO.bossId==='anything_helps'&&pa===1&&pb===0&&A.name==='何でもお手伝いします'&&actualDamage>0){
+    const team=S.soloHelperDamage||(S.soloHelperDamage={turn:S.turn,total:0,recovered:false});
+    if(team.turn!==S.turn){team.turn=S.turn;team.total=0;team.recovered=false;}
+    team.total+=actualDamage;
+    if(team.total>=10&&!team.recovered){team.recovered=true;const oldCost=S.p[1].cost;S.p[1].cost=Math.min(S.p[1].max,S.p[1].cost+1);L(`何でもお手伝いしますのパッシブ：このターンに合計${team.total}ダメージを与え、コスト${S.p[1].cost-oldCost>0?'+1（回復）':'回復（上限）'}。`);}
+  }
+  // 作動中に囚われた職員の単ダイス攻撃を受けた最初の味方を機械へ送る。
+  if(SOLO.bossId==='singing_machine'&&pa===1&&pb===0&&A.name==='囚われた職員'&&card.soloBoss==='song_staff_single'&&S.soloSongMachine&&S.soloSongMachine.activeTurn===S.turn&&!S.soloSongMachine.capturedThisTurn&&B&&B.alive&&actualDamage>0){
+    // capture is applied after the attack resolves, so a character defeated by the hit is not removed a second time.
+    if(B.hp>0){soloSendIntoSingingMachine(B,0,`${B.name}は囚われた職員の攻撃で歌う機械に放り込まれた`);}
+  }
   // 女王蜂に狙われるキャラの記録は「前ターン」単位で使うため、攻撃ダメージの発生時に保存。
   if(SOLO.bossId==='blood_bath'&&A.name==='血の風呂'&&card.soloBoss==='blood_all_three'&&B.hp<before) {
     const slot=A._actionSlot||0;if(!A._soloHitCounts)A._soloHitCounts={};A._soloHitCounts[slot]=(A._soloHitCounts[slot]||0)+1;
@@ -408,16 +526,25 @@ hit=function(pa,pb,B,dmg,A,die){
   }
   // 被弾で死んだ妖精の塊は女王が生存している限りHP1で踏みとどまる。
   if(SOLO.bossId==='fairy_festival'&&B.name==='妖精の塊'&&!B.alive&&S.p[1].chars.some(z=>z.name==='女王妖精'&&z.alive)){B.hp=1;B.alive=true;}
-  else if(beforeAlive&&!B.alive)soloHandleDeath(B);
+  else if(beforeAlive&&!B.alive&&!(B.abnState&&B.abnState.inSingingMachine))soloHandleDeath(B);
 };
 
 const __soloOriginalDirect=direct;
 direct=function(pb,B,dmg,kind){
   const beforeAlive=B&&B.alive;
+  if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.occupant&&dmg>0){dmg+=10;L(`歌う機械の内部効果：${B&&B.name||'対象'}の被ダメージ+10`);}
   __soloOriginalDirect(pb,B,dmg,kind);
   if(!SOLO.active||!B)return;
   if(SOLO.bossId==='fairy_festival'&&B.name==='妖精の塊'&&!B.alive&&S.p[1].chars.some(z=>z.name==='女王妖精'&&z.alive)){B.hp=1;B.alive=true;}
   else if(beforeAlive&&!B.alive)soloHandleDeath(B);
+};
+
+const __soloOriginalAbnormalityRoll=abnormalityRoll;
+abnormalityRoll=function(c,d,inMatch=false,opponent=null){
+  const value=__soloOriginalAbnormalityRoll(c,d,inMatch,opponent);
+  if(SOLO.active&&SOLO.bossId==='singing_machine'&&S&&S.soloSongMachine&&S.soloSongMachine.occupant){L(`歌う機械の内部効果：${c.name}のダイス値+5`);return value+5;}
+  if(SOLO.active&&SOLO.bossId==='abandoned_murderer'&&c&&c.name==='捨てられた殺人者'&&hasStatusAbn(c))return Math.max(0,value-4);
+  return value;
 };
 
 const __soloOriginalDoMatch=doMatch;
@@ -438,11 +565,20 @@ combat=function(){
   if(!SOLO.active||!S)return;
   // __soloOriginalCombat() が開始したダイスアニメーションはここで止めない。
   // 敵固有効果と勝敗判定だけを追加し、既存のアニメーションタイマーを維持する。
-  if(S.p[1]){S.p[1].pendingAbn=false;S.p[1].abnOffers=[];S.p[1].abnSelected=null;S.p[1].coin=0;S.p[1].cost=S.p[1].max=(SOLO.bossId==='happy_teddy'?2:6);}
+  if(S.p[1]){S.p[1].pendingAbn=false;S.p[1].abnOffers=[];S.p[1].abnSelected=null;S.p[1].coin=0;S.p[1].max=(['happy_teddy','abandoned_murderer'].includes(SOLO.bossId)?2:6);if(SOLO.bossId==='anything_helps')S.p[1].cost=Math.max(0,Math.min(S.p[1].max,S.p[1].cost));else S.p[1].cost=S.p[1].max;}
+  if(SOLO.bossId==='anything_helps'){
+    S.p[1].chars.filter(c=>c.name==='何でもお手伝いします'&&c.alive&&c.card&&c.card.soloBoss==='helper_guard'&&c.abnState&&c.abnState.helperDefenseTurn!==S.turn).forEach(c=>{if(!c.nx)c.nx=BF0();c.nx.roll=(c.nx.roll||0)+4;c.abnState.helperDefenseTurn=S.turn;L(`${c.name}の「お手伝い」：次のターンのダイス値+4。`);});
+  }
+  if(SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.activeTurn===S.turn&&!S.soloSongMachine.capturedThisTurn&&!S.soloSongMachine.occupant){
+    const staff=S.p[1].chars.filter(c=>c.name==='囚われた職員'&&c.alive);
+    if(staff.length){const c=staff[Math.floor(rnd()*staff.length)];soloSendIntoSingingMachine(c,1,'味方が歌う機械に放り込まれなかったため、囚われた職員の1人が自ら機械へ入った');}
+  }
   if(SOLO.bossId==='ice_queen') {
     S.p[0].chars.forEach(c=>{if(c.st&&c.st.cold>0)c.st.cold=Math.max(0,c.st.cold-1);});
     const queen=S.p[1].chars.find(c=>c.name==='氷の女王');
     if(queen&&!queen.alive) {
+      const frozen=S.p[1].chars.filter(c=>c.abnState&&c.abnState.frozenConverted);
+      frozen.forEach(c=>{S.p[1].chars=S.p[1].chars.filter(z=>z!==c);const original=c.abnState.frozenOriginal||{};c.name=original.name||c.name;c.title=original.title||c.title;c.max=original.max||c.max;c.ps=original.ps||c.ps;c.at=original.at||c.at;c.spd=original.spd||c.spd;c.abnState.frozenConverted=false;c.abnState.iceLocked=false;c.abnState.skipThisTurn=false;c.abnState.skipNextTurn=false;delete c.abnState.frozenOriginal;c.st.cold=0;c.hp=Math.max(1,Math.ceil(c.max*0.75));c.alive=true;if(!S.p[0].chars.includes(c))S.p[0].chars.push(c);L(`${c.name}は氷の女王の撃破により解放され、HP75%で復帰した。`);});
       S.p[0].chars.forEach(c=>{if(c.abnState&&c.abnState.iceLocked){c.abnState.iceLocked=false;c.abnState.skipThisTurn=false;c.abnState.skipNextTurn=false;c.st.cold=0;c.hp=Math.max(1,Math.ceil(c.max*0.75));c.alive=true;L(`${c.name}は氷から解放され、HP75%で復帰した。`);}});
       L('氷の女王を撃破。凍結していた味方が解放された。');
     }
@@ -471,7 +607,8 @@ combat=function(){
   const queenFairy=SOLO.bossId==='fairy_festival'?S.p[1].chars.find(c=>c.name==='女王妖精'):null;
   const queenBee=SOLO.bossId==='queen_bee'?S.p[1].chars.find(c=>c.name==='女王蜂'):null;
   const burningGirl=SOLO.bossId==='burning_girl'?S.p[1].chars.find(c=>c.name==='燃え尽きた少女'):null;
-  const objectiveBossDead=!!((queenFairy&&!queenFairy.alive)||(queenBee&&!queenBee.alive)||(burningGirl&&burningGirl.abnState&&burningGirl.abnState.selfDestructed));
+  const songMachineWon=SOLO.bossId==='singing_machine'&&S.soloSongMachine&&(S.soloSongMachine.killedEmployees||0)>=2;
+  const objectiveBossDead=!!((queenFairy&&!queenFairy.alive)||(queenBee&&!queenBee.alive)||(burningGirl&&burningGirl.abnState&&burningGirl.abnState.selfDestructed)||songMachineWon);
   if(playerAlive&&(objectiveBossDead||!enemyAlive))S.over=`${S.p[0].name}の勝利、おめ`;
   else if(!playerAlive&&!enemyAlive)S.over='引き分け';
   else if(!playerAlive&&enemyAlive)S.over=`${S.p[1].name}の勝利、おめ`;
@@ -495,6 +632,13 @@ mine=function(ci){
   if(c&&c.abnState&&c.abnState.iceLocked){S.msg=`${c.name}は氷漬けで行動できません。氷の女王を倒してください。`;render();return;}
   if(c&&c.abnState&&c.abnState.skipThisTurn){S.msg=`${c.name}は行動不能のため、このターンは行動を選べません。`;render();return;}
   return __soloOriginalMine(ci);
+};
+
+// 歌う機械から戻るキャラクターを、次ターンの人数・ドロー・コスト計算より先に復帰させる。
+const __soloOriginalNextTurn=nextTurn;
+nextTurn=function(){
+  if(SOLO.active&&SOLO.bossId==='singing_machine'&&S&&S.soloSongMachine)soloReleaseSongMachineIfDue();
+  return __soloOriginalNextTurn();
 };
 
 const __soloOriginalRenderHome=renderHome;
