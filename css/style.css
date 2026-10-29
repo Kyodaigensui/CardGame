@@ -163,3 +163,7 @@ body.deckmode{min-height:100vh;display:flex;flex-direction:column;overflow-x:hid
 .solo-boss-card{display:block;min-width:0;margin:0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow-wrap:anywhere}
 .solo-boss-card p{font-size:.84rem;color:var(--dim);margin:6px 0 10px}
 .solo-boss-card .go{max-width:100%;white-space:normal}
+
+/* 広域攻撃は通常カードと区別し、矢印もタイプ別の色で表示する */
+.fx.area-sum{color:#b99aff;font-weight:700;border-left:3px solid #a879ff;padding-left:6px}
+.fx.area-individual{color:#62dfe4;font-weight:700;border-left:3px solid #35c9d0;padding-left:6px}
