@@ -170,7 +170,7 @@ const newP=(name,deck,hierarchy=ABN_HIERARCHIES[0])=>{
  return p;
 };
 const draw=(p,n)=>{for(let i=0;i<n;i++){if(!p.deck.length){p.deck=sh(p.disc);p.disc=[]}if(p.deck.length)p.hand.push(p.deck.pop())}};
-const used=p=>p.chars.reduce((a,c)=>a+actionStates(c).reduce((n,st)=>n+(st.card?st.card.c:0),0),0);
+const used=p=>p.chars.reduce((a,c)=>a+actionStates(c).reduce((n,st,slot)=>n+(st.card&&!(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='funeral_dead_butterflies'&&c.abnState&&c.abnState.butterflyRightsPenaltyTurn===S.turn&&slot>=actionStates(c).length-1)?st.card.c:0),0),0);
 const act=()=>S.order[S.stage];
 const alive=p=>p.chars.filter(c=>c.alive).length;
 
@@ -559,7 +559,7 @@ const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,...a])=>COND[k].f
 const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,...a])=>COND[k].t(...a))(condKey(c));
 const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib/cold/spore/incap/freeze/iceShard/speedDown/hiveMark/requestMark/takenPlus/globalMusic/globalBlackening/gazeTaken のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
 const fxText=(l,showCond=true)=>l.map(([k,v,c])=>(showCond&&c?`［${condText(c)}］`:'')+FXT[k](v)).join('、');
-const fxLine=(s,dl=true)=>(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
+const fxLine=(s,dl=true)=>(s.aoe?`<div class="fx area-${s.aoe}">広域攻撃：${s.aoe==='sum'?'合算':'個別'}（広域攻撃は遠距離攻撃より先に発動）</div>`:'')+(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
 function fx(pi,ch,list,label,tc,ctx){
  if(!list)return;const p=S.p[pi],x=ctx||{A:ch,B:tc,dmg:0};
  list=list.filter(e=>!e[2]||condTest(e[2],x));       // 条件を満たす効果だけ発動
@@ -903,6 +903,8 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   }
   L(head+`→ ${W.name}の勝ち`+(wd.t==='a'?(dmg?`、${dmg}ダメージ`:'、完全に防がれた'):wd.t==='e'?'、回避ダイス再使用':'、防御成功'));
   if(dmg)hit(wp,lp,Lc,dmg,W,wd);else if(wd.t==='a'&&hasAbn(W,'axe')){const n=R(2,7);L(`　「斧」：${W.name}の攻撃がダメージを与えられず、自身が${n}ダメージ`);direct(wp,W,n,'axe')}
+  // 死蝶の葬儀：非広域カードの最初のダイスでマッチ敗北したら、次ターンの行動権-1。
+  if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='funeral_dead_butterflies'&&Lc&&Lc.card&&Lc.card.d&&Lc.card.d[0]===ld&&Lc.card&&!Lc.card.aoe&&!(Lc.card.c===0&&Lc.card.d&&Lc.card.d[0]&&Lc.card.d[0].t==='a')){if(!Lc.abnState)Lc.abnState={};Lc.abnState.butterflyActionPenalty=1;L(`　死蝶の葬儀：${Lc.name}は最初のダイスでマッチ敗北。次のターン行動権-1。`);}
   pf([ix(wp,W)],[ix(lp,Lc)],[ix(wp,W),ix(lp,Lc)]);   // 勝者が攻撃・敗者が揺れる
   if(wd.t==='e'){aw?j++:i++}else{i++;j++}
  }
@@ -921,8 +923,8 @@ function combat(){
  S.p.forEach(p=>{p.cost-=used(p)});
  const base=S.log.length,hp0=snap(),hold0=holdSnap(),st0=stSnap(),frames=S.fr=[];S.pv=base;S.dm={};S.ev=[];
  const acts=[];
- S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{if(c.alive&&st.card&&st.tgt!=null)acts.push({pi,ci,slot,sp:c.sp,r:rnd()})})));
- const pr=a=>noSpd(actionStates(S.p[a.pi].chars[a.ci])[a.slot].card)?1:0;   // 速度無視のカードは最初（その中では速度順）
+ S.p.forEach((p,pi)=>p.chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{const blocked=typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='funeral_dead_butterflies'&&c.abnState&&c.abnState.butterflyRightsPenaltyTurn===S.turn&&slot>=actionStates(c).length-1;if(c.alive&&st.card&&st.tgt!=null&&!blocked)acts.push({pi,ci,slot,sp:c.sp,r:rnd()})})));
+ const pr=a=>{const card=actionStates(S.p[a.pi].chars[a.ci])[a.slot].card;return card&&card.aoe?2:(noSpd(card)?1:0)};   // 広域攻撃→遠距離など速度無視→通常攻撃
  acts.sort((a,b)=>pr(b)-pr(a)||b.sp-a.sp||a.r-b.r);
  for(const a of acts){
   const c=S.p[a.pi].chars[a.ci];setActionSlot(c,a.slot);
@@ -931,16 +933,49 @@ function combat(){
   S.dm={};
   let qi=1-a.pi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
-  // 魅了されたキャラクターは、付与者が生存している間そのキャラクターだけを狙う。
-  if(c.abnState&&c.abnState.charmedTurn===S.turn&&c.abnState.charmedBy&&c.abnState.charmedBy.alive){const charmOwner=c.abnState.charmedBy;const ownerPi=S.p.findIndex(p=>p.chars.includes(charmOwner));if(ownerPi===1-a.pi){qi=ownerPi;Q=S.p[qi];t=charmOwner;L(`　「艶やか」：${c.name}の攻撃対象を魅了の付与者${charmOwner.name}に変更`)}}
   // 女王蜂のHPが25%未満なら、働き蜂は敵ではなく女王蜂本人を攻撃する。
   if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&a.pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen){const qOwn=S.p[a.pi].chars.find(z=>z.name==='女王蜂'&&z.alive);if(qOwn){qi=a.pi;Q=S.p[qi];t=qOwn;}else c.abnState.targetQueen=false;}
   c.used=true;
   if(!c.alive){setActionSlot(c,0);continue}
+  // 広域攻撃は敵側の各キャラクターの最初の行動カードを対象にする。
+  // 合算：敵カードの全ダイス値の合計を上回ればカード全体を不発にし、攻撃。
+  // 個別：敵カード内の各ダイスと比較し、上回ったダイスだけ取り除いて攻撃。
+  if(c.card&&c.card.aoe){
+    const mode=c.card.aoe,areaDie=c.card.d.find(d=>d.t==='a');
+    if(areaDie){
+      const enemies=S.p[1-a.pi].chars.map((z,zi)=>({z,zi})).filter(x=>x.z.alive&&!(x.z.abnState&&x.z.abnState.soloUntargetable));
+      for(const item of enemies){
+        const target=item.z;if(!target.alive)continue;
+        const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;let defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
+        setActionSlot(c,a.slot);
+        const attackValue=abnormalityRoll(c,areaDie,false,target);
+        if(!c.alive)break;
+        if(!defState||!defState.card){L(`【広域攻撃：${mode==='sum'?'合算':'個別'}】${c.name}[${attackValue}] → ${target.name}（防御カードなし）`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;continue;}
+        setActionSlot(target,defSlot);const defendingCard=defState.card;
+        if(mode==='sum'){
+          let sum=0;for(const die of defendingCard.d){sum+=abnormalityRoll(target,die,true,c);}
+          if(attackValue>sum){defState.used=true;L(`【広域攻撃：合算】${c.name}[${attackValue}] > ${target.name}「${defendingCard.n}」の合計${sum}。カード不発、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
+          else {L(`【広域攻撃：合算】${c.name}[${attackValue}] ≤ ${target.name}「${defendingCard.n}」の合計${sum}。ダメージなし。`);pf([],[],[[a.pi,a.ci],[1-a.pi,item.zi]]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
+        }else{
+          const originalCount=defendingCard.d.length;let successes=0;
+          for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di];const defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;L(`【広域攻撃：個別】${c.name}[${attackValue}] > ${target.name}のダイス[${defValue}]。ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}}
+          if(!successes)L(`【広域攻撃：個別】${c.name}[${attackValue}]は${target.name}のダイスを上回れず、ダメージなし。`);
+          if(!defendingCard.d.length)defState.used=true;
+        }
+        setActionSlot(target,0);
+      }
+    }
+    setActionSlot(c,0);continue;
+  }
   if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='happy_teddy'&&c.name==='幸せなテディ'&&c.card&&c.card.soloBoss==='teddy_hug'&&c.abnState)c.abnState.hugSpent=true;
   if(hasAbn(c,'seventh_bullet')&&c.card.d.some(d=>d.t==='a')){
    if(!c.abnState)c.abnState={};c.abnState.seventhBulletPages=(c.abnState.seventhBulletPages||0)+1;
    if(c.abnState.seventhBulletPages===7){const all=S.p.flatMap((pp,pi)=>pp.chars.map((z,ci)=>({pi,ci,c:z}))).filter(x=>x.c.alive&&x.c!==c);if(all.length){const picked=all[Math.floor(rnd()*all.length)];qi=picked.pi;Q=S.p[qi];t=picked.c;L(`　「7つ目の弾丸」：7回目の攻撃ページの対象がランダムに決定 → ${t.name}${qi===a.pi?'（味方）':''}`)}}
+  }
+  // 魅了はボス固有の対象指定も含めて最優先し、ターゲット決定を実際の攻撃対象・表示に一致させる。
+  if(c.abnState&&c.abnState.charmedTurn===S.turn&&c.abnState.charmedBy&&c.abnState.charmedBy.alive){
+   const charmOwner=c.abnState.charmedBy,ownerPi=S.p.findIndex(p=>p.chars.includes(charmOwner));
+   if(ownerPi===1-a.pi){qi=ownerPi;Q=S.p[qi];t=charmOwner;c.tgt=Q.chars.indexOf(charmOwner);L(`　「艶やか」：${c.name}の攻撃対象を魅了の付与者${charmOwner.name}に変更`)}
   }
   if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t){setActionSlot(c,0);continue}}
   const tStates=actionStates(t),matchSlot=qi!==a.pi&&!(t.abnState&&t.abnState.skipThisTurn)?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
@@ -1302,18 +1337,18 @@ function renderDeck(){
 function drawArrows(){
  const svg=document.getElementById('arr'),bd=document.getElementById('board');if(!svg||!bd)return;
  const decide=S.phase==='decide',view=NET.on?NET.me:(decide?act():0),B=bd.getBoundingClientRect();
- let h='<defs><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
- const add=(pi,ci,qi,ti)=>{
+ let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
+ const add=(pi,ci,qi,ti,area=null)=>{
   const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
   const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),up=ra.top<rb.top;
   const x1=ra.left+ra.width/2-B.left,y1=(up?ra.bottom:ra.top)-B.top,x2=rb.left+rb.width/2-B.left,y2=(up?rb.top:rb.bottom)-B.top;
-  const own=pi===view;
-  h+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${own?'#d9a93f':'#d65a4f'}" stroke-width="3" stroke-linecap="round" marker-end="url(#${own?'ag':'ar'})"/>`;
+  const own=pi===view,stroke=area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(own?'#d9a93f':'#d65a4f'),marker=area==='sum'?'as':area==='individual'?'ai':(own?'ag':'ar');
+  h+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
  };
- if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1])}
+ if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null)}
  else[0,1].forEach(pi=>{
   if(decide&&!(pi===view||(S.stage===1&&pi===S.order[0])))return;
-  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach(st=>{if(st.card&&st.tgt!=null)add(pi,ci,1-pi,st.tgt)}));
+  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach(st=>{if(!st.card||st.tgt==null)return;if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe)});else add(pi,ci,1-pi,st.tgt,null)}));
  });
  svg.innerHTML=h;
 }

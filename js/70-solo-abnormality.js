@@ -25,7 +25,8 @@ const SOLO_BOSSES = [
   {id:'queen_bee', name:'女王蜂', floor:'歴史の階', summary:'働き蜂が胞子を付与し、胞子を持つキャラが死亡すると働き蜂が増える。女王蜂撃破で勝利。'},
   {id:'abandoned_murderer', name:'捨てられた殺人者', floor:'技術科学の階', summary:'行動権2・与ダメージ+10。コスト0の3ダイス防御とコスト2の強力な3ダイス攻撃を使い、状態異常中はダイス値-4。'},
   {id:'anything_helps', name:'何でもお手伝いします', floor:'技術科学の階', summary:'低HPの3体。3ダイス防御で次ターンのダイス値+4、単ダイス攻撃でダメージを与え、1ターンに10以上与えるとコスト1回復。'},
-  {id:'singing_machine', name:'歌う機械', floor:'技術科学の階', summary:'3ターンごとに作動。囚われた職員の攻撃で味方が機械に入ることがあり、機械内に誰かいる間は全員の被ダメージ+10・ダイス値+5。囚われた職員を2体倒すと勝利。'}
+  {id:'singing_machine', name:'歌う機械', floor:'技術科学の階', summary:'3ターンごとに作動。囚われた職員の攻撃で味方が機械に入ることがあり、機械内に誰かいる間は全員の被ダメージ+10・ダイス値+5。囚われた職員を2体倒すと勝利。'},
+  {id:'funeral_dead_butterflies', name:'死蝶の葬儀', floor:'技術科学の階', summary:'低速・2回行動の高体力ボスと2体の蝶の群れ。低HP割合の味方を狙う。広域攻撃を先に発動し、行動不能とマッチ敗北を利用する。'}
 ];
 
 // パッシブ欄の説明専用表示。PKには説明文だけを置き、ギミックの処理自体は下の専用ロジックが担当。
@@ -45,6 +46,8 @@ Object.assign(PAS, {
   solo_helper_desc: {n:'何でもお手伝いしますのギミック', k:'solo_helper_desc'},
   solo_machine_desc: {n:'歌う機械のギミック', k:'solo_machine_desc'},
   solo_staff_desc: {n:'囚われた職員のギミック', k:'solo_staff_desc'},
+  solo_butterfly_boss_desc: {n:'死蝶の葬儀のギミック', k:'solo_butterfly_boss_desc'},
+  solo_butterfly_swarm_desc: {n:'蝶の群れのギミック', k:'solo_butterfly_swarm_desc'},
   solo_ice_cage_desc: {n:'撃破時に凍結した味方が復活する', k:'solo_ice_cage_desc'}
 });
 Object.assign(PK, {
@@ -63,7 +66,9 @@ Object.assign(PK, {
   solo_murderer_desc: {t:()=> '行動権2。与える攻撃ダメージ+10。コスト0の弱い3ダイス防御と、コスト2の強力な3ダイス攻撃を使用する。状態異常中は全ダイス値-4。'},
   solo_helper_desc: {t:()=> 'コスト上限6。コスト0の3ダイス防御を使うと次のターンのダイス値+4。1ターンに10以上の攻撃ダメージを与えるとコストを1回復する。'},
   solo_machine_desc: {t:()=> '攻撃対象に選択できない。3ターンごとに作動し、囚われた職員の単ダイス攻撃が味方に命中するとそのキャラクターを内部へ送る。内部にキャラクターがいる間、全員の被ダメージ+10・ダイス値+5。'},
-  solo_staff_desc: {t:()=> '通常は中程度の2ダイス攻撃を使用する。歌う機械が作動するターンは、最初の対象を機械へ放り込む単ダイス攻撃を使用する。'}
+  solo_staff_desc: {t:()=> '通常は中程度の2ダイス攻撃を使用する。歌う機械が作動するターンは、最初の対象を機械へ放り込む単ダイス攻撃を使用する。'},
+  solo_butterfly_boss_desc: {t:()=> '行動権2・低速。HP割合が最も低い敵を狙う。広域攻撃は遠距離攻撃より先に発動する。0コスト攻撃以外のカードの最初のダイスでマッチ敗北すると、次のターンの行動権-1。行動権が0になると被ダメージ+10。'},
+  solo_butterfly_swarm_desc: {t:()=> '低HP・コスト上限2。3ダイス攻撃と、回避ダイスを含み的中時にダイス値-5または速度-5を付与する2コスト攻撃を使用する。'}
 });
 
 // 寒気は通常の状態異常とは別管理にし、画面表示だけ既存の状態異常欄へ載せます。
@@ -189,10 +194,15 @@ function soloMakeBossTeam(id) {
     const machine=soloBaseChar('歌う機械','幻想体',9999,[1,1],'solo_machine_desc');
     machine.abnState.soloUntargetable=true;
     chars=[machine,soloBaseChar('囚われた職員','幻想体',118,[2,5],'solo_staff_desc'),soloBaseChar('囚われた職員','幻想体',118,[2,5],'solo_staff_desc')];
+  } else if(id==='funeral_dead_butterflies') {
+    const boss=soloBaseChar('死蝶の葬儀','幻想体',340,[1,3],'solo_butterfly_boss_desc',['ranged']);setupActionSlots(boss,2);
+    const swarmA=soloBaseChar('蝶の群れ','幻想体',58,[3,7],'solo_butterfly_swarm_desc');
+    const swarmB=soloBaseChar('蝶の群れ','幻想体',58,[3,7],'solo_butterfly_swarm_desc');
+    chars=[boss,swarmA,swarmB];
   }
   return chars;
 }
-function soloCard(name,c,d,opts={}) { return {n:name,c:c,d:d,soloBoss:opts.soloBoss||'',req:opts.req||undefined,on:opts.on,hit:opts.hit,once:opts.once||false}; }
+function soloCard(name,c,d,opts={}) { return {n:name,c:c,d:d,soloBoss:opts.soloBoss||'',req:opts.req||undefined,aoe:opts.aoe||'',on:opts.on,hit:opts.hit,once:opts.once||false}; }
 const soloBloodSingle = () => soloCard('血の風呂：衰弱',0,[D('a',4,8,[['rolldn',3]])]);
 const soloBloodTriple = () => soloCard('血の風呂：三連撃',0,[D('a',3,6),D('a',3,6),D('a',3,6)],{soloBoss:'blood_all_three'});
 const soloBloodGuard = () => soloCard('血の風呂：三重防御',0,[D('d',3,7),D('d',3,7),D('d',3,7)]);
@@ -221,6 +231,13 @@ const soloHelperAttack=()=>soloCard('何でもお手伝いします：作業用�
 const soloStaffAttack=(active)=>active
   ?soloCard('囚われた職員：機械へ放り込む',0,[D('a',4,7)],{soloBoss:'song_staff_single'})
   :soloCard('囚われた職員：抵抗',0,[D('a',3,6),D('a',3,6)],{soloBoss:'song_staff_double'});
+const soloButterflyWeak=()=>soloCard('死蝶の葬儀：弔いの射撃',0,[D('a',2,4),D('d',2,4),D('d',2,4)],{req:'ranged',soloBoss:'butterfly_weak'});
+const soloButterflyLock=()=>soloCard('死蝶の葬儀：死蝶の封縛',2,[D('a',4,7),D('a',4,7),D('a',4,7)],{req:'ranged',soloBoss:'butterfly_lock'});
+const soloButterflySingleLock=()=>soloCard('死蝶の葬儀：終焉の一矢',3,[D('a',6,10)],{req:'ranged',soloBoss:'butterfly_single_lock'});
+const soloButterflyAreaSum=()=>soloCard('死蝶の葬儀：葬送の波',0,[D('a',3,6)],{aoe:'sum',soloBoss:'butterfly_area_sum'});
+const soloButterflyAreaIndividual=()=>soloCard('死蝶の葬儀：蝶群の掃討',0,[D('a',2,5)],{aoe:'individual',soloBoss:'butterfly_area_individual'});
+const soloSwarmTriple=()=>soloCard('蝶の群れ：羽ばたき',0,[D('a',2,4),D('a',2,4),D('a',2,4)],{soloBoss:'butterfly_swarm_triple'});
+const soloSwarmControl=()=>soloCard('蝶の群れ：翅の毒',2,[D('e',3,7),D('a',3,6),D('a',3,6)],{soloBoss:'butterfly_swarm_control'});
 function soloPlanEnemy() {
   if(!SOLO.active||!S||S.phase!=='decide')return;
   const enemy=S.p[1], targets=S.p[0].chars.map((c,i)=>({c,i})).filter(x=>x.c.alive);
@@ -242,7 +259,7 @@ function soloPlanEnemy() {
     const weights=list.map(x=>{
       const ratio=x.c.max>0?Math.max(0,Math.min(1,x.c.hp/x.c.max)):1;
       const count=plannedTargetCounts.get(x.i)||0;
-      return (1+(1-ratio)*2)/(1+count*1.5);
+      return (1+(1-ratio)*(SOLO.bossId==='funeral_dead_butterflies'?6:2))/(1+count*1.5);
     });
     const total=weights.reduce((a,b)=>a+b,0);let roll=rnd()*total;
     for(let i=0;i<list.length;i++){roll-=weights[i];if(roll<0)return list[i].i;}
@@ -250,6 +267,17 @@ function soloPlanEnemy() {
   };
   let budget=Math.max(0,enemy.cost||0);
   const chooseTarget=(c)=>{
+    if(SOLO.bossId==='funeral_dead_butterflies'&&c.name==='死蝶の葬儀'){const lowest=Math.min(...targets.map(x=>x.c.max>0?x.c.hp/x.c.max:1));const choices=targets.filter(x=>Math.abs((x.c.max>0?x.c.hp/x.c.max:1)-lowest)<1e-9);return choices[Math.floor(rnd()*choices.length)].i;}
+    // 「艶やか」の魅了をAIの対象決定そのものに反映する。
+    // 戦闘開始後に攻撃対象だけ上書きする方式では、決定画面や専用AIの対象選択に反映されないため最優先で処理。
+    const charm=c.abnState&&c.abnState.charmedTurn===S.turn&&c.abnState.charmedBy;
+    if(charm&&charm.alive){
+      const charmIndex=S.p[0].chars.indexOf(charm);
+      if(charmIndex>=0&&targets.some(x=>x.i===charmIndex)){
+        plannedTargetCounts.set(charmIndex,(plannedTargetCounts.get(charmIndex)||0)+1);
+        return charmIndex;
+      }
+    }
     if(SOLO.bossId==='singing_machine'&&c.name==='囚われた職員'&&songFocusIndex!=null)return songFocusIndex;
     if(SOLO.bossId==='ice_queen') {
       const maxCold=Math.max(...targets.map(x=>x.c.st.cold||0));
@@ -277,7 +305,8 @@ function soloPlanEnemy() {
     if(!c.alive)return;
     // 氷の女王に凍らされて敵側へ移った味方は、攻撃せず標的としてのみ存在する。
     if(SOLO.bossId==='ice_queen'&&c.abnState&&c.abnState.frozenConverted)return;
-    const slotCount=actionStates(c).length||1;
+    let slotCount=actionStates(c).length||1;
+    if(SOLO.bossId==='funeral_dead_butterflies'&&c.abnState&&c.abnState.butterflyRightsPenaltyTurn===S.turn)slotCount=Math.max(0,slotCount-1);
     for(let slot=0;slot<slotCount;slot++) {
       setActionSlot(c,slot);
       let card=null;
@@ -301,6 +330,14 @@ function soloPlanEnemy() {
       } else if(SOLO.bossId==='singing_machine') {
         if(c.name==='歌う機械')card=null;
         else card=soloStaffAttack(!!(S.soloSongMachine&&S.soloSongMachine.activeTurn===S.turn));
+      } else if(SOLO.bossId==='funeral_dead_butterflies') {
+        if(c.name==='死蝶の葬儀') {
+          if(S.p[0].chars.some(x=>x.alive&&x.abnState&&(x.abnState.skipThisTurn||x.abnState.skipNextTurn)))card=soloButterflyAreaSum();
+          else if(S.turn%4===0)card=soloButterflyAreaIndividual();
+          else if(slot===0&&S.turn%3===0)card=soloButterflySingleLock();
+          else if(slot===0&&S.turn%2===0)card=soloButterflyLock();
+          else card=soloButterflyWeak();
+        } else card=(S.turn%2===0&&budget>=2)?soloSwarmControl():soloSwarmTriple();
       }
       if(card)budget=Math.max(0,budget-card.c);
       c.card=card;c.tgt=card?chooseTarget(c):null;c.used=false;c.hitFired=[];c.stock=null;c.redirBy=null;c.tgt0=null;
@@ -310,6 +347,7 @@ function soloPlanEnemy() {
   });
   if(SOLO.bossId==='happy_teddy'){enemy.max=2;enemy.cost=2;}
   else if(SOLO.bossId==='abandoned_murderer'){enemy.max=2;enemy.cost=2;}
+  else if(SOLO.bossId==='funeral_dead_butterflies'){enemy.max=5;enemy.cost=Math.min(5,budget);}
   else {enemy.cost=enemy.max=6;}
 }
 
@@ -321,7 +359,7 @@ function startSoloBattle(id) {
   SOLO.active=true;SOLO.bossId=soloBossById(id).id;SOLO.turns=0;SOLO.recordStatus='';
   const boss=soloBossById(SOLO.bossId);
   S={turn:0,p:[newP(PF.name,DK.d[DK.cur],DK.hiers[DK.cur]),newP(boss.name,{},boss.floor||DK.hiers[DK.cur])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,solo:true};
-  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);const lowCostBoss=['happy_teddy','abandoned_murderer'].includes(SOLO.bossId);S.p[1].cost=S.p[1].max=lowCostBoss?2:6;
+  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);const lowCostBoss=['happy_teddy','abandoned_murderer'].includes(SOLO.bossId);S.p[1].cost=S.p[1].max=lowCostBoss?2:(SOLO.bossId==='funeral_dead_butterflies'?5:6);
   if(SOLO.bossId==='singing_machine')S.soloSongMachine={activeTurn:0,occupant:null,capturedThisTurn:false,killedEmployees:0};
   SCR='match';render();
 }
@@ -362,6 +400,14 @@ startTurn=function(){
     S.p[1].chars.forEach(c=>{if(c.abnState&&c.abnState.iceLocked&&SOLO.bossId==='ice_queen'&&S.p[1].chars.some(z=>z.name==='氷の女王'&&z.alive))c.abnState.skipThisTurn=true;});
   }
   __soloOriginalStartTurn();
+  if(SOLO.active&&S&&SOLO.bossId==='funeral_dead_butterflies') {
+    S.p.forEach((p,pi)=>p.chars.forEach(c=>{if(!c.alive||!c.abnState||!c.abnState.butterflyActionPenalty) return;
+      c.abnState.butterflyActionPenalty=0;
+      const rights=actionStates(c).length||1;
+      if(rights<=1){c.abnState.skipThisTurn=true;c.abnState.butterflyVulnerableTurn=S.turn;L(`${c.name}は行動権が0になり、このターン行動不能・被ダメージ+10。`);}
+      else c.abnState.butterflyRightsPenaltyTurn=S.turn;
+    }));
+  }
   if(SOLO.active&&S&&S.phase==='decide') {
     if(SOLO.bossId==='singing_machine'&&S.soloSongMachine){
       const machine=S.p[1].chars.find(c=>c.name==='歌う機械');
@@ -476,6 +522,12 @@ function soloSpawnWorkerBee(reason){
 // 既存命中処理に幻想体戦専用ギミックを追加。
 const __soloOriginalHit=hit;
 hit=function(pa,pb,B,dmg,A,die){
+  if(SOLO.active&&S&&SOLO.bossId==='funeral_dead_butterflies'&&B&&B.alive&&B.abnState&&B.abnState.butterflyVulnerableTurn===S.turn&&dmg>0){dmg+=10;L(`死蝶の葬儀のギミック：${B.name}は行動権0のため被ダメージ+10。`);}
+  if(SOLO.active&&S&&SOLO.bossId==='funeral_dead_butterflies'&&A&&B&&die&&dmg>0){
+    const card=A.card||{},dieIndex=card.d?card.d.indexOf(die):-1;
+    if(card.soloBoss==='butterfly_swarm_triple'&&A.name==='蝶の群れ'&&die.t==='a'){dmg+=2;L('蝶の群れ：的中時追加ダメージ+2。');}
+    if(card.soloBoss==='butterfly_lock'&&dieIndex>0&&B.abnState&&(B.abnState.skipThisTurn||B.abnState.skipNextTurn)){dmg+=4;L(`死蝶の葬儀：行動不能の${B.name}に追加ダメージ+4。`);}
+  }
   if(SOLO.active&&S&&SOLO.bossId==='abandoned_murderer'&&pa===1&&A&&A.name==='捨てられた殺人者'&&die&&die.t==='a'&&dmg>0){dmg+=10;L('捨てられた殺人者のパッシブ：与ダメージ+10。');}
   if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.occupant&&dmg>0){dmg+=10;L(`歌う機械の内部効果：${B&&B.name||'対象'}の被ダメージ+10`);}
   if(SOLO.active&&S&&SOLO.bossId==='queen_bee'&&B&&B.name==='女王蜂'&&pa===0&&pb===1&&A){
@@ -487,6 +539,17 @@ hit=function(pa,pb,B,dmg,A,die){
   if(!SOLO.active||!S||!A||!B)return;
   const card=A.card||{};
   const actualDamage=before!=null&&B?Math.max(0,before-B.hp):0;
+  if(SOLO.bossId==='funeral_dead_butterflies'&&pa===1&&pb===0&&A&&A.name==='死蝶の葬儀'&&actualDamage>0&&B&&B.alive){
+    const card=A.card||{},dieIndex=card.d?card.d.indexOf(die):-1;
+    if(!B.abnState)B.abnState={};
+    if(card.soloBoss==='butterfly_lock'&&dieIndex===0){B.abnState.skipThisTurn=true;B.abnState.skipNextTurn=true;L(`死蝶の葬儀：${B.name}は今と次のターン行動不能。`);}
+    if(card.soloBoss==='butterfly_single_lock'){B.abnState.skipThisTurn=true;B.abnState.skipNextTurn=true;L(`死蝶の葬儀：${B.name}は今と次のターン行動不能。`);}
+  }
+  if(SOLO.bossId==='funeral_dead_butterflies'&&pa===1&&pb===0&&A&&A.name==='蝶の群れ'&&A.card&&A.card.soloBoss==='butterfly_swarm_control'&&actualDamage>0&&B&&B.alive){
+    const dieIndex=A.card.d?A.card.d.indexOf(die):-1;
+    if(dieIndex===1){B.nx.rolldn=(B.nx.rolldn||0)+5;L(`蝶の群れ：${B.name}に次のターン出目-5。`);}
+    else if(dieIndex===2){if(!B.abnState)B.abnState={};B.abnState.speedDownNext=(B.abnState.speedDownNext||0)+5;L(`蝶の群れ：${B.name}に次のターン速度-5。`);}
+  }
   if(SOLO.bossId==='anything_helps'&&pa===1&&pb===0&&A.name==='何でもお手伝いします'&&actualDamage>0){
     const team=S.soloHelperDamage||(S.soloHelperDamage={turn:S.turn,total:0,recovered:false});
     if(team.turn!==S.turn){team.turn=S.turn;team.total=0;team.recovered=false;}
@@ -532,6 +595,7 @@ hit=function(pa,pb,B,dmg,A,die){
 const __soloOriginalDirect=direct;
 direct=function(pb,B,dmg,kind){
   const beforeAlive=B&&B.alive;
+  if(SOLO.active&&S&&SOLO.bossId==='funeral_dead_butterflies'&&B&&B.alive&&B.abnState&&B.abnState.butterflyVulnerableTurn===S.turn&&dmg>0){dmg+=10;L(`死蝶の葬儀のギミック：${B.name}は行動権0のため固定ダメージも+10。`);}
   if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.occupant&&dmg>0){dmg+=10;L(`歌う機械の内部効果：${B&&B.name||'対象'}の被ダメージ+10`);}
   __soloOriginalDirect(pb,B,dmg,kind);
   if(!SOLO.active||!B)return;
@@ -608,7 +672,8 @@ combat=function(){
   const queenBee=SOLO.bossId==='queen_bee'?S.p[1].chars.find(c=>c.name==='女王蜂'):null;
   const burningGirl=SOLO.bossId==='burning_girl'?S.p[1].chars.find(c=>c.name==='燃え尽きた少女'):null;
   const songMachineWon=SOLO.bossId==='singing_machine'&&S.soloSongMachine&&(S.soloSongMachine.killedEmployees||0)>=2;
-  const objectiveBossDead=!!((queenFairy&&!queenFairy.alive)||(queenBee&&!queenBee.alive)||(burningGirl&&burningGirl.abnState&&burningGirl.abnState.selfDestructed)||songMachineWon);
+  const deathButterfliesBoss=SOLO.bossId==='funeral_dead_butterflies'?S.p[1].chars.find(c=>c.name==='死蝶の葬儀'):null;
+  const objectiveBossDead=!!((queenFairy&&!queenFairy.alive)||(queenBee&&!queenBee.alive)||(burningGirl&&burningGirl.abnState&&burningGirl.abnState.selfDestructed)||songMachineWon||(deathButterfliesBoss&&!deathButterfliesBoss.alive));
   if(playerAlive&&(objectiveBossDead||!enemyAlive))S.over=`${S.p[0].name}の勝利、おめ`;
   else if(!playerAlive&&!enemyAlive)S.over='引き分け';
   else if(!playerAlive&&enemyAlive)S.over=`${S.p[1].name}の勝利、おめ`;
