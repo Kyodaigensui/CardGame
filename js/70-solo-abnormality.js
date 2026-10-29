@@ -660,7 +660,7 @@ function renderSoloMenu(){
   document.getElementById('app').innerHTML=`<div class="home"><h1>幻想体戦</h1><p>アカウント「${soloEsc(accountReady?SOLO_ACCOUNT.userName:'未ログイン')}」の保存済み編成を使います。</p>
     ${!accountReady?'<p class="err">幻想体戦はアカウントモード専用です。ホームで登録またはログインしてください。</p>':''}
     ${errors.length?`<p class="err">使用中デッキが未完成：${errors.map(soloEsc).join('、')}</p>`:''}
-    <div class="pf"><h2>幻想体戦</h2>${[...new Set(SOLO_BOSSES.map(b=>b.floor))].map(floor=>`<section style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0"><h3>${soloEsc(floor)}</h3>${SOLO_BOSSES.filter(b=>b.floor===floor).map(b=>`<section style="border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0"><b>${soloEsc(b.name)}</b><p>${soloEsc(b.summary)}</p><button class="go" ${(!accountReady||errors.length)?'disabled':''} onclick="startSoloBattle('${b.id}')">挑戦する</button></section>`).join('')}</section>`).join('')}</div>
+    <section class="pf solo-selection"><h2>幻想体戦</h2><div class="solo-floor-scroll" aria-label="階層一覧">${[...new Set(SOLO_BOSSES.map(b=>b.floor))].map(floor=>`<section class="solo-floor-column"><h3>${soloEsc(floor)}</h3><div class="solo-floor-bosses">${SOLO_BOSSES.filter(b=>b.floor===floor).map(b=>`<article class="solo-boss-card"><b>${soloEsc(b.name)}</b><p>${soloEsc(b.summary)}</p><button class="go" ${(!accountReady||errors.length)?'disabled':''} onclick="startSoloBattle('${b.id}')">挑戦する</button></article>`).join('')}</div></section>`).join('')}</div></section>
     <div class="pf"><h2>ランキング</h2><p>アカウントごとの最少討伐ターン数を表示します。</p><p><button class="sub" onclick="SCR='soloRank';render()">ランキングを見る</button></p>
     <p><small>Google Apps Scriptの連携先はゲーム本体に設定済みです。</small></p></div>
   </div>`;
