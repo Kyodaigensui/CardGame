@@ -152,3 +152,14 @@ body.deckmode{min-height:100vh;display:flex;flex-direction:column;overflow-x:hid
 .ch.dn.hurt.trg{animation:cgStrikeDown .42s ease-out,shake .4s,trg .7s}
 @keyframes cgStrikeUp{0%,100%{transform:translateY(0)}38%{transform:translateY(-22px)}}
 @keyframes cgStrikeDown{0%,100%{transform:translateY(0)}38%{transform:translateY(22px)}}
+
+/* 幻想体戦選択：階層を横並び、各階層内の幻想体戦は縦並びにする */
+.solo-selection{width:100%;max-width:none;margin:10px 0;padding:8px 10px;text-align:left;min-width:0}
+.solo-selection>h2{text-align:center;margin:0 0 10px}
+.solo-floor-scroll{display:flex;align-items:stretch;gap:12px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:2px 2px 14px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-gutter:stable}
+.solo-floor-column{flex:0 0 min(300px,calc(100vw - 56px));width:min(300px,calc(100vw - 56px));min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;background:rgba(0,0,0,.12);scroll-snap-align:start}
+.solo-floor-column>h3{font-size:.98rem;margin:0 0 10px;padding:0 0 8px;border-bottom:1px solid var(--line);text-align:center;overflow-wrap:anywhere}
+.solo-floor-bosses{display:flex;flex-direction:column;gap:8px;min-width:0}
+.solo-boss-card{display:block;min-width:0;margin:0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow-wrap:anywhere}
+.solo-boss-card p{font-size:.84rem;color:var(--dim);margin:6px 0 10px}
+.solo-boss-card .go{max-width:100%;white-space:normal}
