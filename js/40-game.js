@@ -1127,6 +1127,7 @@ function chHTML(pi,ci,view){
  let cls='ch'+(c.size>1?' big':'')+(dead?' dead':'')+(c.actionRights>1?' has-action-rail':'');
  const has=l=>l.some(x=>x[0]===pi&&x[1]===ci);
  const low=pi===view;   // 画面の下側に出ているのは自分側（オンラインのP2視点では pi=1 が下）
+ if(c.actionRights>1)cls+=low?' action-rail-facing-top':' action-rail-facing-bottom';
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
  if(fr&&has(fr.sh))cls+=' hurt';
  const hd=A?(frameAt(A.i<0?A.hold0:fr&&fr.hold,[])||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
@@ -1171,7 +1172,7 @@ function chHTML(pi,ci,view){
  if(isMine||!decide||(NET.on&&pi===view)){
   a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen?'女王蜂':(S.p[1-pi].chars[st.tgt]?S.p[1-pi].chars[st.tgt].name:'対象')}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
  }
- const actionRail=c.actionRights>1?`<div class="action-rail" aria-label="行動権ごとのマッチ表示">${actionStates(c).map((st,slot)=>{const target=st.tgt!=null?`対象：${S.p[1-pi].chars[st.tgt]?.name||'相手'}`:'対象未設定';return `<div id="ch-${pi}-${ci}-slot-${slot}" class="action-rail-slot${st.card?' assigned':''}${st.tgt!=null?' targeted':''}${st.redirBy!=null?' redirected':''}" title="行動${slot+1}：${st.card?st.card.n:'未割当'}／${target}${st.redirBy!=null?'／対象変更':''}"><span>${slot+1}</span>${st.redirBy!=null?'<i>↪</i>':''}</div>`}).join('')}</div>`:'';
+ const actionRail=c.actionRights>1?`<div class="action-rail ${low?'facing-top':'facing-bottom'}" aria-label="行動権ごとのマッチ表示">${actionStates(c).map((st,slot)=>{const target=st.tgt!=null?`対象：${S.p[1-pi].chars[st.tgt]?.name||'相手'}`:'対象未設定';return `<div id="ch-${pi}-${ci}-slot-${slot}" class="action-rail-slot${st.card?' assigned':''}${st.tgt!=null?' targeted':''}${st.redirBy!=null?' redirected':''}" title="行動${slot+1}：${st.card?st.card.n:'未割当'}／${target}${st.redirBy!=null?'／対象変更':''}"><span>${slot+1}</span>${st.redirBy!=null?'<i>↪</i>':''}</div>`}).join('')}</div>`:'';
  const showAbn=!!c.showAbn,abnList=c.abn||[];
  const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
