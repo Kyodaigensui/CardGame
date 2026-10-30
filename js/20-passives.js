@@ -126,15 +126,15 @@ emostack:{
  ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
  ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
  unstableEgo:{
-  t:()=>`サルヴァドールが死亡し、フィリップが唯一の生存味方になったとき、「蜜蝋の翼」を得て、最大HPの50%分回復し、行動権2を得る`,
+  t:()=>`サルヴァドールが死亡し、フィリップが唯一の生存味方になったとき、「蜜蝋の翼」を得る`,
  },
  waxenwings:{
-  t:()=>`ダイス値+2。相手が火傷中ならさらに+2。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。サルヴァドール死亡時にフィリップが唯一の生存者なら、場の枠は1つのまま行動権2を得る`,
+  t:()=>`最大HPの50%分回復し、ダイス値+2。相手が火傷中ならさらに+2。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。場の枠は1つのまま行動権2を得る`,
   turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach(p=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
  },
  tianTui:{t:()=>`「超絶猛虎殺撃乱斬」を広域攻撃：個別として発動できる`},
  tigerBullet:{
-  t:()=>`1ターン目開始時、虎標弾12と特殊カード「再装填」を得る。カード使用時、コストの半分（切り捨て）を虎標弾で支払い、同量だけ実コストを下げる。虎標弾はターン経過で減少しない`,
+  t:()=>`1ターン目開始時、虎標弾12と特殊カード欄に「再装填」を得る。カード使用時、コストの半分（切り捨て）を虎標弾で支払い、同量だけ実コストを下げる。`,
   turn:(c,x,pi)=>{
    if(S.turn!==1||!c.alive)return;
    if(!c.abnState)c.abnState={};if(c.abnState.tigerBulletInitialized)return;
