@@ -173,3 +173,15 @@ body.deckmode{min-height:100vh;display:flex;flex-direction:column;overflow-x:hid
 /* 広域攻撃は通常カードと区別し、矢印もタイプ別の色で表示する */
 .fx.area-sum{color:#b99aff;font-weight:700;border-left:3px solid #a879ff;padding-left:6px}
 .fx.area-individual{color:#62dfe4;font-weight:700;border-left:3px solid #35c9d0;padding-left:6px}
+
+/* 複数行動権：キャラクターマスの側面を行動権ごとに分割し、矢印の始点にする */
+.ch.has-action-rail{padding-right:34px}
+.action-rail{position:absolute;z-index:3;top:0;right:0;bottom:0;width:28px;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--line);border-radius:0 5px 5px 0;background:rgba(9,12,22,.72);pointer-events:none}
+.action-rail-slot{position:relative;flex:1 1 0;min-height:26px;display:flex;align-items:center;justify-content:center;gap:1px;color:var(--dim);font-size:.72rem;font-weight:700;border-bottom:1px solid var(--line);background:rgba(255,255,255,.025)}
+.action-rail-slot:last-child{border-bottom:0}
+.action-rail-slot.assigned{color:var(--ink);background:rgba(217,169,63,.12)}
+.action-rail-slot.targeted{box-shadow:inset 3px 0 0 var(--gold)}
+.action-rail-slot.redirected{color:#ffd0c8;background:rgba(214,90,79,.22);box-shadow:inset 3px 0 0 var(--atk)}
+.action-rail-slot i{font-style:normal;font-size:.65rem;color:var(--atk)}
+.action-arrow.split-action-arrow{filter:drop-shadow(0 0 1px rgba(0,0,0,.85))}
+@media(max-width:620px){.ch.has-action-rail{padding-right:32px}.action-rail{width:26px}}
