@@ -17,6 +17,6 @@ const POOL2=[
  {name:"デモ機",slot:2,hp:24,spd:[3,7],ps:['swift','sharp']},
  {name:"デモ機(大)",size:2,slot:1,hp:44,spd:[2,6],ps:['armor','wall','tough','sharp']},
  {name:"アルガリア",title:"青い残響",size:2,at:['blue'],slot:2,hp:78,spd:[2,8],ps:['rangedres','vibcheck','ailmentup']},
- {name:"フィリップ",title:"不安定な自我",size:1,slot:0,hp:60,spd:[2,6],ps:['ailmentup1','unstableego']},
- {name:"レイホン",size:1,slot:1,hp:140,spd:[2,5],ps:['tianTui','tigerBullet']},
+ {name:"フィリップ",title:"夜明け事務所",size:1,slot:0,hp:60,spd:[2,6],ps:['ailmentup1','unstableego']},
+ {name:"レイホン",title:"挿翅虎",size:1,slot:1,hp:80,spd:[2,5],ps:['tianTui','tigerBullet']},
 ];
