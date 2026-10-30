@@ -174,14 +174,20 @@ body.deckmode{min-height:100vh;display:flex;flex-direction:column;overflow-x:hid
 .fx.area-sum{color:#b99aff;font-weight:700;border-left:3px solid #a879ff;padding-left:6px}
 .fx.area-individual{color:#62dfe4;font-weight:700;border-left:3px solid #35c9d0;padding-left:6px}
 
-/* 複数行動権：キャラクターマスの側面を行動権ごとに分割し、矢印の始点にする */
-.ch.has-action-rail{padding-right:34px}
-.action-rail{position:absolute;z-index:3;top:0;right:0;bottom:0;width:28px;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--line);border-radius:0 5px 5px 0;background:rgba(9,12,22,.72);pointer-events:none}
-.action-rail-slot{position:relative;flex:1 1 0;min-height:26px;display:flex;align-items:center;justify-content:center;gap:1px;color:var(--dim);font-size:.72rem;font-weight:700;border-bottom:1px solid var(--line);background:rgba(255,255,255,.025)}
-.action-rail-slot:last-child{border-bottom:0}
+/* 複数行動権：相手に向いた辺を行動権ごとに分割し、各区画を矢印の始点にする。
+   自分側（画面下段）は上辺、相手側（画面上段）は下辺に配置する。 */
+.ch.has-action-rail.action-rail-facing-top{padding-top:34px;padding-right:8px}
+.ch.has-action-rail.action-rail-facing-bottom{padding-bottom:34px;padding-right:8px}
+.action-rail{position:absolute;z-index:3;left:0;right:0;height:26px;display:flex;flex-direction:row;overflow:hidden;background:rgba(9,12,22,.78);pointer-events:none}
+.action-rail.facing-top{top:0;border-bottom:1px solid var(--line);border-radius:5px 5px 0 0}
+.action-rail.facing-bottom{bottom:0;border-top:1px solid var(--line);border-radius:0 0 5px 5px}
+.action-rail-slot{position:relative;flex:1 1 0;min-width:22px;min-height:0;display:flex;align-items:center;justify-content:center;gap:3px;color:var(--dim);font-size:.72rem;font-weight:700;border-right:1px solid var(--line);background:rgba(255,255,255,.025)}
+.action-rail-slot:last-child{border-right:0}
 .action-rail-slot.assigned{color:var(--ink);background:rgba(217,169,63,.12)}
-.action-rail-slot.targeted{box-shadow:inset 3px 0 0 var(--gold)}
-.action-rail-slot.redirected{color:#ffd0c8;background:rgba(214,90,79,.22);box-shadow:inset 3px 0 0 var(--atk)}
+.action-rail.facing-top .action-rail-slot.targeted{box-shadow:inset 0 -3px 0 var(--gold)}
+.action-rail.facing-bottom .action-rail-slot.targeted{box-shadow:inset 0 3px 0 var(--gold)}
+.action-rail.facing-top .action-rail-slot.redirected{color:#ffd0c8;background:rgba(214,90,79,.22);box-shadow:inset 0 -3px 0 var(--atk)}
+.action-rail.facing-bottom .action-rail-slot.redirected{color:#ffd0c8;background:rgba(214,90,79,.22);box-shadow:inset 0 3px 0 var(--atk)}
 .action-rail-slot i{font-style:normal;font-size:.65rem;color:var(--atk)}
 .action-arrow.split-action-arrow{filter:drop-shadow(0 0 1px rgba(0,0,0,.85))}
-@media(max-width:620px){.ch.has-action-rail{padding-right:32px}.action-rail{width:26px}}
+@media(max-width:620px){.ch.has-action-rail.action-rail-facing-top{padding-top:32px}.ch.has-action-rail.action-rail-facing-bottom{padding-bottom:32px}.action-rail{height:24px}.action-rail-slot{min-width:18px}}
