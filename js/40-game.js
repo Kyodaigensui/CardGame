@@ -418,18 +418,18 @@ function pickTgt(ci){
  const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
  logOp(['P',yi,ci]);undoRedir(yi,slot);
  // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
- const zs=actionStates(z),zslot=zs.findIndex(st=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&y.sp-z.sp>=C.REDIR);
- if(zslot>=0){S.ask={yi,zi:ci,ySlot:slot,zSlot:zslot};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
+ const zs=actionStates(z),zSlots=zs.map((st,i)=>({st,i})).filter(({st})=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&y.sp-z.sp>=C.REDIR).map(x=>x.i);
+ if(zSlots.length){S.ask={yi,zi:ci,ySlot:slot,zSlots};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
  yst.tgt=ci;S.pend=null;S.pendActionSlot=0;S.msg='';render();
 }
-function redir(yes){
- if(!canAct()||!S.ask)return;logOp(['R',yes]);
- const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],ys=actionStates(y)[a.ySlot||0],zs=actionStates(z)[a.zSlot||0];
+function redir(yes,zSlot=null){
+ if(!canAct()||!S.ask)return;const a=S.ask,choices=a.zSlots||[a.zSlot||0];if(yes&&zSlot==null)zSlot=choices[0];if(yes&&!choices.includes(zSlot))return;logOp(['R',yes,zSlot]);
+ const y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],ys=actionStates(y)[a.ySlot||0];
  ys.tgt=a.zi;
- if(yes){zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=redirKey(a.yi,a.ySlot||0)}
+ if(yes){const zs=actionStates(z)[zSlot];zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=redirKey(a.yi,a.ySlot||0)}
  S.ask=null;render();
 }
-const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}・行動${(a.zSlot||0)+1}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いので、この行動同士をマッチさせられます。<br><button class="go" onclick="redir(true)">行動${(a.zSlot||0)+1}の対象を${y.name}に変更する</button> <button class="sub" onclick="redir(false)">変更しない</button></div>`};
+const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],choices=a.zSlots||[a.zSlot||0];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いため、マッチさせる行動権を選べます。${choices.map(slot=>`<div style="margin-top:6px"><b>${z.name}・行動${slot+1}</b><button class="go" onclick="redir(true,${slot})">この行動の対象を${y.name}に変更する</button></div>`).join('')}<button class="sub" style="margin-top:8px" onclick="redir(false)">変更しない</button></div>`};
 function done(){
  if(!canAct())return;
  if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
@@ -1017,25 +1017,29 @@ function combat(){
   // 合算：敵カードの全ダイス値の合計を上回ればカード全体を不発にし、攻撃。
   // 個別：敵カード内の各ダイスと比較し、上回ったダイスだけ取り除いて攻撃。
   if(c.card&&c.card.aoe){
-    const mode=c.card.aoe,areaDie=c.card.d.find(d=>d.t==='a');
-    if(areaDie){
+    const mode=c.card.aoe,areaDice=c.card.d.filter(d=>d.t==='a');
+    if(areaDice.length){
       const enemies=S.p[1-a.pi].chars.map((z,zi)=>({z,zi})).filter(x=>x.z.alive&&!(x.z.abnState&&x.z.abnState.soloUntargetable));
       for(const item of enemies){
         const target=item.z;if(!target.alive)continue;
         const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;let defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
-        setActionSlot(c,a.slot);
-        const attackValue=abnormalityRoll(c,areaDie,false,target);
-        if(!c.alive)break;
-        if(!defState||!defState.card){L(`【広域攻撃：${mode==='sum'?'合算':'個別'}】${c.name}[${attackValue}] → ${target.name}（防御カードなし）`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;continue;}
+        if(!defState||!defState.card){
+          for(const areaDie of areaDice){setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;L(`【広域攻撃：${mode==='sum'?'合算':'個別'}】${c.name}[${attackValue}] → ${target.name}（防御カードなし）`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;if(!target.alive)break;}
+          continue;
+        }
         setActionSlot(target,defSlot);const defendingCard=defState.card;
         if(mode==='sum'){
-          let sum=0;for(const die of defendingCard.d){sum+=abnormalityRoll(target,die,true,c);}
+          const areaDie=areaDice[0];setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);let sum=0;for(const die of defendingCard.d){sum+=abnormalityRoll(target,die,true,c);}
           if(attackValue>sum){defState.used=true;L(`【広域攻撃：合算】${c.name}[${attackValue}] > ${target.name}「${defendingCard.n}」の合計${sum}。カード不発、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
           else {L(`【広域攻撃：合算】${c.name}[${attackValue}] ≤ ${target.name}「${defendingCard.n}」の合計${sum}。ダメージなし。`);pf([],[],[[a.pi,a.ci],[1-a.pi,item.zi]]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
         }else{
-          const originalCount=defendingCard.d.length;let successes=0;
-          for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di];const defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;L(`【広域攻撃：個別】${c.name}[${attackValue}] > ${target.name}のダイス[${defValue}]。ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}}
-          if(!successes)L(`【広域攻撃：個別】${c.name}[${attackValue}]は${target.name}のダイスを上回れず、ダメージなし。`);
+          let successes=0;
+          // 個別は攻撃カード内の全攻撃ダイスを順番に処理する。防御ダイス数で攻撃ダイス数を打ち切らない。
+          for(let ai=0;ai<areaDice.length;ai++){
+            if(!target.alive)break;const areaDie=areaDice[ai];setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
+            for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di];const defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] > ${target.name}のダイス[${defValue}]。防御ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;if(!target.alive)break;}}
+          }
+          if(!successes)L(`【広域攻撃：個別】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
           if(!defendingCard.d.length)defState.used=true;
         }
         setActionSlot(target,0);
