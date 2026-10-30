@@ -404,14 +404,19 @@ function mine(ci){
  if(slot<0){if(NET.on&&c.actionRights>1)return;slot=states.findIndex(st=>st.card)}
  if(slot>=0){S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 }
-function undoRedir(yi){S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(st.redirBy===yi){st.tgt=st.tgt0;st.redirBy=null;st.tgt0=null}}))}
+const redirKey=(ci,slot)=>`${ci}:${slot}`;
+function undoRedir(yi,slot=null){
+ const y=S.p[act()].chars[yi];
+ const keys=new Set(slot==null?actionStates(y).map((_,i)=>redirKey(yi,i)):[redirKey(yi,slot)]);
+ S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(keys.has(st.redirBy)){st.tgt=st.tgt0;st.redirBy=null;st.tgt0=null}}));
+}
 function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)p.hand.push(clearGrantedRayhonAoE(st.card));st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
 function chooseTarget(ci,slot,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()||NET.on)return;const c=S.p[act()].chars[ci],st=actionStates(c)[slot];if(!c||!st||!st.card)return;S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 function pickTgt(ci){
  if(!canAct()||S.p[act()].pendingAbn)return;
  if(S.pend==null||!S.p[1-act()].chars[ci].alive||(S.p[1-act()].chars[ci].abnState&&S.p[1-act()].chars[ci].abnState.soloUntargetable))return;
  const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
- logOp(['P',yi,ci]);undoRedir(yi);
+ logOp(['P',yi,ci]);undoRedir(yi,slot);
  // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
  const zs=actionStates(z),zslot=zs.findIndex(st=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&y.sp-z.sp>=C.REDIR);
  if(zslot>=0){S.ask={yi,zi:ci,ySlot:slot,zSlot:zslot};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
@@ -421,10 +426,10 @@ function redir(yes){
  if(!canAct()||!S.ask)return;logOp(['R',yes]);
  const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],ys=actionStates(y)[a.ySlot||0],zs=actionStates(z)[a.zSlot||0];
  ys.tgt=a.zi;
- if(yes){zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=a.yi}
+ if(yes){zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=redirKey(a.yi,a.ySlot||0)}
  S.ask=null;render();
 }
-const askHTML=()=>{if(!S.ask)return '';const y=S.p[act()].chars[S.ask.yi],z=S.p[1-act()].chars[S.ask.zi];return `<div class="ask"><b>${y.name}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いので、${z.name}のマッチ対象を${y.name}に変更できます。<br><button class="go" onclick="redir(true)">対象を自分に変更する</button> <button class="sub" onclick="redir(false)">変更しない</button></div>`};
+const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}・行動${(a.zSlot||0)+1}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いので、この行動同士をマッチさせられます。<br><button class="go" onclick="redir(true)">行動${(a.zSlot||0)+1}の対象を${y.name}に変更する</button> <button class="sub" onclick="redir(false)">変更しない</button></div>`};
 function done(){
  if(!canAct())return;
  if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
@@ -630,7 +635,7 @@ SKILLS.forEach(s=>{[...(s.on||[]),...(s.hit||[]),...(s.d||[]).flatMap(d=>d.fx||[
 const snap=()=>S.p.map(p=>p.chars.map(c=>c.hp));
 const ix=(pi,c)=>[pi,S.p[pi].chars.indexOf(c)];
 // ダイス1つごとにアニメーションの1コマを記録（lu=前に出る / sh=揺れる / ar=矢印）
-function pf(lu,sh,ar){S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]}
+function pf(lu,sh,ar){const arSlot=ar?ar.map(([pi,ci])=>{const c=S.p[pi]&&S.p[pi].chars[ci];return c&&c._actionStates?(c._actionSlot||0):0}):null;S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,arSlot,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]}
 const stSnap=()=>S.p.map(p=>p.chars.map(c=>({st:{...c.st},bf:{...c.bf},nx:{...c.nx}})));
 const holdSnap=()=>S.p.map(p=>p.chars.map(c=>c.alive?[...actionStates(c).flatMap(st=>st.card&&!st.used?st.card.d:[]),...actionStates(c).flatMap(st=>(st.stock||[]).map(x=>({...x,s:1})))]:[]));
 function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（ダメージ軽減・バフの影響は受けないが、状態異常耐性パッシブ(ailres)では減る）
@@ -978,7 +983,7 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
 function combat(){
  S.inCombat=true;   // 戦闘処理中（lvbuff が「次のターン」に回すかの判定に使う）
  L('── 戦闘開始 ──');
- S.p.forEach((p,pi)=>p.chars.forEach(z=>{if(z.redirBy!=null)L(`　${z.name}のマッチ対象が${S.p[1-pi].chars[z.redirBy].name}に変更された`)}));
+ S.p.forEach((p,pi)=>p.chars.forEach(z=>actionStates(z).forEach((st,slot)=>{if(st.redirBy==null)return;const [sourceCi,sourceSlot]=String(st.redirBy).split(':').map(Number),source=S.p[1-pi].chars[sourceCi];if(source)L(`　${z.name}の行動${slot+1}のマッチ対象が${source.name}の行動${sourceSlot+1}に変更された`)})));
  S.p.forEach(p=>{p.cost-=used(p)});
  const base=S.log.length,hp0=snap(),hold0=holdSnap(),st0=stSnap(),frames=S.fr=[];S.pv=base;S.dm={};S.ev=[];
  const acts=[];
@@ -1040,7 +1045,7 @@ function combat(){
   const tStates=actionStates(t),matchSlot=qi!==a.pi&&!(t.abnState&&t.abnState.skipThisTurn)?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
   if(matchSlot>=0){
    setActionSlot(t,matchSlot);t.used=true;
-   L(`【マッチ】${c.name}「${c.card.n}」(速度${c.sp}) vs ${t.name}「${t.card.n}」`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t);setActionSlot(t,0);
+   L(`【マッチ】${c.name}・行動${a.slot+1}「${c.card.n}」(速度${c.sp}) vs ${t.name}・行動${matchSlot+1}「${t.card.n}」(速度${t.sp})`);bleed(qi,t);fx(a.pi,c,c.card.on,'発動時',t);fx(qi,t,t.card.on,'発動時',c);doMatch(a.pi,c,qi,t);setActionSlot(t,0);
   }else{
    L(`${c.name}「${c.card.n}」(速度${c.sp}) → ${t.name}${qi===a.pi?'（味方）':''}`);fx(a.pi,c,c.card.on,'発動時',t);
    let ii=0;const stockSlot=qi!==a.pi?tStates.findIndex(st=>st.stock&&st.stock.length):-1;
@@ -1119,7 +1124,7 @@ function chHTML(pi,ci,view){
  // そのキャラの現在値にフォールバックする。
  const frameAt=(grid,fallback)=>grid&&grid[pi]&&grid[pi][ci]!==undefined?grid[pi][ci]:fallback;
  const hv=A?frameAt(A.i<0?A.hp0:fr&&fr.hp,c.hp):c.hp,dead=A?hv<=0:!c.alive,dmv=fr&&fr.dm?fr.dm[`${pi}-${ci}`]:undefined;
- let cls='ch'+(c.size>1?' big':'')+(dead?' dead':'');
+ let cls='ch'+(c.size>1?' big':'')+(dead?' dead':'')+(c.actionRights>1?' has-action-rail':'');
  const has=l=>l.some(x=>x[0]===pi&&x[1]===ci);
  const low=pi===view;   // 画面の下側に出ているのは自分側（オンラインのP2視点では pi=1 が下）
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
@@ -1166,10 +1171,11 @@ function chHTML(pi,ci,view){
  if(isMine||!decide||(NET.on&&pi===view)){
   a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen?'女王蜂':(S.p[1-pi].chars[st.tgt]?S.p[1-pi].chars[st.tgt].name:'対象')}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
  }
+ const actionRail=c.actionRights>1?`<div class="action-rail" aria-label="行動権ごとのマッチ表示">${actionStates(c).map((st,slot)=>{const target=st.tgt!=null?`対象：${S.p[1-pi].chars[st.tgt]?.name||'相手'}`:'対象未設定';return `<div id="ch-${pi}-${ci}-slot-${slot}" class="action-rail-slot${st.card?' assigned':''}${st.tgt!=null?' targeted':''}${st.redirBy!=null?' redirected':''}" title="行動${slot+1}：${st.card?st.card.n:'未割当'}／${target}${st.redirBy!=null?'／対象変更':''}"><span>${slot+1}</span>${st.redirBy!=null?'<i>↪</i>':''}</div>`}).join('')}</div>`:'';
  const showAbn=!!c.showAbn,abnList=c.abn||[];
  const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
- return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
+ return `<div id="ch-${pi}-${ci}" class="${cls}" ${ev} style="${trg?`--c:${STN[trg.k].c}`:''}">${aur}${actionRail}<div class="nm"><span>${c.name}${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${c.actionRights>1?` <span class="sz">行動権${c.actionRights}</span>`:''}${ttlHTML(c)}</span><span class="sp">速度 ${c.alive?c.sp:'-'}</span></div>
  <div>HP ${hv}/${c.max}　<small>帰属枠 ${c.slot}</small></div><div class="bar"><i style="width:${hv/c.max*100}%"></i></div>
  <div class="sts">${sts}${extraStatuses}${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='fairy_festival'&&c.name==='妖精の塊'&&c.abnState&&c.abnState.preparedMeatTurn===S.turn?'<span class="stt" style="--c:#d9a441" title="ターン終了時にHP1なら女王妖精に捕食される">🍖 用意された肉</span>':''}${c.kb?`<span class="stt" style="--c:#d65a4f" title="撃破ボーナス：ダイス値+${c.kb}（戦闘中永続）">⚔+${c.kb}</span>`:''}</div>${switchBtn}${detail}${atHTML(c)}${a}${fl}${gh}</div>`;
 }
@@ -1302,6 +1308,7 @@ function renderRules(){
   <ul>
    <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、「蜜蝋の翼」を得たフィリップは行動権2となり、最大2枚まで割り当てられます。</li>
    <li>割り当てたカードのコストの合計は、現在のコスト以内にします。割り当てたカードの「×」ボタンで割り当てを外して、付け替えられます。</li>
+   <li><b>行動権が複数あるキャラ</b>は、行動権ごとにカード・攻撃対象・マッチ対象の変更を別々に決めます。速度はキャラクター共通で、各行動権に同じ速度を使います。マス側面の分割欄と、そこから伸びる矢印で対応する行動を確認できます。</li>
    <li>カードには<b>ダイス</b>が付いています：${die('a','3-8')}攻撃　${die('d','2-6')}防御　${die('e','4-9')}回避（数字は出目の範囲）。</li>
    <li>ダイスの<b>✧</b>は、そのダイスが当たったときの追加効果（的中時）、カードの「発動時」は使った時点で起きる効果です。</li>
    <li>「使い捨て」のカードは、使うと消滅します。</li>
@@ -1323,7 +1330,7 @@ function renderRules(){
   <h3>行動の順番</h3>
   <p>速度の高いキャラから順に行動します。遠距離などの「速度を無視する」カードは、戦闘の最初に発動します。</p>
   <h3>マッチ対象の変更</h3>
-  <p>後から決める側のキャラは、自分の速度が相手キャラより<b>${C.REDIR}以上高い</b>とき、相手が決めた対象を自分に変更して、強制的にマッチへ持ち込めます（相手のカードも自分のカードも速度無視でないときのみ）。</p></section>
+  <p>後から決める側は、対象に選んだキャラの行動権のうち、まだ別の相手に向いているカードを個別に変更できます。自分の速度が相手より<b>${C.REDIR}以上高い</b>とき、その行動権の対象を自分に変更してマッチへ持ち込めます（双方のカードが速度無視でないときのみ）。複数行動権でも速度はキャラクター共通ですが、変更判定と結果は行動権ごとに独立します。</p></section>
 
  <section><h2>6. 感情レベルとコイン</h2>
   <ul>
@@ -1411,17 +1418,22 @@ function drawArrows(){
  const svg=document.getElementById('arr'),bd=document.getElementById('board');if(!svg||!bd)return;
  const decide=S.phase==='decide',view=NET.on?NET.me:(decide?act():0),B=bd.getBoundingClientRect();
  let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
- const add=(pi,ci,qi,ti,area=null)=>{
+ const add=(pi,ci,qi,ti,area=null,slot=0)=>{
   const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
-  const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),up=ra.top<rb.top;
-  const x1=ra.left+ra.width/2-B.left,y1=(up?ra.bottom:ra.top)-B.top,x2=rb.left+rb.width/2-B.left,y2=(up?rb.top:rb.bottom)-B.top;
+  const source=document.getElementById(`ch-${pi}-${ci}-slot-${slot}`),ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),up=ra.top<rb.top;
+  const sr=source?source.getBoundingClientRect():ra;
+  const x1=source?sr.left+sr.width/2-B.left:ra.left+ra.width/2-B.left;
+  const y1=source?sr.top+sr.height/2-B.top:(up?ra.bottom:ra.top)-B.top;
+  const targetCenter=rb.left+rb.width/2,sourceAbs=x1+B.left;
+  const x2=(source&&sourceAbs<targetCenter?rb.left:source?rb.right:targetCenter)-B.left;
+  const y2=(up?rb.top:rb.bottom)-B.top;
   const own=pi===view,stroke=area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(own?'#d9a93f':'#d65a4f'),marker=area==='sum'?'as':area==='individual'?'ai':(own?'ag':'ar');
-  h+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+  h+=`<line class="action-arrow${source?' split-action-arrow':''}" data-source-slot="${slot+1}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
  };
- if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null)}
+ if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null,f.arSlot&&f.arSlot[0]||0)}
  else[0,1].forEach(pi=>{
   if(decide&&!(pi===view||(S.stage===1&&pi===S.order[0])))return;
-  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach(st=>{if(!st.card||st.tgt==null)return;if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe)});else add(pi,ci,1-pi,st.tgt,null)}));
+  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{if(!st.card||st.tgt==null)return;if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe,slot)});else add(pi,ci,1-pi,st.tgt,null,slot)}));
  });
  svg.innerHTML=h;
 }
