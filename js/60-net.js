@@ -13,8 +13,8 @@ NET.clients=[];   // 中継サーバーとの接続の一覧（部屋を作る�
 const hash=str=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)};
 // バージョン照合用の指紋：カード・キャラ・パッシブ・設定のデータと、ゲーム処理の関数の中身から作る
 const netVer=()=>hash(JSON.stringify([SKILLS,CHARS,PAS,ATTR,STN,C])
- +Object.entries(PK).map(([k,v])=>k+Object.entries(v).map(([a,b])=>a+String(b)).join('')).join('')
- +[startTurn,combat,hit,doMatch,oneSided,direct,vibex,fx,roll,coin,nextTurn,draw,assign,attribute,pickTgt,redir,unassign,done,mkField,mkC,newP,applySetup,hookSum,hook,run1].map(String).join(''));
+ +Object.entries(PK).map(([k,v])=>k+Object.entries(v).map(([a,b])=>a+String(b)).join('')).join('')+JSON.stringify(SPECIAL_CARD_DEFS)
+ +[startTurn,combat,hit,doMatch,oneSided,direct,vibex,fx,roll,coin,nextTurn,draw,assign,assignSpecial,bulletCostInfo,tigerAmmoKey,commitBulletCosts,clearGrantedRayhonAoE,registerSpecialCard,attribute,pickTgt,redir,unassign,done,mkField,mkC,newP,applySetup,hookSum,hook,run1].map(String).join(''));
 
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 function deckValid(d){   // 相手から届いたデッキが正しい形か
@@ -42,7 +42,7 @@ function startOnline(seed,decks,me,names){
  if(names[0]===names[1])names=[names[0],names[1]+'（2）'];   // 同じ名前なら後ろに印を付ける（両者で同じ結果になる）
  Object.assign(NET,{on:true,me,seed,s:seed|0,decks,names,q:[],picks:[null,null],sums:{},rm:[false,false],lost:false,err:''});
  SCR='match';
- S={turn:0,p:[newP(names[0],decks[0]),newP(names[1],decks[1])],over:null,phase:'setup',sp:me,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,ops:[],waitSetup:false};
+ S={turn:0,p:[newP(names[0],decks[0]),newP(names[1],decks[1])],over:null,phase:'setup',sp:me,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,ops:[],waitSetup:false,handMode:'normal'};
  render();
 }
 
@@ -107,6 +107,7 @@ function netApplyDecide(m){
   for(const op of m.ops){
    if(!Array.isArray(op))throw new Error('op');
    if(op[0]==='A')assign(op[1],op[2]);
+   else if(op[0]==='AS'){if(!assignSpecial(op[1],op[2]))throw new Error('special')}
    else if(op[0]==='P'){S.pend=op[1];pickTgt(op[2])}
    else if(op[0]==='R')redir(op[1]);
    else if(op[0]==='U')unassign(op[1],{stopPropagation(){}});
@@ -126,7 +127,7 @@ function netApplyDecide(m){
 }
 
 // 毎ターン、両者の状態の指紋を交換して、ずれていないか確かめる
-const stateSum=()=>hash(JSON.stringify(S.p.map(p=>[p.hand.map(key),p.deck.length,p.disc.length,p.cost,p.max,p.lv,p.coin,p.chars.map(c=>[c.hp,c.max,c.sp,c.alive,c.ps.length])]))+S.order.join()+NET.s);
+const stateSum=()=>hash(JSON.stringify(S.p.map(p=>[p.hand.map(key),p.specialHand.map(x=>x.id),p.deck.length,p.disc.length,p.cost,p.max,p.lv,p.coin,p.chars.map(c=>[c.hp,c.max,c.sp,c.alive,c.ps.length,c.abnState&&c.abnState.tigerBullet||0,c.abnState&&c.abnState.mightyTigerBullet||0])]))+S.order.join()+NET.s);
 function netAfterTurnStart(){
  const h=stateSum();(NET.sums[S.turn]=NET.sums[S.turn]||{}).mine=h;
  netSend({t:'sum',turn:S.turn,h});netCheckSum(S.turn);netFlush();

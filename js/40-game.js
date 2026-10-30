@@ -2,7 +2,7 @@ const key=x=>x.n||x.name,byKey={};
 [...SKILLS,...CHARS].forEach(c=>byKey[key(c)]=c);
 
 // フィリップ「蜜蝋の翼」用の複数行動スロット。通常キャラは従来どおり1スロット。
-const ACTION_FIELDS=['card','tgt','used','hitFired','stock','redirBy','tgt0'];
+const ACTION_FIELDS=['card','tgt','used','hitFired','stock','redirBy','tgt0','effectiveCost','bulletSpent','bulletKind','bulletDieBonus','bulletCommitted'];
 const actionStates=c=>c?(c._actionStates||[c]):[];
 const setActionSlot=(c,i)=>{if(c&&c._actionStates)c._actionSlot=Math.max(0,Math.min(c._actionStates.length-1,Number(i)||0))};
 const setupActionSlots=(c,count=2)=>{
@@ -10,9 +10,10 @@ const setupActionSlots=(c,count=2)=>{
  const states=[{
   card:c.card||null,tgt:c.tgt==null?null:c.tgt,used:!!c.used,
   hitFired:Array.isArray(c.hitFired)?c.hitFired:[],stock:c.stock||null,
-  redirBy:c.redirBy==null?null:c.redirBy,tgt0:c.tgt0==null?null:c.tgt0
+  redirBy:c.redirBy==null?null:c.redirBy,tgt0:c.tgt0==null?null:c.tgt0,
+  effectiveCost:c.effectiveCost==null?null:c.effectiveCost,bulletSpent:c.bulletSpent||0,bulletKind:c.bulletKind||null,bulletDieBonus:c.bulletDieBonus||0,bulletCommitted:!!c.bulletCommitted
  }];
- for(let i=1;i<count;i++)states.push({card:null,tgt:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null});
+ for(let i=1;i<count;i++)states.push({card:null,tgt:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null,effectiveCost:null,bulletSpent:0,bulletKind:null,bulletDieBonus:0,bulletCommitted:false});
  Object.defineProperty(c,'_actionStates',{value:states,writable:true,configurable:true,enumerable:true});
  Object.defineProperty(c,'_actionSlot',{value:0,writable:true,configurable:true,enumerable:true});
  for(const field of ACTION_FIELDS){
@@ -82,6 +83,8 @@ const ABN_CARDS=[
 ];
 const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
 const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
+const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,desc:'虎標弾を消滅させ、猛虎標弾を8得る'}};
+const registerSpecialCard=(p,id)=>{const c=SPECIAL_CARD_DEFS[id];if(!p||!c||!Array.isArray(p.specialHand))return false;if(p.specialHand.some(x=>x.id===id))return false;p.specialHand.push({...c});return true};
 const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.slice(0,5).forEach(c=>d[c.name]=1);return d};   // 初期デッキ：技10＋キャラ5
 // ===== プレイヤー名とデッキの保存 =====
 // 名前ごとにデッキ2つを、このブラウザ（localStorage）へ保存する。別の端末・別のブラウザへは自動では引き継がれない（バックアップで持ち運べる）
@@ -164,13 +167,13 @@ function dkHierarchy(value){if(!ABN_HIERARCHIES.includes(value))return;DK.hiers[
 let S;
 const setCover=i=>{S.cover=NET.on?null:i};   // オンラインでは画面を隠さない
 const newP=(name,deck,hierarchy=ABN_HIERARCHIES[0])=>{
- const p={name,chars:[],pool:[],deck:[],disc:[],hand:[],cost:C.COST,max:C.COST,lv:0,coin:0,hierarchy:ABN_HIERARCHIES.includes(hierarchy)?hierarchy:ABN_HIERARCHIES[0],emoPos:0,emoNeg:0,pendingAbn:false,abnOffers:[],abnSelected:null};
+ const p={name,chars:[],pool:[],deck:[],disc:[],hand:[],cost:C.COST,max:C.COST,lv:0,coin:0,hierarchy:ABN_HIERARCHIES.includes(hierarchy)?hierarchy:ABN_HIERARCHIES[0],emoPos:0,emoNeg:0,pendingAbn:false,abnOffers:[],abnSelected:null,specialHand:[]};
  for(const [k,n] of Object.entries(deck).sort(([a],[b])=>a<b?-1:a>b?1:0)){const c=byKey[k];   // キー順に固定（両者で同じ並びにする）
   if(isCh(c))p.pool.push(mkC(c));else for(let i=0;i<n;i++)p.deck.push(c)}
  return p;
 };
 const draw=(p,n)=>{for(let i=0;i<n;i++){if(!p.deck.length){p.deck=sh(p.disc);p.disc=[]}if(p.deck.length)p.hand.push(p.deck.pop())}};
-const used=p=>p.chars.reduce((a,c)=>a+actionStates(c).reduce((n,st,slot)=>n+(st.card&&!(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='funeral_dead_butterflies'&&c.abnState&&c.abnState.butterflyRightsPenaltyTurn===S.turn&&slot>=actionStates(c).length-1)?st.card.c:0),0),0);
+const used=p=>p.chars.reduce((a,c)=>a+actionStates(c).reduce((n,st,slot)=>{const free=typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='funeral_dead_butterflies'&&c.abnState&&c.abnState.butterflyRightsPenaltyTurn===S.turn&&slot>=actionStates(c).length-1;return n+(st.card&&!free?(st.effectiveCost==null?st.card.c:st.effectiveCost):0)},0),0);
 const act=()=>S.order[S.stage];
 const alive=p=>p.chars.filter(c=>c.alive).length;
 
@@ -178,7 +181,7 @@ const alive=p=>p.chars.filter(c=>c.alive).length;
 function startMatch(){
  if(dErr(DK.d[0]).length||dErr(DK.d[1]).length)return;
  SCR='match';
- S={turn:0,p:[newP(PF.name||'プレイヤー1',DK.d[0],DK.hiers[0]),newP('プレイヤー2',DK.d[1],DK.hiers[1])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false};
+ S={turn:0,p:[newP(PF.name||'プレイヤー1',DK.d[0],DK.hiers[0]),newP('プレイヤー2',DK.d[1],DK.hiers[1])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,handMode:'normal'};
  render();
 }
 const toHome=()=>{netClose();if(typeof SOLO!=='undefined')SOLO.active=false;S=null;SCR='home';render()};
@@ -210,7 +213,7 @@ function confirmSetup(){
  if(S.sp===0){S.sp=1;setCover(1);render()}else startTurn();
 }
 function startTurn(){
- S.turn++;S.msg='';S.sel=null;S.pend=null;S.pendActionSlot=0;S.ask=null;
+ S.turn++;S.msg='';S.sel=null;S.handMode='normal';S.pend=null;S.pendActionSlot=0;S.ask=null;
  S.log=[];S.dm={};S.ev=[];S.turnDamageTeam=[false,false];
  S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
  // 「艶やか」：魅了はターン開始時に敵ごとに再判定し、そのターン中だけ有効。
@@ -316,7 +319,54 @@ function assignAbnormality(ci){
  S.msg=`「${card.n}」を${c.name}に付与しました`;logOp(['ABN',ci,card.id]);render();return true;
 }
 function toggleCharacterView(pi,ci,e){if(e)e.stopPropagation();const c=S&&S.p[pi]&&S.p[pi].chars[ci];if(!c)return;c.showAbn=!c.showAbn;render()}
-function selCard(i){if(!canAct()||S.p[act()].pendingAbn)return;S.sel=S.sel===i?null:i;render()}
+function clearGrantedRayhonAoE(card){
+ if(!card||!card.__rayhonAoe)return card;
+ const {aoe,__rayhonAoe,...base}=card;return base;
+}
+function tigerAmmoKey(c){
+ const a=c&&c.abnState||{};
+ if((a.mightyTigerBullet||0)>0)return 'mightyTigerBullet';
+ if((a.tigerBullet||0)>0)return 'tigerBullet';
+ return hasPasKind(c,'tigerBullet')?'tigerBullet':null;
+}
+function bulletCostInfo(c,card,excludeSlot=-1){
+ const key=tigerAmmoKey(c);if(!key||!card)return {kind:null,spent:0,cost:card?card.c:0,dieBonus:0};
+ const states=actionStates(c),reserved=states.reduce((n,st,i)=>n+(i!==excludeSlot&&!st.bulletCommitted&&st.bulletKind===key?(st.bulletSpent||0):0),0);
+ const amount=Math.max(0,Number(c.abnState&&c.abnState[key])||0)-reserved;
+ const spent=Math.min(Math.max(0,Math.floor(Math.max(0,Number(card.c)||0)/2)),Math.max(0,Math.floor(amount)));
+ return {kind:key,spent,cost:Math.max(0,card.c-spent),dieBonus:key==='mightyTigerBullet'?spent*2:0};
+}
+function commitBulletCosts(p){
+ p.chars.forEach(c=>actionStates(c).forEach(st=>{
+  if(!st.card||st.bulletCommitted)return;
+  if((st.bulletSpent||0)>0&&c.abnState&&st.bulletKind){
+   const before=c.abnState[st.bulletKind]||0;c.abnState[st.bulletKind]=Math.max(0,before-st.bulletSpent);
+   L(`　${c.name}の「${st.bulletKind==='mightyTigerBullet'?'猛虎標弾':'虎標弾'}」を${st.bulletSpent}消費（残り${c.abnState[st.bulletKind]}）`);
+  }
+  st.bulletCommitted=true;
+ }));
+}
+function selCard(i){if(!canAct()||S.p[act()].pendingAbn||S.handMode==='special')return;S.sel=S.sel===i?null:i;render()}
+function selSpecialCard(i){if(!canAct()||S.p[act()].pendingAbn)return;const p=S.p[act()];if(!p.specialHand||!p.specialHand[i])return;S.handMode='special';S.sel=S.sel===i?null:i;render()}
+function toggleHandMode(){
+ if(!canAct())return;const p=S.p[act()];if(!p.specialHand||!p.specialHand.length)return;
+ S.handMode=S.handMode==='special'?'normal':'special';S.sel=null;S.msg='';render();
+}
+function assignSpecial(ci,hi){
+ if(!canAct())return false;const p=S.p[act()],c=p.chars[ci],card=p.specialHand&&p.specialHand[hi];
+ if(!c||!c.alive||!card)return false;
+ if(card.id==='reload'){
+  if(!hasPasKind(c,'tigerBullet')){S.msg='「再装填」は「虎標弾」を持つレイホンに使用してください';render();return false}
+  const pending=actionStates(c).some(st=>st.card&&!st.bulletCommitted&&(st.bulletSpent||0)>0);
+  if(pending){S.msg='先にレイホンへ割り当てたカードを解除してください（虎標弾の消費予約中です）';render();return false}
+  if(!c.abnState)c.abnState={};
+  c.abnState.tigerBullet=0;c.abnState.mightyTigerBullet=(c.abnState.mightyTigerBullet||0)+8;
+  p.specialHand.splice(hi,1);p.gone=(p.gone||0)+1;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';
+  logOp(['AS',ci,hi]);L(`　${c.name}は特殊カード「再装填」を使用。「虎標弾」を消滅させ、「猛虎標弾」8を獲得`);
+  S.msg=`${c.name}は「猛虎標弾」を8獲得しました`;render();return true;
+ }
+ return false;
+}
 function attribute(p,c,hi){
  const card=p.hand[hi];
  if(c.slot<=0){S.msg=`${c.name}には帰属枠が残っていません`;render();return}
@@ -335,23 +385,27 @@ function assign(ci,hi){
  if(isCh(card))return attribute(p,c,hi);
  if(card.req&&!c.at.includes(card.req)){S.msg=`「${card.n}」は${ATTR[card.req].n}属性のキャラだけが使えます`;render();return}
  const states=actionStates(c);let slot=states.findIndex(st=>!st.card);if(slot<0)slot=0;
- const st=states[slot],old=st.card;
- if(used(p)-(old?old.c:0)+card.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+(old?old.c:0)}）`;render();return}
- p.hand.splice(hi,1);if(old)p.hand.push(old);
- st.card=card;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+ const st=states[slot],old=st.card,oldCost=old?(st.effectiveCost==null?old.c:st.effectiveCost):0;
+ const bullet=bulletCostInfo(c,card,slot),effectiveCost=bullet.cost;
+ if(used(p)-oldCost+effectiveCost>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}。虎標弾適用後コスト${effectiveCost}）`;render();return}
+ p.hand.splice(hi,1);if(old)p.hand.push(clearGrantedRayhonAoE(old));
+ let assigned=card;
+ if(card.n==='超絶猛虎殺撃乱斬'&&hasPasKind(c,'tianTui'))assigned={...card,aoe:'individual',__rayhonAoe:true,d:card.d.map(d=>({...d,r:[...d.r],fx:d.fx?d.fx.map(x=>[...x]):d.fx}))};
+ st.card=assigned;st.effectiveCost=effectiveCost;st.bulletSpent=bullet.spent;st.bulletKind=bullet.kind;st.bulletDieBonus=bullet.dieBonus;st.bulletCommitted=false;
+ st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
  S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render();
 }
 function mine(ci){
  if(!canAct())return;
  const p=S.p[act()],c=p.chars[ci];
  if(p.pendingAbn){if(p.abnSelected==null){S.msg='先に幻想体カードを1枚選んでください';render();return}assignAbnormality(ci);return}
- if(S.sel!=null){assign(ci,S.sel);return}
+ if(S.sel!=null){if(S.handMode==='special')assignSpecial(ci,S.sel);else assign(ci,S.sel);return}
  const states=actionStates(c);let slot=states.findIndex(st=>st.card&&st.tgt==null);
  if(slot<0){if(NET.on&&c.actionRights>1)return;slot=states.findIndex(st=>st.card)}
  if(slot>=0){S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 }
 function undoRedir(yi){S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(st.redirBy===yi){st.tgt=st.tgt0;st.redirBy=null;st.tgt0=null}}))}
-function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)p.hand.push(st.card);st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
+function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)p.hand.push(clearGrantedRayhonAoE(st.card));st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
 function chooseTarget(ci,slot,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()||NET.on)return;const c=S.p[act()].chars[ci],st=actionStates(c)[slot];if(!c||!st||!st.card)return;S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
 function pickTgt(ci){
  if(!canAct()||S.p[act()].pendingAbn)return;
@@ -376,8 +430,10 @@ function done(){
  if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
  if(S.ask){S.msg='マッチ対象を変更するか選んでください';render();return}
  const p=S.p[act()];
+ if(S.handMode==='special'&&S.sel!=null){S.msg='特殊カードを使用するキャラクターをクリックしてください';render();return}
  if(p.chars.some(c=>c.alive&&actionStates(c).some(st=>st.card&&st.tgt==null))){S.msg='攻撃対象が未設定の行動があります';render();return}
- S.pend=null;S.pendActionSlot=0;S.sel=null;S.msg='';
+ commitBulletCosts(p);
+ S.pend=null;S.pendActionSlot=0;S.sel=null;S.handMode='normal';S.msg='';
  if(NET.on&&!REPLAY){netSend({t:'decide',turn:S.turn,stage:S.stage,pi:act(),ops:S.ops});S.ops=[]}   // 決定内容（操作の記録）を相手へ送る
  if(S.stage===0){S.stage=1;setCover(act());render()}else{combat()}
 }
@@ -491,6 +547,8 @@ const STN={
  charm:{n:'魅了',i:'💗',c:'#e47aa7',t:'このターン、魅了したキャラクターだけを攻撃対象にする。与ダメージ+2〜7'},
  gift:{n:'プレゼント',i:'🎁',c:'#d7a4e8',t:'付与者以外とのマッチで40%の確率でダメージと出血を受ける'},
  nettle:{n:'イラクサの服',i:'🌿',c:'#75ba89',t:'ターン開始時、残数分だけ被ダメージを減らし、ターン終了時に1減る'},
+ tigerBullet:{n:'虎標弾',i:'🔹',c:'#67b8e8',t:'カードのコストを弾数分だけ減らす。使用時にコストの半分（切り捨て）を消費し、ターン経過では減らない'},
+ mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数×2だけ使用カードの全ダイス値を上げる'},
  axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ'},
  merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ'},
  parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ'},
@@ -623,6 +681,7 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
   if(f.blackening&&d.t==='a')bonus+=(c.abnState&&c.abnState.blackeningAtk)||R(2,4);
   if(f.cleaning&&opponent&&c.sp>opponent.sp)bonus+=Math.min(3,Math.floor((c.sp-opponent.sp)/2));
  }
+ if(c.bulletDieBonus)bonus+=c.bulletDieBonus;
  // 「警戒」を持つ相手とマッチすると、その相手のダイス値を1下げる。
  if(inMatch&&opponent&&hasAbn(opponent,'vigilance'))bonus-=1;
  if(hasPasKind(c,'waxenwings')){
@@ -1039,7 +1098,7 @@ function nextTurn(){
  S.p.forEach(p=>{
   const n=alive(p);
   p.chars.forEach(c=>{
-   actionStates(c).forEach(st=>{if(st.card){if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else p.disc.push(st.card)}st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null});setActionSlot(c,0);
+   actionStates(c).forEach(st=>{if(st.card){if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else p.disc.push(clearGrantedRayhonAoE(st.card))}st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});setActionSlot(c,0);
    c.bf=c.nx;c.nx=BF0();   // 「次のターン」のバフが有効になる
    if(c.abnState){c.abnState.surgingActive=false;c.abnState.speedDownNow=0;c.abnState.frostSpeedDown=0;c.abnState.teamDiceBonus=0;c.abnState.skipThisTurn=false;}
   });
@@ -1086,6 +1145,8 @@ function chHTML(pi,ci,view){
  if(ad.charmedTurn===S.turn&&ad.charmedBy)special.push(specialBadge('charm','魅了',`→${ad.charmedBy.name}`));
  if(ad.giftFrom)special.push(specialBadge('gift','プレゼント'));
  if((ad.nettleClothes||0)>0)special.push(specialBadge('nettle','イラクサの服',ad.nettleClothes));
+ if((ad.tigerBullet||0)>0)special.push(specialBadge('tigerBullet','虎標弾',ad.tigerBullet));
+ if((ad.mightyTigerBullet||0)>0)special.push(specialBadge('mightyTigerBullet','猛虎標弾',ad.mightyTigerBullet));
  if(hasAbn(c,'gaze'))special.push(specialBadge('gazeTaken','与・被ダメージ×2'));
  const globalMusicTaken=globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
  if(globalMusicTaken>0)special.push(specialBadge('globalMusic','音楽の影響',`被ダメージ+${globalMusicTaken}`));
@@ -1095,7 +1156,7 @@ function chHTML(pi,ci,view){
  const trg=evs.find(e=>e.k),dbase=(dmv||0)-evs.reduce((x,e)=>x+e.a,0);
  if(trg)cls+=' trg';
  const fl=(dbase>0?`<div class="dmg">-${dbase}</div>`:'')+evs.map((e,k)=>`<div class="dmg ${e.k}" style="top:${38+k*13}%;left:${50+(k%2?22:-22)}%">${e.t||'-'+e.a}</div>`).join('');
- const sc=isMine&&S.sel!=null?p.hand[S.sel]:null;
+ const sc=isMine&&S.handMode!=='special'&&S.sel!=null?p.hand[S.sel]:null;
  if(sc&&!isCh(sc)&&sc.req&&!c.at.includes(sc.req))cls+=' dimc';   // 使えないキャラを暗くする
  if(isMine&&c.alive)cls+=' mine'+(S.pend===ci?' pend':'');
  if(decide&&pi!==view&&S.pend!=null&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable))cls+=' tgt';
@@ -1133,14 +1194,22 @@ function sideHTML(pi,view,btm){
  const row=`<div class="row">${p.chars.map((_,ci)=>chHTML(pi,ci,view)).join('')}</div>`;
  return `<div class="side">${btm?row+info:info+row}</div>`;
 }
-const handHTML=(c,i,mode)=>{
+const handHTML=(c,i,mode,owner=null)=>{
+ if(mode==='special-play'||mode==='special-view'){
+  const active=mode==='special-play',sel=active&&S.handMode==='special'&&S.sel===i;
+  const click=active?`onclick="selSpecialCard(${i})"`:'';
+  return `<div class="card special-card${sel?' sel':''}" ${click}><b>${c.n}</b> <span class="c">コスト${c.c}</span><div class="fx">消滅</div><div class="fx">${c.desc||''}</div>${active?'<div class="fx">カードを選択してから使用するキャラをクリック</div>':''}</div>`;
+ }
  const drag=mode==='play'?`draggable="true" ondragstart="event.dataTransfer.setData('text/plain',${i})" onclick="selCard(${i})"`:'';
  if(isCh(c)){
   const sel=mode==='play'?S.sel===i:S.pick.includes(i);
   const clk=mode==='setup'?`onclick="pickCh(${i})"`:'';
   return `<div class="card chc${sel?' sel':''}" ${drag} ${clk}><b>${c.name}</b>${c.size>1?` <span class="sz">${c.size}枠</span>`:''}${ttlHTML(c)} <span class="c">HP${c.hp}</span> <span class="sp">速度${c.spd[0]}-${c.spd[1]}</span> <small>帰属枠${c.slot}</small><ul class="pl">${c.ps.map((x,k)=>`<li class="${k?'':'top'}">${k?'':'▶ '}${x.n}：${pasText(x)}</li>`).join('')}</ul>${atHTML(c)}${mode==='play'?'<div class="fx">キャラに重ねると先頭のパッシブを帰属（カードは消滅）</div>':''}</div>`;
  }
- return `<div class="card${mode==='setup'?' off':''}${mode==='play'&&S.sel===i?' sel':''}" ${drag}><b>${c.n}</b> <span class="c">コスト${c.c}</span>${fxLine(c,false)}${diceRows(c)}</div>`;
+ const preview=mode==='play'&&owner?owner.chars.filter(z=>z.alive&&hasPasKind(z,'tigerBullet')).map(z=>({c:z,info:bulletCostInfo(z,c)})).filter(x=>x.info.spent>0):[];
+ const reduced=preview.length?`<div class="fx">虎標弾適用時：コスト${preview.map(x=>`${x.info.cost}（${x.c.name}：弾薬-${x.info.spent}${x.info.dieBonus?`・ダイス+${x.info.dieBonus}`:''}）`).join('／')}</div>`:'';
+ const tigerAoE=mode==='play'&&c.n==='超絶猛虎殺撃乱斬'&&owner&&owner.chars.some(z=>z.alive&&hasPasKind(z,'tianTui'))?'<div class="fx area-individual">レイホンの「天退星」：広域攻撃：個別</div>':'';
+ return `<div class="card${mode==='setup'?' off':''}${mode==='play'&&S.handMode!=='special'&&S.sel===i?' sel':''}" ${drag}><b>${c.n}</b> <span class="c">コスト${c.c}</span>${reduced}${tigerAoE}${fxLine(c,false)}${diceRows(c)}</div>`;
 };
 const legendHTML=()=>`<details class="lg"><summary>状態異常・バフの説明</summary>${Object.keys(STN).map(k=>`<div><span class="stt" style="--c:${STN[k].c}">${STN[k].i}</span> <b>${STN[k].n}</b>：${STN[k].t}</div>`).join('')}${Object.keys(ATTR).map(k=>`<div><b>属性：${ATTR[k].n}</b>：${ATTR[k].t}</div>`).join('')}<div><small>破線のバッジは「次のターンから」有効になるバフです。</small></div></details>`;
 function abnormalityOfferHTML(p,enabled){
@@ -1165,8 +1234,12 @@ function renderMatch(){
  let h=`<div id="board">${sideHTML(1-view,view,false)}<div class="gap"></div>${sideHTML(view,view,true)}<svg id="arr"></svg></div>`;
  if(decide){
   const p=S.p[view];
-  h+=abnormalityOfferHTML(p,can)+`<div class="msg">${can?(p.pendingAbn?'幻想体カードの選択と付与を完了してください。':(S.msg||'技カードを自分のキャラへドラッグ（またはカード→キャラの順にクリック）。キャラカードを重ねるとパッシブを帰属できます')):'相手が行動を決めています。決定されるまでお待ちください…'}</div>
-  <div class="handwrap"><div class="hand">${p.hand.map((c,i)=>handHTML(c,i,can?'play':'view')).join('')}</div></div>`;
+  const specialMode=!!(p.specialHand&&p.specialHand.length&&S.handMode==='special');
+  const activeHand=specialMode?p.specialHand:p.hand;
+  const handMode=specialMode?(can?'special-play':'special-view'):(can?'play':'view');
+  const handToggle=p.specialHand&&p.specialHand.length?`<div class="hand-switch"><button class="sub" ${can?'':'disabled'} onclick="toggleHandMode()">${specialMode?'通常カードに戻る':'特殊カード'}</button></div>`:'';
+  h+=abnormalityOfferHTML(p,can)+`<div class="msg">${can?(p.pendingAbn?'幻想体カードの選択と付与を完了してください。':(S.msg||'技カードを自分のキャラへドラッグ（またはカード→キャラの順にクリック）。キャラカードを重ねるとパッシブを帰属できます')):'相手が行動を決めています。決定されるまでお待ちください…'}</div>`;
+  h+=`<div class="handwrap"><div class="hand">${activeHand.map((c,i)=>handHTML(c,i,handMode,p)).join('')}</div>${handToggle}</div>`;
   if(can)h=`<div class="topbar"><button class="go" onclick="done()">${S.stage===0?(NET.on?'決定（相手の番へ）':'決定（相手に交代）'):'決定して戦闘開始'}</button></div>`+askHTML()+h;   // 誤操作を防ぐため一番上に配置
  }else{
   h+=S.anim?`<button class="sub" style="margin-top:10px" title="戦闘演出を最後まで再生せずに結果へ進みます" onclick="skipAnim()">演出をスキップ</button>`:S.over?`<h1 style="margin:12px 0">${S.over}</h1>${NET.on?(NET.rm[NET.me]?'<span class="msg">相手の返事を待っています…</span>':'<button class="go" onclick="netRematch()">もう一度対戦</button>'):'<button class="go" onclick="startMatch()">同じデッキでもう一度</button>'} <button class="sub" onclick="toHome()">ホームへ戻る</button>`:`<button class="go" style="margin-top:10px" onclick="nextTurn()">次のターンへ</button>`;
