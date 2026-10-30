@@ -635,7 +635,19 @@ SKILLS.forEach(s=>{[...(s.on||[]),...(s.hit||[]),...(s.d||[]).flatMap(d=>d.fx||[
 const snap=()=>S.p.map(p=>p.chars.map(c=>c.hp));
 const ix=(pi,c)=>[pi,S.p[pi].chars.indexOf(c)];
 // ダイス1つごとにアニメーションの1コマを記録（lu=前に出る / sh=揺れる / ar=矢印）
-function pf(lu,sh,ar){const arSlot=ar?ar.map(([pi,ci])=>{const c=S.p[pi]&&S.p[pi].chars[ci];return c&&c._actionStates?(c._actionSlot||0):0}):null;S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,arSlot,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]}
+function pf(lu,sh,ar){
+ const arSlot=ar?ar.map(([pi,ci])=>{const c=S.p[pi]&&S.p[pi].chars[ci];return c&&c._actionStates?(c._actionSlot||0):0}):null;
+ // マッチ演出では、矢印の到着先になる側の行動権も記録する。
+ // 相手のカードがこちらを対象にしている場合だけ、そのカードのスロット中央へ矢印を接続する。
+ const arTargetSlot=ar?ar.map(([pi,ci],i)=>{
+  if(i!==1)return null;
+  const [spi,sci]=ar[0]||[],target=S.p[pi]&&S.p[pi].chars[ci];
+  if(!target||(target.actionRights||1)<=1)return null;
+  const active=target._actionSlot||0,st=actionStates(target)[active];
+  return st&&st.card&&st.tgt===sci?active:null;
+ }):null;
+ S.fr.push({to:S.log.length,hp:snap(),hold:holdSnap(),sts:stSnap(),dm:S.dm,ev:S.ev,lu,sh,ar:ar||null,arSlot,arTargetSlot,ms:Math.min(2200,750+(S.log.length-S.pv)*160)});S.pv=S.log.length;S.dm={};S.ev=[]
+}
 const stSnap=()=>S.p.map(p=>p.chars.map(c=>({st:{...c.st},bf:{...c.bf},nx:{...c.nx}})));
 const holdSnap=()=>S.p.map(p=>p.chars.map(c=>c.alive?[...actionStates(c).flatMap(st=>st.card&&!st.used?st.card.d:[]),...actionStates(c).flatMap(st=>(st.stock||[]).map(x=>({...x,s:1})))]:[]));
 function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（ダメージ軽減・バフの影響は受けないが、状態異常耐性パッシブ(ailres)では減る）
@@ -1419,22 +1431,40 @@ function drawArrows(){
  const svg=document.getElementById('arr'),bd=document.getElementById('board');if(!svg||!bd)return;
  const decide=S.phase==='decide',view=NET.on?NET.me:(typeof SOLO!=='undefined'&&SOLO.active?0:(decide?act():0)),B=bd.getBoundingClientRect();
  let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
- const add=(pi,ci,qi,ti,area=null,slot=0)=>{
-  const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
-  const source=document.getElementById(`ch-${pi}-${ci}-slot-${slot}`),ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),up=ra.top<rb.top;
-  const sr=source?source.getBoundingClientRect():ra;
-  const x1=source?sr.left+sr.width/2-B.left:ra.left+ra.width/2-B.left;
-  const y1=source?sr.top+sr.height/2-B.top:(up?ra.bottom:ra.top)-B.top;
-  const targetCenter=rb.left+rb.width/2,sourceAbs=x1+B.left;
-  const x2=(source&&sourceAbs<targetCenter?rb.left:source?rb.right:targetCenter)-B.left;
-  const y2=(up?rb.top:rb.bottom)-B.top;
-  const own=pi===view,stroke=area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(own?'#d9a93f':'#d65a4f'),marker=area==='sum'?'as':area==='individual'?'ai':(own?'ag':'ar');
-  h+=`<line class="action-arrow${source?' split-action-arrow':''}" data-source-slot="${slot+1}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+ const center=r=>({x:r.left+r.width/2,y:r.top+r.height/2});
+ const matchingSlot=(sourceCi,target)=>{
+  if(!target||(target.actionRights||1)<=1)return null;
+  const i=actionStates(target).findIndex(st=>st.card&&st.tgt===sourceCi);
+  return i>=0?i:null;
  };
- if(S.anim){const f=S.anim.i>=0&&S.anim.frames[S.anim.i];if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null,f.arSlot&&f.arSlot[0]||0)}
- else[0,1].forEach(pi=>{
+ const add=(pi,ci,qi,ti,area=null,slot=0,targetSlot=null)=>{
+  const sourceChar=S.p[pi].chars[ci],targetChar=S.p[qi].chars[ti];
+  const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
+  const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),ac=center(ra),bc=center(rb),sourceAbove=ac.y<bc.y;
+  // 複数行動権側は、対面側の該当スロット中央から線を出す。
+  const sourceEl=sourceChar&&sourceChar.actionRights>1?document.getElementById(`ch-${pi}-${ci}-slot-${slot}`):null;
+  const sr=sourceEl?sourceEl.getBoundingClientRect():null,sc=sr?center(sr):null;
+  const x1=(sc?sc.x:ac.x)-B.left;
+  const y1=(sc?sc.y:(sourceAbove?ra.bottom:ra.top))-B.top;
+  // 相手も複数行動権なら、こちらを対象にしている行動権の中央に接続する。
+  // 対応するマッチがない場合や単独行動権の場合は、キャラ枠の対面辺中央へ接続する。
+  const targetEl=targetSlot!=null&&targetChar&&targetChar.actionRights>1?document.getElementById(`ch-${qi}-${ti}-slot-${targetSlot}`):null;
+  const tr=targetEl?targetEl.getBoundingClientRect():null,tc=tr?center(tr):null;
+  const x2=(tc?tc.x:bc.x)-B.left;
+  const y2=(tc?tc.y:(sourceAbove?rb.top:rb.bottom))-B.top;
+  const own=pi===view,stroke=area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(own?'#d9a93f':'#d65a4f'),marker=area==='sum'?'as':area==='individual'?'ai':(own?'ag':'ar');
+  h+=`<line class="action-arrow${sourceEl?' split-action-arrow':''}" data-source-slot="${slot+1}"${targetSlot!=null?' data-target-slot="'+(targetSlot+1)+'"':''} x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+ };
+ if(S.anim){
+  const f=S.anim.i>=0&&S.anim.frames[S.anim.i];
+  if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null,f.arSlot&&f.arSlot[0]||0,f.arTargetSlot&&f.arTargetSlot[1]!=null?f.arTargetSlot[1]:null);
+ }else[0,1].forEach(pi=>{
   if(decide&&!(pi===view||(S.stage===1&&pi===S.order[0])))return;
-  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{if(!st.card||st.tgt==null)return;if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe,slot)});else add(pi,ci,1-pi,st.tgt,null,slot)}));
+  S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{
+   if(!st.card||st.tgt==null)return;
+   if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe,slot,null)});
+   else {const target=S.p[1-pi].chars[st.tgt],targetSlot=matchingSlot(ci,target);add(pi,ci,1-pi,st.tgt,null,slot,targetSlot)}
+  }));
  });
  svg.innerHTML=h;
 }
