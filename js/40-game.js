@@ -1236,7 +1236,7 @@ function renderMatch(){
   if(S.cover!=null)h=`<div class="cover"><h1>${S.p[S.cover].name}の番です</h1><p>相手に画面を見せないでください。</p><button class="go" onclick="S.cover=null;render()">手札を表示</button></div>`+h;
   document.getElementById('app').innerHTML=h;return;
  }
- const decide=S.phase==='decide',view=NET.on?NET.me:(decide?act():0),can=!NET.on||act()===NET.me;
+ const decide=S.phase==='decide',view=NET.on?NET.me:(typeof SOLO!=='undefined'&&SOLO.active?0:(decide?act():0)),can=!NET.on||act()===NET.me;
  document.getElementById('stat').innerHTML=`<small>${NET.on?`オンライン（あなた＝${S.p[NET.me].name}）　`:''}ターン${S.turn}　${decide?(NET.on?(can?'あなたが行動決定中':'相手が行動決定中'):`${S.p[view].name}が行動決定中`):'戦闘結果'}</small> ${leaveBtn()}`;
  let h=`<div id="board">${sideHTML(1-view,view,false)}<div class="gap"></div>${sideHTML(view,view,true)}<svg id="arr"></svg></div>`;
  if(decide){
@@ -1417,7 +1417,7 @@ function renderDeck(){
 }
 function drawArrows(){
  const svg=document.getElementById('arr'),bd=document.getElementById('board');if(!svg||!bd)return;
- const decide=S.phase==='decide',view=NET.on?NET.me:(decide?act():0),B=bd.getBoundingClientRect();
+ const decide=S.phase==='decide',view=NET.on?NET.me:(typeof SOLO!=='undefined'&&SOLO.active?0:(decide?act():0)),B=bd.getBoundingClientRect();
  let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
  const add=(pi,ci,qi,ti,area=null,slot=0)=>{
   const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
