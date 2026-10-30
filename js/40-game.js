@@ -334,7 +334,7 @@ function bulletCostInfo(c,card,excludeSlot=-1){
  const states=actionStates(c),reserved=states.reduce((n,st,i)=>n+(i!==excludeSlot&&!st.bulletCommitted&&st.bulletKind===key?(st.bulletSpent||0):0),0);
  const amount=Math.max(0,Number(c.abnState&&c.abnState[key])||0)-reserved;
  const spent=Math.min(Math.max(0,Math.floor(Math.max(0,Number(card.c)||0)/2)),Math.max(0,Math.floor(amount)));
- return {kind:key,spent,cost:Math.max(0,card.c-spent),dieBonus:key==='mightyTigerBullet'?spent*2:0};
+ return {kind:key,spent,cost:Math.max(0,card.c-spent),dieBonus:key==='mightyTigerBullet'?spent:0};
 }
 function commitBulletCosts(p){
  p.chars.forEach(c=>actionStates(c).forEach(st=>{
@@ -548,7 +548,7 @@ const STN={
  gift:{n:'プレゼント',i:'🎁',c:'#d7a4e8',t:'付与者以外とのマッチで40%の確率でダメージと出血を受ける'},
  nettle:{n:'イラクサの服',i:'🌿',c:'#75ba89',t:'ターン開始時、残数分だけ被ダメージを減らし、ターン終了時に1減る'},
  tigerBullet:{n:'虎標弾',i:'🔹',c:'#67b8e8',t:'カードのコストを弾数分だけ減らす。使用時にコストの半分（切り捨て）を消費し、ターン経過では減らない'},
- mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数×2だけ使用カードの全ダイス値を上げる'},
+ mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数だけ使用カードの全ダイス値を上げる'},
  axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ'},
  merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ'},
  parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ'},
