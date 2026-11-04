@@ -83,7 +83,7 @@ const ABN_CARDS=[
 ];
 const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
 const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
-const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,desc:'虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,desc:'広域攻撃：個別。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d}};
+const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,8)).concat([D('a',5,10)])}};
 const registerSpecialCard=(p,id)=>{const c=SPECIAL_CARD_DEFS[id];if(!p||!c||!Array.isArray(p.specialHand))return false;if(p.specialHand.some(x=>x.id===id))return false;p.specialHand.push({...c});return true};
 const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.slice(0,5).forEach(c=>d[c.name]=1);return d};   // 初期デッキ：技10＋キャラ5
 // ===== プレイヤー名とデッキの保存 =====
@@ -294,6 +294,7 @@ function startTurn(){
  S.log.unshift(`── ターン${S.turn} ──`,`速度ダイスの平均 P1:${s[0].toFixed(1)} / P2:${s[1].toFixed(1)}　低い${S.p[S.order[0]].name}から行動を決めます`);
  chaseLog.forEach(m=>L(m));
  vineStartLog.forEach(m=>L(m));
+ S.p.forEach(p=>p.chars.forEach(c=>{if(c.abnState)delete c.abnState.directiveTargetBy;}));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{
   if(!c.alive)return;
   hook('turn',c,pi);   // 再生・蔵書の加護など（PKの turn フック）
@@ -381,7 +382,7 @@ function toggleHandMode(){
 function assignSpecial(ci,hi){
  if(!canAct())return false;const p=S.p[act()],c=p.chars[ci],card=p.specialHand&&p.specialHand[hi];
  if(!c||!c.alive||!card)return false;
- if(card.id==='reload'){
+ if(card.id==='reload'&&card.trigger==='equip'){
   if(!hasPasKind(c,'tigerBullet')){S.msg='「再装填」は「虎標弾」を持つレイホンに使用してください';render();return false}
   const pending=actionStates(c).some(st=>st.card&&!st.bulletCommitted&&(st.bulletSpent||0)>0);
   if(pending){S.msg='先にレイホンへ割り当てたカードを解除してください（虎標弾の消費予約中です）';render();return false}
@@ -404,6 +405,21 @@ function assignSpecial(ci,hi){
   st.card=assigned;st.effectiveCost=effectiveCost;st.bulletSpent=bullet.spent;st.bulletKind=bullet.kind;st.bulletDieBonus=bullet.dieBonus;st.bulletCommitted=false;
   st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
   S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`行動${slot+1}の攻撃対象を選んでください`;
+  render();return true;
+ }
+ if(card.id==='furiosoReplica'){
+  if(c.name!=='リアン'||!hasPasKind(c,'oracle')){S.msg='「Furioso-Replica」は神託代行者を持つリアンだけが使用できます';render();return false}
+  const foes=S.p[1-act()].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
+  if(!foes.length){S.msg='攻撃できる対象がいません';render();return false}
+  const states=actionStates(c);let slot=states.findIndex(st=>!st.card);if(slot<0)slot=0;
+  const st=states[slot],old=st.card,oldCost=old?(st.effectiveCost==null?old.c:old.effectiveCost):0;
+  const def=SPECIAL_CARD_DEFS.furiosoReplica;
+  const assigned={...def,__specialCardId:'furiosoReplica',__furiosoReplica:true,d:def.d.map(d=>({...d,r:[...d.r]}))};
+  if(used(p)-oldCost+assigned.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}）`;render();return false}
+  logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
+  st.card=assigned;st.effectiveCost=assigned.c;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=true;
+  st.tgt=foes[0].zi;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+  S.pend=null;S.pendActionSlot=0;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg='「Furioso-Replica」：各ダイスの攻撃対象はランダムに決まります';
   render();return true;
  }
  return false;
@@ -459,8 +475,10 @@ function pickTgt(ci){
  const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
  logOp(['P',yi,ci]);undoRedir(yi,slot);
  // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
- const zs=actionStates(z),zSlots=zs.map((st,i)=>({st,i})).filter(({st})=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&y.sp-z.sp>=C.REDIR).map(x=>x.i);
- if(zSlots.length){S.ask={yi,zi:ci,ySlot:slot,zSlots};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
+ const swordRedirect=hasPasKind(z,'yourshield')&&(z.sp<=2||y.sp-z.sp>=3);
+ const speedRedirect=y.sp-z.sp>=C.REDIR;
+ const zs=actionStates(z),zSlots=zs.map((st,i)=>({st,i})).filter(({st})=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&(speedRedirect||swordRedirect)).map(x=>x.i);
+ if(zSlots.length){S.ask={yi,zi:ci,ySlot:slot,zSlots,reason:swordRedirect?'「衝撃相殺グレートソード」または速度差':'速度差'};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
  yst.tgt=ci;S.pend=null;S.pendActionSlot=0;S.msg='';render();
 }
 function redir(yes,zSlot=null){
@@ -470,7 +488,7 @@ function redir(yes,zSlot=null){
  if(yes){const zs=actionStates(z)[zSlot];zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=redirKey(a.yi,a.ySlot||0)}
  S.ask=null;render();
 }
-const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],choices=a.zSlots||[a.zSlot||0];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）より速度が${C.REDIR}以上高いため、マッチさせる行動権を選べます。${choices.map(slot=>`<div style="margin-top:6px"><b>${z.name}・行動${slot+1}</b><button class="go" onclick="redir(true,${slot})">この行動の対象を${y.name}に変更する</button></div>`).join('')}<button class="sub" style="margin-top:8px" onclick="redir(false)">変更しない</button></div>`};
+const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],choices=a.zSlots||[a.zSlot||0];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）に対し、${a.reason||'速度差'}でマッチ対象を変更できます。変更する行動権を選んでください。${choices.map(slot=>`<div style="margin-top:6px"><b>${z.name}・行動${slot+1}</b><button class="go" onclick="redir(true,${slot})">この行動の対象を${y.name}に変更する</button></div>`).join('')}<button class="sub" style="margin-top:8px" onclick="redir(false)">変更しない</button></div>`};
 function done(){
  if(!canAct())return;
  if(S.p[act()].pendingAbn){S.msg='幻想体カードを選び、味方キャラに付与してから決定してください';render();return}
@@ -581,24 +599,29 @@ const STN={
  vib:{n:'振動',i:'〰',c:'#5cc8f5',t:'「振動爆発」を持つダイスでダメージを受けると、数値÷2枚の手札が山札に戻り、振動は消える'},
  incap:{n:'行動不能',i:'⛔',c:'#e05252',t:'このターン行動を決定・実行できない'},
  freeze:{n:'凍結',i:'❄',c:'#89c8ff',t:'氷の女王が生存している間、行動できない'},
- iceShard:{n:'氷の欠片',i:'🧊',c:'#78c7ff',t:'3以上になると次のターン行動不能になり、氷の欠片をすべて失う'},
+ iceShard:{n:'氷の欠片',i:'🧊',c:'#78c7ff',t:'3以上になると次のターン行動不能になり、氷の欠片をすべて失う',legend:false},
  speedDown:{n:'速度低下',i:'🐢',c:'#80b8d9',t:'速度が低下している。次ターン分は「次」の表示が付く'},
- hiveMark:{n:'蜂の標的',i:'🐝',c:'#d9bd4c',t:'標的キャラの被ダメージが数値分増える'},
- requestMark:{n:'依頼対象',i:'🎯',c:'#e0709a',t:'このキャラが受けるダメージが数値分増える'},
- takenPlus:{n:'被ダメージ増加',i:'💔',c:'#e0709a',t:'特定の幻想体カード効果により受けるダメージが増えている'},
- globalMusic:{n:'音楽の影響',i:'🎵',c:'#d9a93f',t:'音楽の効果で全キャラクターの被ダメージが増えている'},
- globalBlackening:{n:'黒化の影響',i:'🌑',c:'#a17bd8',t:'黒化の効果で全キャラクターの被ダメージが1.5倍になっている'},
- gazeTaken:{n:'眼差し',i:'👁',c:'#b17cf0',t:'与ダメージ・被ダメージが2倍になる'},
- malice:{n:'悪意',i:'☠',c:'#8f344f',t:'悪意による固定ダメージ'},
- charm:{n:'魅了',i:'💗',c:'#e47aa7',t:'このターン、魅了したキャラクターだけを攻撃対象にする。与ダメージ+2〜7'},
- gift:{n:'プレゼント',i:'🎁',c:'#d7a4e8',t:'付与者以外とのマッチで40%の確率でダメージと出血を受ける'},
- nettle:{n:'イラクサの服',i:'🌿',c:'#75ba89',t:'ターン開始時、残数分だけ被ダメージを減らし、ターン終了時に1減る'},
+ hiveMark:{n:'蜂の標的',i:'🐝',c:'#d9bd4c',t:'標的キャラの被ダメージが数値分増える',legend:false},
+ requestMark:{n:'依頼対象',i:'🎯',c:'#e0709a',t:'このキャラが受けるダメージが数値分増える',legend:false},
+ takenPlus:{n:'被ダメージ増加',i:'💔',c:'#e0709a',t:'特定の幻想体カード効果により受けるダメージが増えている',legend:false},
+ globalMusic:{n:'音楽の影響',i:'🎵',c:'#d9a93f',t:'音楽の効果で全キャラクターの被ダメージが増えている',legend:false},
+ globalBlackening:{n:'黒化の影響',i:'🌑',c:'#a17bd8',t:'黒化の効果で全キャラクターの被ダメージが1.5倍になっている',legend:false},
+ gazeTaken:{n:'眼差し',i:'👁',c:'#b17cf0',t:'与ダメージ・被ダメージが2倍になる',legend:false},
+ malice:{n:'悪意',i:'☠',c:'#8f344f',t:'悪意による固定ダメージ',legend:false},
+ charm:{n:'魅了',i:'💗',c:'#e47aa7',t:'このターン、魅了したキャラクターだけを攻撃対象にする。与ダメージ+2〜7',legend:false},
+ gift:{n:'プレゼント',i:'🎁',c:'#d7a4e8',t:'付与者以外とのマッチで40%の確率でダメージと出血を受ける',legend:false},
+ nettle:{n:'イラクサの服',i:'🌿',c:'#75ba89',t:'ターン開始時、残数分だけ被ダメージを減らし、ターン終了時に1減る',legend:false},
  tigerBullet:{n:'虎標弾',i:'🔹',c:'#67b8e8',t:'カードのコストを弾数分だけ減らす。使用時にコストの1/3（切り捨て）を消費し、ターン経過では減らない'},
  mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数だけ使用カードの全ダイス値を上げる'},
- axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ'},
- merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ'},
- parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ'},
- fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ'},
+ directiveTarget:{n:'指令対象',i:'📜',c:'#a77dd5',t:'人差し指によって指定された攻撃対象'},
+ directiveCard:{n:'指令カード',i:'🪶',c:'#a77dd5',t:'人差し指によって指定されたカード。カード名の表示のみで追加効果はない'},
+ directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30'},
+ directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる'},
+ directiveDamage:{n:'指令の反動',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが増加（戦闘中永続）'},
+ axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ',legend:false},
+ merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ',legend:false},
+ parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ',legend:false},
+ fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ',legend:false},
  dmgup:{n:'ダメージ上昇',i:'⚔',c:'#d9a93f',t:'このターン、与えるダメージが数値分上がる'},
  guard:{n:'被ダメージ減少',i:'🛡',c:'#4e8fd6',t:'このターン、受けるダメージが数値分減る'},
  roll:{n:'ダイス数値上昇',i:'🎲',c:'#4fb58a',t:'このターン、ダイスの出目が数値分上がる'},
@@ -663,7 +686,7 @@ const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,...a])=>COND[k].f
 const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,...a])=>COND[k].t(...a))(condKey(c));
 const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib/cold/spore/incap/freeze/iceShard/speedDown/hiveMark/requestMark/takenPlus/globalMusic/globalBlackening/gazeTaken のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
 const fxText=(l,showCond=true)=>l.map(([k,v,c])=>(showCond&&c?`［${condText(c)}］`:'')+FXT[k](v)).join('、');
-const fxLine=(s,dl=true)=>(s.aoe?`<div class="fx area-${s.aoe}">広域攻撃：${s.aoe==='sum'?'合算':'個別'}（広域攻撃は遠距離攻撃より先に発動）</div>`:'')+(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
+const fxLine=(s,dl=true)=>(s.aoe?`<div class="fx area-${s.aoe}">広域攻撃：${s.aoe==='sum'?'合算':s.aoe==='random'?'乱射':'個別'}（広域攻撃は遠距離攻撃より先に発動）</div>`:'')+(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
 function fx(pi,ch,list,label,tc,ctx){
  if(!list)return;const p=S.p[pi],x=ctx||{A:ch,B:tc,dmg:0};
  list=list.filter(e=>!e[2]||condTest(e[2],x));       // 条件を満たす効果だけ発動
@@ -696,6 +719,7 @@ function direct(pb,B,dmg,kind){   // 状態異常による固定ダメージ（�
  const res=hookSum('ailres',B,kind);   // 状態異常耐性パッシブ：1回ごとに res 減らす
  if(res>0){const cut=Math.min(res,dmg);dmg-=cut;L(`　${B.name}の耐性で${STN[kind].n}ダメージ-${cut}`);if(dmg<=0)return}
  // 全キャラクター対象の被ダメージ効果は、状態異常などの固定ダメージにも適用する。
+ const directiveVuln=Number(B.abnState&&B.abnState.directiveTakenBonus)||0;if(directiveVuln){dmg+=directiveVuln;L(`　「人差し指」：${B.name}の被ダメージ+${directiveVuln}`)}
  const marks=requestMarks(B),requestBonus=Object.values(marks).reduce((a,v)=>a+(Number(v)||0),0);if(requestBonus){dmg+=requestBonus;L(`　「依頼対象」：被ダメージ+${requestBonus}`)}
  if(hasStatusAbn(B)&&globalAbnHolders('mourning').length){const n=R(2,7);dmg+=n;L(`　「哀悼」：状態異常中の${B.name}は被ダメージ+${n}`)}
  const music=globalAbnHolders('music'),musicTaken=music.reduce((a,x)=>a+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);if(musicTaken){dmg+=musicTaken;L(`　「音楽」：被ダメージ+${musicTaken}`)}
@@ -740,6 +764,13 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
   if(f.cleaning&&opponent&&c.sp>opponent.sp)bonus+=Math.min(3,Math.floor((c.sp-opponent.sp)/2));
  }
  if(c.bulletDieBonus)bonus+=c.bulletDieBonus;
+ // 人差し指：指定対象へ攻撃すると、指定カードなら+3、別カードなら+1。
+ if(d.t==='a'&&hasPasKind(c,'indexFinger')&&opponent&&c.abnState&&c.abnState.directiveTargetPi!=null){
+  const oi=S.p.findIndex(p=>p.chars.includes(opponent)),oci=oi<0?-1:S.p[oi].chars.indexOf(opponent);
+  if(oi===c.abnState.directiveTargetPi&&oci===c.abnState.directiveTargetCi){const n=c.card&&c.card.n===c.abnState.directiveCardName?3:1;bonus+=n;}
+ }
+ // 指令沈着：そのターンの指令カードの攻撃ダイスを強化する。
+ if(d.t==='a'&&hasPasKind(c,'indexFinger')&&c.abnState&&c.abnState.directiveComposure&&c.card&&c.card.n===c.abnState.directiveCardName)bonus+=Math.round((c.abnState.directiveBlessing||0)/10);
  // 「警戒」を持つ相手とマッチすると、その相手のダイス値を1下げる。
  if(inMatch&&opponent&&hasAbn(opponent,'vigilance'))bonus-=1;
  if(hasPasKind(c,'waxenwings')){
@@ -861,7 +892,8 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
   dmg=Math.floor(dmg/2);
   L(`　${B.name}の遠距離耐性：ダメージ半減`);}
- const g=pv(B,'guard')+B.bf.guard-B.bf.vuln;
+ const directiveVuln=Number(B.abnState&&B.abnState.directiveTakenBonus)||0;
+ const g=pv(B,'guard')+B.bf.guard-B.bf.vuln-directiveVuln;
  if(g&&dmg>0){dmg=Math.max(0,dmg-g);L(g>0?`　${B.name}の軽減でダメージ-${g}`:`　${B.name}の脆弱でダメージ+${-g}`)}
  const ar=(B.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.reduce)||0),0);
  if(ar&&dmg>0){const cut=Math.min(ar,dmg);dmg-=cut;L(`　${B.name}の幻想体カード効果：被ダメージ-${cut}`)}
@@ -1005,6 +1037,7 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
   moodEvent(wp,'positive');moodEvent(lp,'negative');
   if(W===A)winA++;else winB++;
   abnormalityMatchWin(W,Lc,wp,lp);
+  hook('matchWin',W,Lc,wp,lp,wd,wv);   // マッチ勝利時のパッシブ（ツヴァイの剣術など）
   if(ld.t==='a'&&hasAbn(Lc,'axe')){const n=R(2,7);L(`　「斧」：${Lc.name}の攻撃がマッチに負け、自身が${n}ダメージ`);direct(lp,Lc,n,'axe')}
   if(hasAbn(W,'pattern_recognition')){if(!W.abnState)W.abnState={};W.abnState.patternWins=(W.abnState.patternWins||0)+1;if(W.abnState.patternWins>=3){W.abnState.patternWins-=3;const wpPlayer=S.p[wp],oldCost=wpPlayer.cost;wpPlayer.cost=Math.min(wpPlayer.max,wpPlayer.cost+1);const speed=R(1,2);W.abnState.speedUpNext=(W.abnState.speedUpNext||0)+speed;L(`　「パターン反復認識機能」：${W.name}が3回マッチ勝利、コスト${wpPlayer.cost-oldCost>0?'+1':'は最大'}、次ターン速度+${speed}`)}}
   if(hasAbn(W,'frost_sword')&&rnd()<0.5){if(!Lc.abnState)Lc.abnState={};Lc.abnState.speedDownNext=Math.max(Lc.abnState.speedDownNext||0,1);Lc.abnState.frostSpeedDown=1;L(`　「霜の剣」：${Lc.name}の速度-1（次のターン）`)}
@@ -1033,6 +1066,24 @@ function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
  if(winB>=2&&hasAbn(B,'kiss')&&B.card){if(!A.abnState)A.abnState={};A.abnState.iceShard=(A.abnState.iceShard||0)+1;L(`　「口づけ」：${A.name}に氷の欠片+1（現在${A.abnState.iceShard}）`)}
  return [i,j];
 }
+function resolveIndexFingerCommands(){
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>{
+  if(!c.alive||!hasPasKind(c,'indexFinger'))return;
+  if(!c.abnState)c.abnState={};
+  const result=Number(c.abnState.directiveResult)||0;
+  if(result>0){
+   let gain=result>=2?6:3;
+   if((c.abnState.directiveBlessing||0)>=15)gain=Math.round(gain*1.5);
+   const before=c.abnState.directiveBlessing||0;
+   c.abnState.directiveBlessing=Math.min(30,before+gain);
+   L(`　「端末機:カドゥケウス」：${c.name}は指令の加護+${c.abnState.directiveBlessing-before}（${c.abnState.directiveBlessing}/30）`);
+  }else{
+   c.abnState.directiveTakenBonus=(c.abnState.directiveTakenBonus||0)+1;
+   L(`　「人差し指」：指令未達成。${c.name}の被ダメージ+1（累計+${c.abnState.directiveTakenBonus}）`);
+  }
+  c.abnState.directiveResult=0;
+ }));
+}
 function combat(){
  S.inCombat=true;   // 戦闘処理中（lvbuff が「次のターン」に回すかの判定に使う）
  L('── 戦闘開始 ──');
@@ -1053,39 +1104,91 @@ function combat(){
   // 女王蜂のHPが25%未満なら、働き蜂は敵ではなく女王蜂本人を攻撃する。
   if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&a.pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen){const qOwn=S.p[a.pi].chars.find(z=>z.name==='女王蜂'&&z.alive);if(qOwn){qi=a.pi;Q=S.p[qi];t=qOwn;}else c.abnState.targetQueen=false;}
   c.used=true;
+  if(c.card&&c.card.n==='快刀亂麻'&&hasPasKind(c,'tianTui'))registerSpecialCard(S.p[a.pi],'tianTui');
   if(!c.alive){setActionSlot(c,0);continue}
   // 広域攻撃は敵側の各キャラクターの最初の行動カードを対象にする。
   // 合算：敵カードの全ダイス値の合計を上回ればカード全体を不発にし、攻撃。
   // 個別：敵カード内の各ダイスと比較し、上回ったダイスだけ取り除いて攻撃。
   if(c.card&&c.card.aoe){
-    const mode=c.card.aoe,areaDice=c.card.d.filter(d=>d.t==='a');
+    const mode=c.card.aoe;
+    if(mode!=='random'&&hasPasKind(c,'indexFinger')&&t&&t.alive&&c.abnState&&qi===c.abnState.directiveTargetPi&&S.p[qi].chars.indexOf(t)===c.abnState.directiveTargetCi&&c.card.d&&c.card.d.some(d=>d.t==='a'))c.abnState.directiveResult=Math.max(Number(c.abnState.directiveResult)||0,c.card.n===c.abnState.directiveCardName?2:1);
+    const areaDice=c.card.d.filter(d=>d.t==='a');
     if(areaDice.length){
-      const enemies=S.p[1-a.pi].chars.map((z,zi)=>({z,zi})).filter(x=>x.z.alive&&!(x.z.abnState&&x.z.abnState.soloUntargetable));
-      for(const item of enemies){
-        const target=item.z;if(!target.alive)continue;
-        const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;let defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
-        if(!defState||!defState.card){
-          for(const areaDie of areaDice){setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;L(`【広域攻撃：${mode==='sum'?'合算':'個別'}】${c.name}[${attackValue}] → ${target.name}（防御カードなし）`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;if(!target.alive)break;}
-          continue;
-        }
-        setActionSlot(target,defSlot);const defendingCard=defState.card;
-        if(mode==='sum'){
-          const areaDie=areaDice[0];setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);let sum=0;for(const die of defendingCard.d){sum+=abnormalityRoll(target,die,true,c);}
-          if(attackValue>sum){defState.used=true;L(`【広域攻撃：合算】${c.name}[${attackValue}] > ${target.name}「${defendingCard.n}」の合計${sum}。カード不発、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
-          else {L(`【広域攻撃：合算】${c.name}[${attackValue}] ≤ ${target.name}「${defendingCard.n}」の合計${sum}。ダメージなし。`);pf([],[],[[a.pi,a.ci],[1-a.pi,item.zi]]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;}
-        }else{
-          let successes=0;
-          // 個別は攻撃カード内の全攻撃ダイスを順番に処理する。防御ダイス数で攻撃ダイス数を打ち切らない。
-          for(let ai=0;ai<areaDice.length;ai++){
-            if(!target.alive)break;const areaDie=areaDice[ai];setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
-            // 防御ダイスをすべて取り除いた後も、残りの攻撃ダイスは止めずに直接ダメージを与える。
-            if(!defendingCard.d.length){successes++;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;continue;}
-            for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di];const defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] > ${target.name}のダイス[${defValue}]。防御ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);pf([ix(a.pi,c)],[ix(1-a.pi,target)],[ix(a.pi,c),ix(1-a.pi,target)]);if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;if(!target.alive)break;}}
+      const getEnemies=()=>S.p[1-a.pi].chars.map((z,zi)=>({z,zi})).filter(x=>x.z.alive&&!(x.z.abnState&&x.z.abnState.soloUntargetable));
+      const animateArea=(hitIds,arrowId=null)=>{
+        const hurt=hitIds.map(zi=>ix(1-a.pi,S.p[1-a.pi].chars[zi]));
+        const ar=arrowId!=null?[[a.pi,a.ci],ix(1-a.pi,S.p[1-a.pi].chars[arrowId])]:null;
+        pf(hitIds.length?[ix(a.pi,c)]:[],hurt,ar);
+        if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;
+      };
+      if(mode==='random'){
+        let successfulHits=0;const allHitIds=new Set();
+        for(let ai=0;ai<areaDice.length;ai++){
+          const candidates=getEnemies();if(!candidates.length)break;
+          const targetInfo=candidates[Math.floor(rnd()*candidates.length)],target=targetInfo.z,zi=targetInfo.zi;
+          if(hasPasKind(c,'indexFinger')&&c.abnState&&1-a.pi===c.abnState.directiveTargetPi&&zi===c.abnState.directiveTargetCi)c.abnState.directiveResult=Math.max(Number(c.abnState.directiveResult)||0,c.card.n===c.abnState.directiveCardName?2:1);
+          const baseDie=areaDice[ai];
+          const areaDie=(c.card.__furiosoReplica&&ai===8)?{...baseDie,r:[baseDie.r[0]+successfulHits,baseDie.r[1]+successfulHits]}:baseDie;
+          setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
+          const states=actionStates(target),defState=states[0]&&!states[0].used?states[0]:null;
+          const defendingCard=defState&&defState.card?defState.card:null;
+          let successes=0,losses=0,damageEvents=0;
+          if(!defendingCard||!defendingCard.d.length){
+            const before=target.hp;L(`【広域攻撃：乱射】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(target.hp<before)damageEvents++;successfulHits++;allHitIds.add(zi);
+          }else{
+            setActionSlot(target,0);
+            for(let di=defendingCard.d.length-1;di>=0;di--){
+              if(!target.alive)break;
+              const die=defendingCard.d[di],defValue=abnormalityRoll(target,die,true,c);
+              if(attackValue>defValue){
+                defendingCard.d.splice(di,1);successes++;const before=target.hp;
+                L(`【広域攻撃：乱射】${c.name}のダイス${ai+1}[${attackValue}] > ${target.name}のダイス[${defValue}]。防御ダイスを削除、${attackValue}ダメージ。`);
+                hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(target.hp<before)damageEvents++;
+              }else losses++;
+            }
+            if(successes){successfulHits++;allHitIds.add(zi);if(!defendingCard.d.length)defState.used=true;}
+            if(c.card.__furiosoReplica&&losses>0&&target.alive){
+              const half=Math.floor(attackValue/2),before=target.hp;
+              L(`【Furioso-Replica】${c.name}のダイス${ai+1}[${attackValue}]はマッチ敗北。${target.name}に半分の${half}ダメージ。`);
+              hit(a.pi,1-a.pi,target,half,c,areaDie);if(target.hp<before)damageEvents++;allHitIds.add(zi);
+            }else if(!successes&&!c.card.__furiosoReplica)L(`【広域攻撃：乱射】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
+            setActionSlot(target,0);
           }
-          if(!successes)L(`【広域攻撃：個別】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
-          if(!defendingCard.d.length)defState.used=true;
+          if(damageEvents)allHitIds.add(zi);
         }
-        setActionSlot(target,0);
+        animateArea([...allHitIds]);
+        if(c.card.__furiosoReplica&&c.alive&&c.abnState&&!c.abnState.directiveComposure){c.abnState.directiveComposure=true;L(`　「神託代行者」：初回の「Furioso-Replica」使用後、「指令沈着」を獲得`)}
+      }else if(mode==='sum'){
+        const areaDie=areaDice[0],hitIds=[];
+        for(const item of getEnemies()){
+          const target=item.z;if(!target.alive)continue;
+          const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;const defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
+          if(!defState){setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target),before=target.hp;L(`【広域攻撃：合算】${c.name}[${attackValue}] → ${target.name}（防御カードなし）`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);continue;}
+          setActionSlot(target,defSlot);const defendingCard=defState.card;setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);let sum=0;for(const die of defendingCard.d)sum+=abnormalityRoll(target,die,true,c);
+          if(attackValue>sum){defState.used=true;const before=target.hp;L(`【広域攻撃：合算】${c.name}[${attackValue}] > ${target.name}「${defendingCard.n}」の合計${sum}。カード不発、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);}
+          else L(`【広域攻撃：合算】${c.name}[${attackValue}] ≤ ${target.name}「${defendingCard.n}」の合計${sum}。ダメージなし。`);
+          setActionSlot(target,0);
+        }
+        animateArea(hitIds);
+      }else{
+        const allHitIds=new Set();
+        for(let ai=0;ai<areaDice.length;ai++){
+          const hitIds=[];
+          for(const item of getEnemies()){
+            const target=item.z;if(!target.alive)continue;
+            const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;const defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
+            setActionSlot(c,a.slot);const areaDie=areaDice[ai],attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
+            if(!defState||!defState.card){const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御カードなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);continue;}
+            setActionSlot(target,defSlot);const defendingCard=defState.card;
+            if(!defendingCard.d.length){const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);continue;}
+            let successes=0;
+            for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di],defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] > ${target.name}のダイス[${defValue}]。防御ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(!hitIds.includes(item.zi))hitIds.push(item.zi);if(!target.alive)break;}}
+            if(!successes)L(`【広域攻撃：個別】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
+            if(!defendingCard.d.length)defState.used=true;setActionSlot(target,0);
+          }
+          hitIds.forEach(zi=>allHitIds.add(zi));
+        }
+        animateArea([...allHitIds]);
       }
     }
     setActionSlot(c,0);continue;
@@ -1101,6 +1204,7 @@ function combat(){
    if(ownerPi===1-a.pi){qi=ownerPi;Q=S.p[qi];t=charmOwner;c.tgt=Q.chars.indexOf(charmOwner);L(`　「艶やか」：${c.name}の攻撃対象を魅了の付与者${charmOwner.name}に変更`)}
   }
   if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t){setActionSlot(c,0);continue}}
+  if(hasPasKind(c,'indexFinger')&&t&&t.alive&&c.abnState&&qi===c.abnState.directiveTargetPi&&S.p[qi].chars.indexOf(t)===c.abnState.directiveTargetCi&&c.card&&c.card.d&&c.card.d.some(d=>d.t==='a'))c.abnState.directiveResult=Math.max(Number(c.abnState.directiveResult)||0,c.card.n===c.abnState.directiveCardName?2:1);
   const tStates=actionStates(t),matchSlot=qi!==a.pi&&!(t.abnState&&t.abnState.skipThisTurn)?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
   if(matchSlot>=0){
    setActionSlot(t,matchSlot);t.used=true;
@@ -1115,6 +1219,7 @@ function combat(){
   }
   setActionSlot(c,0);
  }
+ resolveIndexFingerCommands();
  L('── ターン終了時 ──');
  // 「愛する家族」：イラクサの服をターン終了時に1減らす。
  S.p.forEach(p=>p.chars.forEach(c=>{if(!c.alive||!hasAbn(c,'beloved_family')||(c.abnState.nettleClothes||0)<=0)return;c.abnState.nettleClothes=Math.max(0,c.abnState.nettleClothes-1);L(`　「愛する家族」：${c.name}のイラクサの服は${c.abnState.nettleClothes}`)}));
@@ -1212,6 +1317,11 @@ function chHTML(pi,ci,view){
  if((ad.nettleClothes||0)>0)special.push(specialBadge('nettle','イラクサの服',ad.nettleClothes));
  if((ad.tigerBullet||0)>0)special.push(specialBadge('tigerBullet','虎標弾',ad.tigerBullet));
  if((ad.mightyTigerBullet||0)>0)special.push(specialBadge('mightyTigerBullet','猛虎標弾',ad.mightyTigerBullet));
+ if(ad.directiveTargetBy)special.push(specialBadge('directiveTarget','指令対象'));
+ if(ad.directiveCardName)special.push(specialBadge('directiveCard',`指令カード：${ad.directiveCardName}`));
+ if((ad.directiveBlessing||0)>0)special.push(specialBadge('directiveBlessing','指令の加護',`${ad.directiveBlessing}/30`));
+ if(ad.directiveComposure)special.push(specialBadge('directiveComposure','指令沈着'));
+ if((ad.directiveTakenBonus||0)>0)special.push(specialBadge('directiveDamage','被ダメージ',`+${ad.directiveTakenBonus}`));
  if(hasAbn(c,'gaze'))special.push(specialBadge('gazeTaken','与・被ダメージ×2'));
  const globalMusicTaken=globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
  if(globalMusicTaken>0)special.push(specialBadge('globalMusic','音楽の影響',`被ダメージ+${globalMusicTaken}`));
@@ -1266,7 +1376,7 @@ const handHTML=(c,i,mode,owner=null)=>{
   const click=active?`onclick="selSpecialCard(${i})"`:'';
   const preview=active&&c.id==='tianTui'&&owner?owner.chars.filter(z=>z.alive&&hasPasKind(z,'tigerBullet')).map(z=>({c:z,info:bulletCostInfo(z,c)})).filter(x=>x.info.spent>0):[];
   const reduced=preview.length?`<div class="fx">虎標弾適用時：コスト${preview.map(x=>`${x.info.cost}（${x.c.name}：弾薬-${x.info.spent}${x.info.dieBonus?`・ダイス+${x.info.dieBonus}`:''}）`).join('／')}</div>`:'';
-  return `<div class="card special-card${sel?' sel':''}" ${click}><b>${c.n}</b> <span class="c">コスト${c.c}</span><div class="fx">消滅</div>${reduced}<div class="fx">${c.desc||''}</div>${c.d?diceRows(c):''}${active?'<div class="fx">カードを選択してから使用するキャラをクリック</div>':''}</div>`;
+  return `<div class="card special-card${sel?' sel':''}" ${click}><b>${c.n}</b> <span class="c">コスト${c.c}</span><div class="fx">${c.trigger==='equip'?'装着時発動':'使用時に消滅'}</div>${reduced}<div class="fx">${c.desc||''}</div>${c.d?diceRows(c):''}${active?'<div class="fx">カードを選択してから使用するキャラをクリック</div>':''}</div>`;
  }
  const drag=mode==='play'?`draggable="true" ondragstart="event.dataTransfer.setData('text/plain',${i})" onclick="selCard(${i})"`:'';
  if(isCh(c)){
@@ -1279,7 +1389,7 @@ const handHTML=(c,i,mode,owner=null)=>{
  const tigerAoE=mode==='play'&&c.n==='超絶猛虎殺撃乱斬'&&owner&&owner.chars.some(z=>z.alive&&hasPasKind(z,'tianTui'))?'<div class="fx area-individual">レイホンの「天退星」：広域攻撃：個別</div>':'';
  return `<div class="card${mode==='setup'?' off':''}${mode==='play'&&S.handMode!=='special'&&S.sel===i?' sel':''}" ${drag}><b>${c.n}</b> <span class="c">コスト${c.c}</span>${reduced}${tigerAoE}${fxLine(c,false)}${diceRows(c)}</div>`;
 };
-const legendHTML=()=>`<details class="lg"><summary>状態異常・バフの説明</summary>${Object.keys(STN).map(k=>`<div><span class="stt" style="--c:${STN[k].c}">${STN[k].i}</span> <b>${STN[k].n}</b>：${STN[k].t}</div>`).join('')}${Object.keys(ATTR).map(k=>`<div><b>属性：${ATTR[k].n}</b>：${ATTR[k].t}</div>`).join('')}<div><small>破線のバッジは「次のターンから」有効になるバフです。</small></div></details>`;
+const legendHTML=()=>`<details class="lg"><summary>状態異常・バフの説明</summary>${Object.keys(STN).filter(k=>STN[k].legend!==false).map(k=>`<div><span class="stt" style="--c:${STN[k].c}">${STN[k].i}</span> <b>${STN[k].n}</b>：${STN[k].t}</div>`).join('')}${Object.keys(ATTR).map(k=>`<div><b>属性：${ATTR[k].n}</b>：${ATTR[k].t}</div>`).join('')}<div><small>破線のバッジは「次のターンから」有効になるバフです。</small></div></details>`;
 function abnormalityOfferHTML(p,enabled){
  if(!p.pendingAbn||!enabled)return '';
  const ratio=Math.round(positiveMoodRatio(p)*100),selected=p.abnSelected;
@@ -1414,9 +1524,9 @@ function renderRules(){
   <h3>数値を持つ状態異常</h3>
   <ul>${['burn','bleed','rupt','vib','cold','spore'].map(st).join('')}</ul>
   <h3>行動阻害・被ダメージ増加などの特殊デバフ</h3>
-  <ul>${['incap','freeze','iceShard','speedDown','hiveMark','requestMark','takenPlus','globalMusic','globalBlackening','gazeTaken'].map(st).join('')}</ul>
+  <ul>${['incap','freeze','iceShard','speedDown','hiveMark','requestMark','takenPlus','globalMusic','globalBlackening','gazeTaken'].filter(k=>STN[k].legend!==false).map(st).join('')}</ul>
   <h3>バフ・デバフ（1ターンだけ。多くは「次のターン」から効く）</h3>
-  <ul>${['dmgup','guard','roll','atk','rolldn','vuln','dmgdn'].map(st).join('')}</ul></section>
+  <ul>${['dmgup','guard','roll','atk','rolldn','vuln','dmgdn','directiveTarget','directiveCard','directiveBlessing','directiveComposure','directiveDamage'].filter(k=>STN[k].legend!==false).map(st).join('')}</ul></section>
 
  <section><h2>9. 属性</h2>
   <p>キャラが持つ「属性」は、同じ属性が付いた専用カードを使えるようにします。</p>

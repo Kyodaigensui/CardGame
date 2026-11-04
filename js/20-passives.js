@@ -37,7 +37,8 @@ const PAS={
  strongest:{n:'最強',k:'catchup',v:2},
  bloodlust:{n:'赤い霧',k:'killup',v:2},
  hongoku:{n:'本国剣術',k:'atk',v:2},
- yourshield:{n:'衝撃相殺グレートソード',k:'def',v:3},
+ yourshield:{n:'衝撃相殺グレートソード',k:'yourshield'},
+ twinBlade:{n:'ツヴァイの剣術',k:'twinBlade'},
  debuffup:{n:'狙撃',k:'debuffup',v:1},
  ailmentup:{n:'集中',k:'ailmentup',v:1},
  ailmentup1:{n:'スティグマ工房の武器',k:'ailmentup',v:1},
@@ -53,26 +54,55 @@ const PAS={
  vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
  rangedres:{n:'青い残響',k:'rangedres'},
  emostack:{n:'龍生九子',k:'emostack'},
- ailres:{n:'あなたの盾',k:'ailres',v:3},               // 火傷・出血・破裂すべて、1回ごとに v 減らす
+ ailres:{n:'あなたの盾',k:'def',v:2},               // 守備ダイス（防御・回避）のダイス値+2
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
  burncheck:{n:'夜明け',k:'burncheck',v:2},
  unstableego:{n:'不安定な自我の殻',k:'unstableEgo'},
  waxenwings:{n:'蜜蝋の翼',k:'waxenwings'},
  tianTui:{n:'天退星',k:'tianTui'},
  tigerBullet:{n:'虎標弾',k:'tigerBullet'},
+ indexFinger:{n:'人差し指',k:'indexFinger'},
+ caduceus:{n:'端末機:カドゥケウス',k:'caduceus'},
+ oracle:{n:'神託代行者',k:'oracle'},
 };
 // ---------- ② 種類(k)ごとの 説明文＋動作 ----------
 const PK={
  // ── 数値を足すだけのタイプ（pv で読まれる）──
  spd:{t:p=>`速度+${p.v}`,use:'startTurn()：速度ダイスに加算'},
  atk:{t:p=>`攻撃ダイス+${p.v}`,use:'roll()：攻撃ダイスの出目に加算'},
- def:{t:p=>`防御ダイス+${p.v}`,use:'roll()：防御ダイスの出目に加算'},
+ def:{t:p=>`守備ダイス（防御・回避）のダイス値+${p.v}`,use:'roll()：防御・回避ダイスの出目に加算'},
  eva:{t:p=>`回避ダイス+${p.v}`,use:'roll()：回避ダイスの出目に加算'},
  guard:{t:p=>`被ダメージ-${p.v}`,use:'hit()：受けるダメージから引く'},
  debuffup:{t:p=>`相手に与えるデバフ（ダイス値減少・被ダメージ増加・与ダメージ減少）の付与量+${p.v}`,use:'FXA：rolldn/vuln/dmgdn の付与量に加算'},
  ailmentup:{t:p=>`相手に与える状態異常（火傷・出血・破裂・振動）の付与量+${p.v}`,use:'FXA：burn/bleed/rupt/vib の付与量に加算'},
  ailmentup1:{t:p=>`相手に与える状態異常（火傷・出血・破裂・振動）の付与量+${p.v}`,use:'FXA：burn/bleed/rupt/vib の付与量に加算'},
  ailmentup2:{t:p=>`相手に与える状態異常（火傷・出血・破裂・振動）の付与量+${p.v}`,use:'FXA：burn/bleed/rupt/vib の付与量に加算'},
+ yourshield:{t:()=>`自分の速度が2以下、または相手より3以上遅いとき、マッチ対象変更ができる`},
+ twinBlade:{t:()=>`マッチ勝利時、体力を1〜2回復`,matchWin:(c,x,loser)=>{const n=R(1,2),old=c.hp;c.hp=Math.min(c.max,c.hp+n);if(c.hp>old)L(`　「ツヴァイの剣術」：${c.name}はHP${c.hp-old}回復`)}},
+ indexFinger:{
+  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、属性条件を満たす自分の手札からカード1枚を「指令カード」に指定する。指定カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
+  turn:(c,x,pi)=>{
+   if(!c.alive)return;if(!c.abnState)c.abnState={};
+   const p=S.p[pi],foes=S.p[1-pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
+   c.abnState.directiveResult=0;c.abnState.directiveTargetPi=1-pi;c.abnState.directiveTargetCi=null;c.abnState.directiveCardName=null;
+   if(!foes.length){L(`　「人差し指」：${c.name}の指令対象なし`);return}
+   const picked=foes[Math.floor(rnd()*foes.length)];c.abnState.directiveTargetCi=picked.zi;
+   if(!picked.z.abnState)picked.z.abnState={};picked.z.abnState.directiveTargetBy=`${pi}:${S.p[pi].chars.indexOf(c)}`;
+   const eligible=(p.hand||[]).filter(card=>!isCh(card)&&(!card.req||(c.at||[]).includes(card.req)));
+   const selected=eligible.length?eligible[Math.floor(rnd()*eligible.length)]:null;
+   c.abnState.directiveCardName=selected?selected.n:null;
+   L(`　「人差し指」：${picked.z.name}を指令対象に指定${selected?`。指令カードは「${selected.n}」`: '。使用可能な手札カードなし'}`);
+  }
+ },
+ caduceus:{t:()=>`人差し指の指令を達成して攻撃すると指令の加護+6、別カードで指令対象を攻撃した場合は+3。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
+ oracle:{
+  t:()=>`ターン開始時、指令の加護が30以上なら特殊カード「Furioso-Replica」を追加し、指令の加護を30消費する。初めて使用した後、永続バフ「指令沈着」を得る`,
+  turn:(c,x,pi)=>{
+   if(!c.alive)return;if(!c.abnState)c.abnState={};
+   if(c.abnState.directiveComposure){c.st.burn=(c.st.burn||0)+3;c.st.bleed=(c.st.bleed||0)+3;L(`　「指令沈着」：${c.name}に火傷+3・出血+3`)}
+   if((c.abnState.directiveBlessing||0)>=30&&registerSpecialCard(S.p[pi],'furiosoReplica')){c.abnState.directiveBlessing-=30;L(`　「神託代行者」：特殊カード「Furioso-Replica」を追加（指令の加護-30）`)}
+  }
+ },
  // ── 動作（フック）を持つタイプ ──
  maxhp:{t:p=>`最大HP+${p.v}`,
   init:(c,x)=>{c.max+=x.v;c.hp+=x.v}},
@@ -133,7 +163,7 @@ emostack:{
   turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach(p=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
  },
  tianTui:{
-  t:()=>`1ターン目開始時、デッキ内の「超絶猛虎殺撃乱斬」を消滅させ、特殊カード欄に追加する。使用した「超絶猛虎殺撃乱斬」は消滅する。`,
+  t:()=>`1ターン目開始時、デッキ内の「超絶猛虎殺撃乱斬」を消滅させ、「快刀亂麻」（5コスト・広域攻撃：合算15〜20、使い捨て）をデッキに追加する。「快刀亂麻」の発動時、特殊カード欄に「超絶猛虎殺撃乱斬」を追加する。`,
   turn:(c,x,pi)=>{
    if(S.turn!==1||!c.alive)return;
    if(!c.abnState)c.abnState={};if(c.abnState.tianTuiInitialized)return;
@@ -144,8 +174,9 @@ emostack:{
     const before=p[key].length;p[key]=p[key].filter(card=>!card||card.n!==name);removed+=before-p[key].length;
    });
    if(removed)p.gone=(p.gone||0)+removed;
-   if(typeof registerSpecialCard==='function')registerSpecialCard(p,'tianTui');
-   L(`　「天退星」：デッキ内の「${name}」を消滅させ、特殊カード欄に追加`);
+   const quick=SKILLS.find(card=>card.n==='快刀亂麻');
+   if(quick&&!p.deck.some(card=>card&&card.n==='快刀亂麻'))p.deck.push({...quick,d:quick.d.map(d=>({...d,r:[...d.r]}))});
+   L(`　「天退星」：デッキ内の「${name}」を消滅させ、「快刀亂麻」をデッキに追加`);
   }
  },
  tigerBullet:{
