@@ -80,7 +80,7 @@ const PK={
  yourshield:{t:()=>`自分の速度が2以下、または相手より3以上遅いとき、マッチ対象変更ができる`},
  twinBlade:{t:()=>`マッチ勝利時、体力を1〜2回復`,matchWin:(c,x,loser)=>{const n=R(1,2),old=c.hp;c.hp=Math.min(c.max,c.hp+n);if(c.hp>old)L(`　「ツヴァイの剣術」：${c.name}はHP${c.hp-old}回復`)}},
  indexFinger:{
-  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、属性条件を満たす自分の手札からカード1枚を「指令カード」に指定する。指定カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
+  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、手札のうち装着可能なカードを指定する。指定カードで指令対象を狙うとダイス値+3、別カードなら+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    const p=S.p[pi],foes=S.p[1-pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
