@@ -173,6 +173,7 @@ body.deckmode{min-height:100vh;display:flex;flex-direction:column;overflow-x:hid
 /* 広域攻撃は通常カードと区別し、矢印もタイプ別の色で表示する */
 .fx.area-sum{color:#b99aff;font-weight:700;border-left:3px solid #a879ff;padding-left:6px}
 .fx.area-individual{color:#62dfe4;font-weight:700;border-left:3px solid #35c9d0;padding-left:6px}
+.fx.area-random{color:#f0b76b;font-weight:700;border-left:3px solid #d9983e;padding-left:6px}
 
 /* 複数行動権：相手に向いた辺を行動権ごとに分割し、各区画を矢印の始点にする。
    自分側（画面下段）は上辺、相手側（画面上段）は下辺に配置する。 */
