@@ -169,7 +169,10 @@ const setCover=i=>{S.cover=NET.on?null:i};   // オンラインでは画面を�
 const newP=(name,deck,hierarchy=ABN_HIERARCHIES[0])=>{
  const p={name,chars:[],pool:[],deck:[],disc:[],hand:[],cost:C.COST,max:C.COST,lv:0,coin:0,hierarchy:ABN_HIERARCHIES.includes(hierarchy)?hierarchy:ABN_HIERARCHIES[0],emoPos:0,emoNeg:0,pendingAbn:false,abnOffers:[],abnSelected:null,specialHand:[]};
  for(const [k,n] of Object.entries(deck).sort(([a],[b])=>a<b?-1:a>b?1:0)){const c=byKey[k];   // キー順に固定（両者で同じ並びにする）
-  if(isCh(c))p.pool.push(mkC(c));else for(let i=0;i<n;i++)p.deck.push(c)}
+  if(isCh(c))p.pool.push({
+  ...mkC(c),
+  actionRights: Math.max(1, Math.floor(Number(c.actionRights) || 1))});
+  else for(let i=0;i<n;i++)p.deck.push(c)}
  return p;
 };
 const draw=(p,n)=>{for(let i=0;i<n;i++){if(!p.deck.length){p.deck=sh(p.disc);p.disc=[]}if(p.deck.length)p.hand.push(p.deck.pop())}};
@@ -200,8 +203,21 @@ function pickCh(i){
 // 場に出すキャラを確定する（pi＝プレイヤー番号）。オンラインでも「P1→P2の順」で適用して乱数の使い方を揃える
 function applySetup(pi,pick){
  const p=S.p[pi];
- p.chars=pick.map(i=>({...mkField(p.pool[i]),abn:[],abnState:{},abnFlags:{},showAbn:false}));
- p.deck=sh([...p.deck,...p.pool.filter((_,i)=>!pick.includes(i))]);p.pool=[];   // 選ばなかったキャラは山札に戻す
+ p.chars=pick.map(i=>{
+  const base=p.pool[i];
+  const c={
+   ...mkField(base),
+   abn:[],
+   abnState:{},
+   abnFlags:{},
+   showAbn:false
+  };
+  const rights=Math.max(1,Math.floor(Number(base.actionRights)||1));
+  if(rights>1)setupActionSlots(c,rights);
+  return c;
+ });
+ p.deck=sh([...p.deck,...p.pool.filter((_,i)=>!pick.includes(i))]);
+ p.pool=[];
  draw(p,5);
 }
 function confirmSetup(){
@@ -585,8 +601,8 @@ const STN={
  fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ'},
  dmgup:{n:'ダメージ上昇',i:'⚔',c:'#d9a93f',t:'このターン、与えるダメージが数値分上がる'},
  guard:{n:'被ダメージ減少',i:'🛡',c:'#4e8fd6',t:'このターン、受けるダメージが数値分減る'},
- roll:{n:'マッチ数値上昇',i:'🎲',c:'#4fb58a',t:'このターン、ダイスの出目が数値分上がる'},
- rolldn:{n:'ダイス値減少',i:'🌫',c:'#8f9bb3',t:'このターン、ダイスの出目が数値分下がる（0未満にはならない）'},
+ roll:{n:'ダイス数値上昇',i:'🎲',c:'#4fb58a',t:'このターン、ダイスの出目が数値分上がる'},
+ rolldn:{n:'ダイス値減少',i:'🎲',c:'#8f9bb3',t:'このターン、ダイスの出目が数値分下がる（0未満にはならない）'},
  vuln:{n:'被ダメージ増加',i:'💔',c:'#e0709a',t:'このターン、受けるダメージが数値分増える'},
  dmgdn:{n:'与ダメージ減少',i:'🥀',c:'#b39a72',t:'このターン、与えるダメージが数値分減る'},
  atk:{n:'攻撃ダイス上昇',i:'🗡',c:'#e8603c',t:'このターン、攻撃ダイスの出目が数値分上がる'}
