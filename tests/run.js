@@ -451,6 +451,55 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('寒気・胞子・行動不能も状態異常判定に含まれ、寒気/胞子を条件として指定できる',res.cold&&res.spore&&res.incap&&res.coldCond&&res.sporeCond&&res.incapCond,JSON.stringify(res));
 }
 
+
+// ───── 新規追加・変更仕様：レイホン、ツヴァイ、リアン、広域攻撃 ─────
+{
+ const c=makeCtx();
+ const defs=ev(c,`(()=>{const iso=CHARS.find(x=>x.name==='イサドラ'),jul=CHARS.find(x=>x.name==='ジュリア'),ray=CHARS.find(x=>x.name==='レイホン'),lian=CHARS.find(x=>x.name==='リアン'),old=SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬'),quick=SKILLS.find(x=>x.n==='快刀亂麻');return {iso:iso.ps,jul:jul.ps,rayRights:ray.actionRights,lian:{title:lian.title,size:lian.size,slot:lian.slot,rights:lian.actionRights,hp:lian.hp},old:old.d.map(x=>({t:x.t,r:x.r,fx:x.fx})),quick:{c:quick.c,aoe:quick.aoe,once:quick.once,d:quick.d.map(x=>({t:x.t,r:x.r}))},reload:SPECIAL_CARD_DEFS.reload.trigger,furioso:SPECIAL_CARD_DEFS.furiosoReplica.d.map(x=>x.r)}})()`);
+ ok('ツヴァイ2人の先頭パッシブと「あなたの盾」+2が定義されている',defs.iso[0]==='twinBlade'&&defs.iso.includes('yourshield')&&defs.iso.includes('ailres')&&defs.jul[0]==='yourshield'&&defs.jul.includes('ailres')&&ev(c,'PAS.ailres.k')==='def'&&ev(c,'PAS.ailres.v')===2,JSON.stringify(defs));
+ ok('レイホンは行動権2を維持し、「快刀亂麻」と3ダイス版「超絶猛虎殺撃乱斬」が定義されている',defs.rayRights===2&&defs.old.length===3&&defs.old[0].r[0]===7&&defs.old[2].r[0]===12&&defs.quick.c===5&&defs.quick.aoe==='sum'&&defs.quick.once&&defs.quick.d.length===1&&defs.quick.d[0].r[0]===15&&defs.quick.d[0].r[1]===20);
+ ok('リアンが2枠・帰属枠0・行動権1で定義されている',defs.lian.title==='人差し指:神託代行者'&&defs.lian.size===2&&defs.lian.slot===0&&defs.lian.rights===1&&defs.lian.hp<67&&defs.lian.hp>=55,JSON.stringify(defs.lian));
+ ok('「再装填」は装着時発動として定義されている',defs.reload==='equip');
+ ok('Furioso-Replicaは9ダイスで、先頭8個が4〜8、9個目が5〜10',defs.furioso.length===9&&defs.furioso.slice(0,8).every(r=>r[0]===4&&r[1]===8)&&defs.furioso[8][0]===5&&defs.furioso[8][1]===10,JSON.stringify(defs.furioso));
+
+ const rayCtx=makeCtx();
+ const rayResult=ev(rayCtx,`(()=>{startMatch();const r=mkField(mkC(byKey['レイホン']));S.p[0].chars=[r];S.p[0].deck=[{n:'超絶猛虎殺撃乱斬'},{n:'別カード'}];S.p[0].disc=[{n:'超絶猛虎殺撃乱斬'}];S.p[0].hand=[{n:'超絶猛虎殺撃乱斬'}];S.p[0].gone=0;S.turn=1;PK.tianTui.turn(r,PAS.tianTui,0);return {deck:S.p[0].deck.map(x=>x.n),disc:S.p[0].disc.map(x=>x.n),hand:S.p[0].hand.map(x=>x.n),gone:S.p[0].gone,quick:S.p[0].deck.some(x=>x.n==='快刀亂麻'),special:S.p[0].specialHand.map(x=>x.id)}})()`);
+ ok('天退星は旧カードをデッキ・捨て札・手札から消滅させ、快刀亂麻をデッキに追加する',rayResult.deck.includes('快刀亂麻')&&!rayResult.deck.includes('超絶猛虎殺撃乱斬')&&!rayResult.disc.includes('超絶猛虎殺撃乱斬')&&!rayResult.hand.includes('超絶猛虎殺撃乱斬')&&rayResult.gone===3&&!rayResult.special.includes('tianTui'),JSON.stringify(rayResult));
+
+ const reloadCtx=makeCtx();
+ const reloadResult=ev(reloadCtx,`(()=>{startMatch();const r=mkField(mkC(byKey['レイホン']));r.abnState={tigerBullet:8,mightyTigerBullet:0};S.p[0].chars=[r];S.p[0].specialHand=[{...SPECIAL_CARD_DEFS.reload}];S.phase='decide';S.order=[0,1];S.stage=0;const ok=assignSpecial(0,0);return {ok,tiger:r.abnState.tigerBullet,mighty:r.abnState.mightyTigerBullet,gone:S.p[0].gone,left:S.p[0].specialHand.length}})()`);
+ ok('再装填は装着時に従来どおり虎標弾を消滅させ、猛虎標弾5を得る',reloadResult.ok&&reloadResult.tiger===0&&reloadResult.mighty===5&&reloadResult.gone===1&&reloadResult.left===0,JSON.stringify(reloadResult));
+
+ const lianCtx=makeCtx();
+ const lianResult=ev(lianCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン'])),enemy=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));S.p[0].chars=[c];S.p[1].chars=[enemy];S.p[0].hand=[SKILLS.find(x=>x.n==='斬撃')];PK.indexFinger.turn(c,PAS.indexFinger,0);const target=enemy.abnState.directiveTargetBy==='0:0',name=c.abnState.directiveCardName; c.abnState.directiveBlessing=15;c.abnState.directiveResult=2;resolveIndexFingerCommands();const blessing=c.abnState.directiveBlessing;c.abnState.directiveResult=0;resolveIndexFingerCommands();const penalty=c.abnState.directiveTakenBonus;return {target,name,hand:S.p[0].hand.map(x=>x.n),blessing,penalty}})()`);
+ ok('人差し指はランダム敵を指定し、手札のカード名を指令カードにする',lianResult.target&&lianResult.name==='斬撃'&&lianResult.hand.includes('斬撃'),JSON.stringify(lianResult));
+ ok('カドゥケウスは指令達成で+6×1.5、未達成で永続被ダメージ+1',lianResult.blessing===24&&lianResult.penalty===1,JSON.stringify(lianResult));
+
+ const oracleCtx=makeCtx();
+ const oracleResult=ev(oracleCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン']));S.p[0].chars=[c];c.abnState={directiveBlessing:30};c.abnState.directiveComposure=true;PK.oracle.turn(c,PAS.oracle,0);return {burn:c.st.burn,bleed:c.st.bleed,blessing:c.abnState.directiveBlessing,special:S.p[0].specialHand.map(x=>x.id)}})()`);
+ ok('指令沈着は毎ターン火傷3・出血3を付与し、加護30でFuriosoを追加して30消費する',oracleResult.burn===3&&oracleResult.bleed===3&&oracleResult.blessing===0&&oracleResult.special.includes('furiosoReplica'),JSON.stringify(oracleResult));
+
+ const matchCtx=makeCtx();
+ const matchResult=ev(matchCtx,`(()=>{startMatch();const a=mkField(mkC(byKey['イサドラ'])),b=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));a.hp=30;S.p[0].chars=[a];S.p[1].chars=[b];S.dm={};S.ev=[];S.fr=[];S.pv=0;S.turnDamageTeam=[false,false];a.card={n:'テスト',c:0,d:[D('a',10,10)]};b.card={n:'テスト防御',c:0,d:[D('d',1,1)]};S.turn=1;const old=a.hp;doMatch(0,a,1,b,[D('a',10,10)],[D('d',1,1)]);return {delta:a.hp-old,log:S.log.some(x=>x.includes('ツヴァイの剣術'))}})()`);
+ ok('ツヴァイの剣術はマッチ勝利時にHP1〜2を回復する',matchResult.delta>=1&&matchResult.delta<=2&&matchResult.log,JSON.stringify(matchResult));
+
+ const aoeCtx=makeCtx();
+ const aoeResult=ev(aoeCtx,`(()=>{startMatch();const a=mkField(mkC({name:'広域攻撃者',slot:0,hp:1000,spd:[1,1],ps:[]})),b=mkField(mkC({name:'敵1',slot:0,hp:1000,spd:[1,1],ps:[]})),d=mkField(mkC({name:'敵2',slot:0,hp:1000,spd:[1,1],ps:[]}));S.p[0].chars=[a];S.p[1].chars=[b,d];S.turnDamageTeam=[false,false];b.bf.guard=100;d.bf.guard=100;S.turn=1;a.card={n:'全体攻撃',c:0,aoe:'individual',d:[D('a',10,10),D('a',10,10)]};a.tgt=0;a.used=false;combat();const frames=S.fr.filter(f=>f.lu.some(x=>x[0]===0&&x[1]===0));return {count:frames.length,attacker:frames[0]&&frames[0].lu.some(x=>x[0]===0&&x[1]===0),victims:frames[0]&&frames[0].sh.map(x=>x.join(':')).sort(),log:S.log.filter(x=>x.includes('広域攻撃：個別')).length}})()`);
+ ok('広域攻撃は複数ダイス・複数対象を一括アニメーションし、軽減でHPが減らなくても成功した対象と攻撃者を同じフレームで動かす',aoeResult.count===1&&aoeResult.attacker&&aoeResult.victims.join(',')==='1:0,1:1'&&aoeResult.log>=4,JSON.stringify(aoeResult));
+
+ const randomDirectiveCtx=makeCtx();
+ const randomDirectiveResult=ev(randomDirectiveCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン'])),a=mkField(mkC({name:'敵A',slot:0,hp:1000,spd:[1,1],ps:[]})),b=mkField(mkC({name:'敵B',slot:0,hp:1000,spd:[1,1],ps:[]}));S.p[0].chars=[c];S.p[1].chars=[a,b];S.turn=1;S.turnDamageTeam=[false,false];c.abnState={directiveTargetPi:1,directiveTargetCi:0,directiveCardName:'指定カード',directiveBlessing:0,directiveResult:0};c.card={n:'Furioso-Replica',c:0,aoe:'random',__furiosoReplica:true,d:[D('a',1,1),D('a',1,1)]};c.tgt=0;c.used=false;const old=Math.random;Math.random=()=>0.999999;try{combat()}finally{Math.random=old}return {blessing:c.abnState.directiveBlessing,penalty:c.abnState.directiveTakenBonus||0}})()`);
+ ok('乱射は実際に指令対象へ着弾した場合だけ指令達成として扱う',randomDirectiveResult.blessing===0&&randomDirectiveResult.penalty===1,JSON.stringify(randomDirectiveResult));
+
+ const furiosoCtx=makeCtx();
+ const furiosoResult=ev(furiosoCtx,`(()=>{startMatch();const a=mkField(mkC(byKey['リアン'])),b=mkField(mkC({name:'防御敵',slot:0,hp:10000,spd:[1,1],ps:[]}));S.p[0].chars=[a];S.p[1].chars=[b];S.turn=2;a.abnState={directiveBlessing:0};a.card={...SPECIAL_CARD_DEFS.furiosoReplica,__furiosoReplica:true,d:SPECIAL_CARD_DEFS.furiosoReplica.d.map(x=>({...x,r:[...x.r]}))};a.tgt=0;a.used=false;b.card={n:'強い守備',c:0,d:[D('d',100,100)]};b.tgt=0;b.used=false;combat();const nine=S.log.map(x=>{const m=x.match(/ダイス9\\[(\\d+)\\]/);return m?Number(m[1]):null}).find(x=>x!==null);const attackFrames=S.fr.filter(f=>f.lu.some(x=>x[0]===0&&x[1]===0));return {nine,expectedMin:5,expectedMax:10,half:S.log.some(x=>x.includes('半分の')),composure:a.abnState.directiveComposure,frames:attackFrames.length,victims:attackFrames[0]&&attackFrames[0].sh.length}})()`);
+ ok('Furioso-Replicaは防御ダイスに負けても半分のダメージを与え、初回使用後に指令沈着を得る',furiosoResult.half&&furiosoResult.composure&&furiosoResult.nine>=5&&furiosoResult.nine<=10&&furiosoResult.frames===1&&furiosoResult.victims===1,JSON.stringify(furiosoResult));
+
+ const legendCtx=makeCtx();
+ const legendResult=ev(legendCtx,`(()=>{startMatch();const h=legendHTML();return {hidden:['氷の欠片','蜂の標的','依頼対象','音楽の影響','黒化の影響','眼差し','魅了','プレゼント','日傘の反射','妖精の世話'].every(x=>!h.includes(x))&&STN.takenPlus.legend===false,ordinary:['火傷','出血','破裂','振動','行動不能','速度低下','指令対象','指令カード','指令の加護'].every(x=>h.includes(x))}})()`);
+ ok('幻想体カード由来の効果は一覧から隠し、通常状態異常とリアンの効果は表示する',legendResult.hidden&&legendResult.ordinary,JSON.stringify(legendResult));
+}
+
 finish();
 function finish(){
  console.log(`\n合格 ${pass} / 失敗 ${fail}`);
