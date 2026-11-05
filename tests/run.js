@@ -127,11 +127,23 @@ for(const c of names.ch){ // 全キャラが戦場データにできる
   return c;
  };
  const burn=checkTeam('burning_girl','燃え尽きた少女|最後のマッチの火|最後のマッチの火');
- ok('燃え尽きた少女は最初の4ターン行動せず、5ターン目に自爆ページを準備する',
-  ev(burn,"S.p[1].chars[0].card===null")&&ev(burn,"S.turn=5;soloPlanEnemy();S.p[1].chars[0].card.n")==='4本目のマッチの火');
+ ok('燃え尽きた少女は保有コスト0・最大5で開始する',ev(burn,"S.p[1].cost===0&&S.p[1].max===5"));
+ ok('取り巻きの攻撃・回避ページはすべてコスト0',ev(burn,"S.p[1].chars.slice(1).every(x=>x.card&&x.card.c===0)"));
+ ok('5ターン目でも保有コスト4なら4本目のマッチの火を使わない',ev(burn,"S.turn=5;S.p[1].cost=4;soloPlanEnemy();S.p[1].chars[0].card===null"));
+ const burnPage=ev(burn,"S.turn=6;S.p[1].cost=5;soloPlanEnemy();(()=>{const c=S.p[1].chars[0].card;return {name:c&&c.n,cost:c&&c.c,aoe:c&&c.aoe,dice:c&&c.d.map(x=>x.r),stored:S.p[1].cost}})()");
+ ok('コスト5を保有すると4本目のマッチの火（個別広域・2ダイス・HP連動威力）を使用する',burnPage.name==='4本目のマッチの火'&&burnPage.cost===5&&burnPage.aoe==='individual'&&burnPage.dice.length===2&&burnPage.dice[0][0]===18&&burnPage.dice[0][1]===22&&burnPage.stored===5,JSON.stringify(burnPage));
  ev(burn,'done()');
- ok('5ターン目の「4本目のマッチの火」使用後に燃え尽きた少女が自滅する',!ev(burn,"S.p[1].chars.find(x=>x.name==='燃え尽きた少女').alive"));
+ ok('4本目のマッチの火を使用した後に燃え尽きた少女が自滅する',!ev(burn,"S.p[1].chars.find(x=>x.name==='燃え尽きた少女').alive"));
  ok('燃え尽きた少女が自爆した時点で、最後のマッチの火が残っていても敵側の敗北になる',ev(burn,"S.over&&S.over.startsWith(S.p[0].name)&&S.p[1].chars.some(x=>x.name==='最後のマッチの火'&&x.alive)"),ev(burn,"JSON.stringify({over:S.over,phase:S.phase,enemies:S.p[1].chars.map(x=>({n:x.name,alive:x.alive}))})"));
+ const burnCost=setup('burning_girl');
+ const regen=ev(burnCost,"(()=>{S.p[1].cost=2;nextTurn();return {turn:S.turn,cost:S.p[1].cost,max:S.p[1].max}})()");
+ ok('燃え尽きた少女の保有コストはターン経過で1だけ回復する',regen.cost===3&&regen.max===5,JSON.stringify(regen));
+ const burnThreshold=setup('burning_girl');
+ const threshold=ev(burnThreshold,"(()=>{const g=S.p[1].chars[0];S.p[1].cost=3;direct(1,g,99,'bleed');const first={hp:g.hp,cost:S.p[1].cost};direct(1,g,99,'bleed');return {first,second:{hp:g.hp,cost:S.p[1].cost}}})()");
+ ok('燃え尽きた少女は最大HPの約33%を失うごとに保有コスト-1',threshold.first.hp===201&&threshold.first.cost===2&&threshold.second.hp===102&&threshold.second.cost===1,JSON.stringify(threshold));
+ const burnMinions=setup('burning_girl');
+ const halved=ev(burnMinions,"(()=>{const p=S.p[1],g=p.chars[0];p.cost=3;soloHandleDeath(p.chars[1]);const first={hp:g.hp,cost:p.cost};soloHandleDeath(p.chars[2]);return {first,second:{hp:g.hp,cost:p.cost}}})()");
+ ok('取り巻きが倒れるたびに本体HP半減と33%ごとのコスト減少が連動する',halved.first.hp===150&&halved.first.cost===2&&halved.second.hp===75&&halved.second.cost===1,JSON.stringify(halved));
  const teddy=checkTeam('happy_teddy','幸せなテディ');
  ok('幸せなテディは速度10固定、行動権2、コスト最大値2',ev(teddy,"S.p[1].chars[0].spd[0]===10&&S.p[1].chars[0].spd[1]===10&&S.p[1].chars[0].actionRights===2&&S.p[1].max===2"));
  const fairy=checkTeam('fairy_festival','女王妖精|妖精の塊|妖精の塊');
@@ -471,9 +483,9 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('再装填は装着時に従来どおり虎標弾を消滅させ、猛虎標弾5を得る',reloadResult.ok&&reloadResult.tiger===0&&reloadResult.mighty===5&&reloadResult.gone===1&&reloadResult.left===0,JSON.stringify(reloadResult));
 
  const lianCtx=makeCtx();
- const lianResult=ev(lianCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン'])),enemy=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));S.p[0].chars=[c];S.p[1].chars=[enemy];S.p[0].hand=[SKILLS.find(x=>x.n==='斬撃')];PK.indexFinger.turn(c,PAS.indexFinger,0);const target=enemy.abnState.directiveTargetBy==='0:0',name=c.abnState.directiveCardName; c.abnState.directiveBlessing=15;c.abnState.directiveResult=2;resolveIndexFingerCommands();const blessing=c.abnState.directiveBlessing;c.abnState.directiveResult=0;resolveIndexFingerCommands();const penalty=c.abnState.directiveTakenBonus;return {target,name,hand:S.p[0].hand.map(x=>x.n),blessing,penalty}})()`);
+ const lianResult=ev(lianCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン'])),enemy=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));S.p[0].chars=[c];S.p[1].chars=[enemy];S.p[0].hand=[SKILLS.find(x=>x.n==='斬撃')];PK.indexFinger.turn(c,PAS.indexFinger,0);const target=enemy.abnState.directiveTargetBy==='0:0',name=c.abnState.directiveCardName;c.abnState.directiveBlessing=0;c.abnState.directiveResult=2;resolveIndexFingerCommands();const fullBase=c.abnState.directiveBlessing;c.abnState.directiveBlessing=15;c.abnState.directiveResult=2;resolveIndexFingerCommands();const blessing=c.abnState.directiveBlessing;c.abnState.directiveResult=0;resolveIndexFingerCommands();const penalty=c.abnState.directiveTakenBonus;c.abnState.directiveBlessing=0;c.abnState.directiveResult=1;resolveIndexFingerCommands();const partialGain=c.abnState.directiveBlessing;return {target,name,hand:S.p[0].hand.map(x=>x.n),fullBase,blessing,penalty,partialGain}})()`);
  ok('人差し指はランダム敵を指定し、手札のカード名を指令カードにする',lianResult.target&&lianResult.name==='斬撃'&&lianResult.hand.includes('斬撃'),JSON.stringify(lianResult));
- ok('カドゥケウスは指令達成で+6×1.5、未達成で永続被ダメージ+1',lianResult.blessing===24&&lianResult.penalty===1,JSON.stringify(lianResult));
+ ok('カドゥケウスは両達成+7（15以上なら+11）、片方達成+2、未達成で永続被ダメージ+1',lianResult.fullBase===7&&lianResult.blessing===26&&lianResult.penalty===1&&lianResult.partialGain===2,JSON.stringify(lianResult));
 
  const oracleCtx=makeCtx();
  const oracleResult=ev(oracleCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン']));S.p[0].chars=[c];c.abnState={directiveBlessing:30};c.abnState.directiveComposure=true;PK.oracle.turn(c,PAS.oracle,0);return {burn:c.st.burn,bleed:c.st.bleed,blessing:c.abnState.directiveBlessing,special:S.p[0].specialHand.map(x=>x.id)}})()`);
