@@ -10,6 +10,21 @@ main{max-width:980px;margin:0 auto;padding:10px 14px 30px}
 .row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .ch{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px;min-height:130px;position:relative}
 .ch.dead{opacity:.35}
+/* Furioso-Replicaを保有しているリアン：紫紺の発光と脈動 */
+.ch.furioso-ready{
+ border-color:#b69aff;
+ background:radial-gradient(ellipse at 50% 0%,rgba(150,112,255,.24),transparent 68%),var(--panel);
+ animation:furiosoReadyPulse 2.2s ease-in-out infinite;
+}
+.ch.furioso-ready .nm span:first-child::after{
+ content:' ✦ REPLICA';color:#d9c8ff;font-size:.58rem;letter-spacing:.08em;
+ text-shadow:0 0 5px #9e7bff,0 0 12px #8055ff;white-space:nowrap;
+}
+@keyframes furiosoReadyPulse{
+ 0%,100%{box-shadow:0 0 0 1px rgba(174,145,255,.55),0 0 10px rgba(135,91,255,.28),inset 0 0 12px rgba(124,89,211,.12)}
+ 50%{box-shadow:0 0 0 2px rgba(218,199,255,.9),0 0 23px rgba(151,105,255,.62),inset 0 0 20px rgba(124,89,211,.25)}
+}
+@media (prefers-reduced-motion:reduce){.ch.furioso-ready{animation:none;box-shadow:0 0 0 1px rgba(174,145,255,.7),0 0 12px rgba(135,91,255,.3)}}
 .ch.big{grid-column:span 2}
 .ch.big .nm span:first-child{font-size:1.1rem}
 .ttl{display:block;font-size:.7rem;font-weight:400;color:var(--dim);line-height:1.2;margin:1px 0 2px}
