@@ -83,7 +83,7 @@ const ABN_CARDS=[
 ];
 const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
 const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
-const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,8)).concat([D('a',5,10)])}};
+const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。最終ダイス以外はバフ・デバフの影響を受けない。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>({...D('a',3,6),__ignoreBuffDebuffs:true})).concat([D('a',5,10)])},furiosoCrescendo:{id:'furiosoCrescendo',n:'Furioso-Crescendo',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。Furioso-Replicaより全ダイスの出目が+1され、バフ・デバフの影響を受ける。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,7)).concat([D('a',6,11)])}};
 const registerSpecialCard=(p,id)=>{const c=SPECIAL_CARD_DEFS[id];if(!p||!c||!Array.isArray(p.specialHand))return false;if(p.specialHand.some(x=>x.id===id))return false;p.specialHand.push({...c});return true};
 const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.slice(0,5).forEach(c=>d[c.name]=1);return d};   // 初期デッキ：技10＋キャラ5
 // ===== プレイヤー名とデッキの保存 =====
@@ -407,19 +407,19 @@ function assignSpecial(ci,hi){
   S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`行動${slot+1}の攻撃対象を選んでください`;
   render();return true;
  }
- if(card.id==='furiosoReplica'){
-  if(c.name!=='リアン'||!hasPasKind(c,'oracle')){S.msg='「Furioso-Replica」は神託代行者を持つリアンだけが使用できます';render();return false}
+ if(card.id==='furiosoReplica'||card.id==='furiosoCrescendo'){
+  if(c.name!=='リアン'||!hasPasKind(c,'oracle')){S.msg='Furioso系特殊カードは神託代行者を持つリアンだけが使用できます';render();return false}
   const foes=S.p[1-act()].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
   if(!foes.length){S.msg='攻撃できる対象がいません';render();return false}
   const states=actionStates(c);let slot=states.findIndex(st=>!st.card);if(slot<0)slot=0;
   const st=states[slot],old=st.card,oldCost=old?(st.effectiveCost==null?old.c:old.effectiveCost):0;
-  const def=SPECIAL_CARD_DEFS.furiosoReplica;
-  const assigned={...def,__specialCardId:'furiosoReplica',__furiosoReplica:true,d:def.d.map(d=>({...d,r:[...d.r]}))};
+  const isCrescendo=card.id==='furiosoCrescendo',def=SPECIAL_CARD_DEFS[card.id];
+  const assigned={...def,__specialCardId:card.id,__furiosoSpecial:true,__furiosoReplica:!isCrescendo,__furiosoCrescendo:isCrescendo,d:def.d.map(d=>({...d,r:[...d.r]}))};
   if(used(p)-oldCost+assigned.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}）`;render();return false}
   logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
   st.card=assigned;st.effectiveCost=assigned.c;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=true;
   st.tgt=foes[0].zi;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
-  S.pend=null;S.pendActionSlot=0;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg='「Furioso-Replica」：各ダイスの攻撃対象はランダムに決まります';
+  S.pend=null;S.pendActionSlot=0;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`「${assigned.n}」：各ダイスの攻撃対象はランダムに決まります`;
   render();return true;
  }
  return false;
@@ -615,8 +615,8 @@ const STN={
  mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数だけ使用カードの全ダイス値を上げる'},
  directiveTarget:{n:'指令対象',i:'📜',c:'#a77dd5',t:'人差し指によって指定された攻撃対象'},
  directiveCard:{n:'指令カード',i:'🪶',c:'#a77dd5',t:'人差し指によって指定されたカード。カード名の表示のみで追加効果はない'},
- directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30'},
- directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる'},
+ directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30（30を超えて蓄積しない）'},
+ directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる。以後に追加されるFurioso系カードはFurioso-Crescendoに変化する'},
  directiveDamage:{n:'指令の反動',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが増加（戦闘中永続）'},
  axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ',legend:false},
  merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ',legend:false},
@@ -743,7 +743,8 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
  const range=[...rollDie.r];let chosenBase=null,merryMin=false;
  const forcedMerry=hasAbn(c,'merry_trick')&&c.card&&Array.isArray(c.card.d)&&c.card.d[0]===d;
  if(forcedMerry){merryMin=rnd()<0.5;chosenBase=merryMin?range[0]:range[1]}else chosenBase=R(...range);
- const raw=Math.max(0,chosenBase+pv(c,KEY[d.t])+(c.kb||0)+hookSum('dice',c,d)+(d.t==='a'?c.bf.atk:0)+c.bf.roll-c.bf.rolldn);let bonus=0;
+ const ignoreBuffDebuffs=!!d.__ignoreBuffDebuffs;
+ const raw=Math.max(0,chosenBase+pv(c,KEY[d.t])+(c.kb||0)+hookSum('dice',c,d)+(ignoreBuffDebuffs?0:(d.t==='a'?c.bf.atk:0)+c.bf.roll-c.bf.rolldn));let bonus=0;
  if(!c.abnState)c.abnState={};c.abnState.lastRollWasMax=chosenBase===range[1];c.abnState.lastRollBase=chosenBase;
  if(forcedMerry&&merryMin){const pi=S.p.findIndex(p=>p.chars.includes(c));if(pi>=0){const n=R(2,7);L(`　「愉快ないたずら」：${c.name}は最小値を出し、${n}ダメージ`);direct(pi,c,n,'merry')}}
  // 妖精の祭典：女王妖精だけが残ると全ダイス値+30。
@@ -772,7 +773,7 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
  // 指令沈着：そのターンの指令カードの攻撃ダイスを強化する。
  if(d.t==='a'&&hasPasKind(c,'indexFinger')&&c.abnState&&c.abnState.directiveComposure&&c.card&&c.card.n===c.abnState.directiveCardName)bonus+=Math.round((c.abnState.directiveBlessing||0)/10);
  // 「警戒」を持つ相手とマッチすると、その相手のダイス値を1下げる。
- if(inMatch&&opponent&&hasAbn(opponent,'vigilance'))bonus-=1;
+ if(!ignoreBuffDebuffs&&inMatch&&opponent&&hasAbn(opponent,'vigilance'))bonus-=1;
  if(hasPasKind(c,'waxenwings')){
   bonus+=2;if(opponent&&opponent.st&&(opponent.st.burn||0)>0)bonus+=2;
   if(d.t==='a'){
@@ -780,9 +781,9 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
    if(burnFx(d.fx)||burnFx(c.card&&c.card.hit))bonus+=3;
   }
  }
- if(c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
+ if(!ignoreBuffDebuffs&&c.abnState&&c.abnState.teamDiceBonus)bonus+=c.abnState.teamDiceBonus;
  if(d.t==='a'&&c.abnState){
-  bonus+=(c.abnState.nextAtk||0);c.abnState.nextAtk=0;
+  if(!ignoreBuffDebuffs){bonus+=(c.abnState.nextAtk||0);c.abnState.nextAtk=0;}
   const killRate=(c.abn||[]).reduce((n,x)=>n+((x.fx&&x.fx.killAtk)||0),0);
   bonus+=(c.abnState.kills||0)*killRate;
  }
@@ -1071,10 +1072,11 @@ function resolveIndexFingerCommands(){
   if(!c.alive||!hasPasKind(c,'indexFinger'))return;
   if(!c.abnState)c.abnState={};
   const result=Number(c.abnState.directiveResult)||0;
+  const before=Math.max(0,Math.min(30,Number(c.abnState.directiveBlessing)||0));
+  c.abnState.directiveBlessing=before;
   if(result>0){
    let gain=result>=2?7:2;
-   if((c.abnState.directiveBlessing||0)>=15)gain=Math.round(gain*1.5);
-   const before=c.abnState.directiveBlessing||0;
+   if(before>=15)gain=Math.round(gain*1.5);
    c.abnState.directiveBlessing=Math.min(30,before+gain);
    L(`　「端末機:カドゥケウス」：${c.name}は指令の加護+${c.abnState.directiveBlessing-before}（${c.abnState.directiveBlessing}/30）`);
   }else{
@@ -1122,19 +1124,20 @@ function combat(){
         if(S.fr.length)S.fr[S.fr.length-1].aoe=mode;
       };
       if(mode==='random'){
-        let successfulHits=0;const allHitIds=new Set();
+        let successfulHits=0;
         for(let ai=0;ai<areaDice.length;ai++){
+          const dieHitIds=new Set();
           const candidates=getEnemies();if(!candidates.length)break;
           const targetInfo=candidates[Math.floor(rnd()*candidates.length)],target=targetInfo.z,zi=targetInfo.zi;
           if(hasPasKind(c,'indexFinger')&&c.abnState&&1-a.pi===c.abnState.directiveTargetPi&&zi===c.abnState.directiveTargetCi)c.abnState.directiveResult=Math.max(Number(c.abnState.directiveResult)||0,c.card.n===c.abnState.directiveCardName?2:1);
           const baseDie=areaDice[ai];
-          const areaDie=(c.card.__furiosoReplica&&ai===8)?{...baseDie,r:[baseDie.r[0]+successfulHits,baseDie.r[1]+successfulHits]}:baseDie;
+          const areaDie=((c.card.__furiosoSpecial||c.card.__furiosoReplica||c.card.__furiosoCrescendo)&&ai===8)?{...baseDie,r:[baseDie.r[0]+successfulHits,baseDie.r[1]+successfulHits]}:baseDie;
           setActionSlot(c,a.slot);const attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
           const states=actionStates(target),defState=states[0]&&!states[0].used?states[0]:null;
           const defendingCard=defState&&defState.card?defState.card:null;
           let successes=0,losses=0,damageEvents=0;
           if(!defendingCard||!defendingCard.d.length){
-            const before=target.hp;L(`【広域攻撃：乱射】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(target.hp<before)damageEvents++;successfulHits++;allHitIds.add(zi);
+            const before=target.hp;L(`【広域攻撃：乱射】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(target.hp<before)damageEvents++;successfulHits++;dieHitIds.add(zi);
           }else{
             setActionSlot(target,0);
             for(let di=defendingCard.d.length-1;di>=0;di--){
@@ -1146,18 +1149,24 @@ function combat(){
                 hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(target.hp<before)damageEvents++;
               }else losses++;
             }
-            if(successes){successfulHits++;allHitIds.add(zi);if(!defendingCard.d.length)defState.used=true;}
-            if(c.card.__furiosoReplica&&losses>0&&target.alive){
+            if(successes){successfulHits++;dieHitIds.add(zi);if(!defendingCard.d.length)defState.used=true;}
+            if((c.card.__furiosoSpecial||c.card.__furiosoReplica||c.card.__furiosoCrescendo)&&losses>0&&target.alive){
               const half=Math.floor(attackValue/2),before=target.hp;
-              L(`【Furioso-Replica】${c.name}のダイス${ai+1}[${attackValue}]はマッチ敗北。${target.name}に半分の${half}ダメージ。`);
-              hit(a.pi,1-a.pi,target,half,c,areaDie);if(target.hp<before)damageEvents++;allHitIds.add(zi);
-            }else if(!successes&&!c.card.__furiosoReplica)L(`【広域攻撃：乱射】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
+              L(`【${c.card.n}】${c.name}のダイス${ai+1}[${attackValue}]はマッチ敗北。${target.name}に半分の${half}ダメージ。`);
+              hit(a.pi,1-a.pi,target,half,c,areaDie);if(target.hp<before)damageEvents++;dieHitIds.add(zi);
+              // 半分ダメージは命中回数に含めない。最終ダイスの強化は防御ダイスを上回った回数のみを数える。
+            }else if(!successes&&!c.card.__furiosoSpecial&&!c.card.__furiosoReplica&&!c.card.__furiosoCrescendo)L(`【広域攻撃：乱射】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
             setActionSlot(target,0);
           }
-          if(damageEvents)allHitIds.add(zi);
+          if(damageEvents)dieHitIds.add(zi);
+          // 乱射はダイスごとに独立した演出フレームを作り、攻撃の流れを順番に表示する。
+          animateArea([...dieHitIds]);
         }
-        animateArea([...allHitIds]);
-        if(c.card.__furiosoReplica&&c.alive&&c.abnState&&!c.abnState.directiveComposure){c.abnState.directiveComposure=true;L(`　「神託代行者」：初回の「Furioso-Replica」使用後、「指令沈着」を獲得`)}
+        if((c.card.__furiosoSpecial||c.card.__furiosoReplica||c.card.__furiosoCrescendo)&&c.abnState){
+          const before=c.abnState.directiveBlessing||0;c.abnState.directiveBlessing=Math.max(0,before-30);
+          if(before)L(`　「神託代行者」：「${c.card.n}」使用後、指令の加護-30（${before} → ${c.abnState.directiveBlessing}）`);
+          if(c.alive&&!c.abnState.directiveComposure){c.abnState.directiveComposure=true;L(`　「神託代行者」：初回のFurioso系カード使用後、「指令沈着」を獲得`)}
+        }
       }else if(mode==='sum'){
         const areaDie=areaDice[0],hitIds=[];
         for(const item of getEnemies()){
@@ -1289,6 +1298,8 @@ function chHTML(pi,ci,view){
  const frameAt=(grid,fallback)=>grid&&grid[pi]&&grid[pi][ci]!==undefined?grid[pi][ci]:fallback;
  const hv=A?frameAt(A.i<0?A.hp0:fr&&fr.hp,c.hp):c.hp,dead=A?hv<=0:!c.alive,dmv=fr&&fr.dm?fr.dm[`${pi}-${ci}`]:undefined;
  let cls='ch'+(c.size>1?' big':'')+(dead?' dead':'')+(c.actionRights>1?' has-action-rail':'');
+ const furiosoReady=!dead&&c.name==='リアン'&&(p.specialHand||[]).some(x=>x.id==='furiosoReplica'||x.id==='furiosoCrescendo');
+ if(furiosoReady)cls+=' furioso-ready';
  const has=l=>l.some(x=>x[0]===pi&&x[1]===ci);
  const low=pi===view;   // 画面の下側に出ているのは自分側（オンラインのP2視点では pi=1 が下）
  if(c.actionRights>1)cls+=low?' action-rail-facing-top':' action-rail-facing-bottom';

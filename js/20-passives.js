@@ -96,11 +96,14 @@ const PK={
  },
  caduceus:{t:()=>`人差し指の指令を達成して攻撃すると指令の加護+7、別カードで指令対象を攻撃した場合は+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
  oracle:{
-  t:()=>`ターン開始時、指令の加護が30以上なら特殊カード「Furioso-Replica」を追加し、指令の加護を30消費する。初めて使用した後、永続バフ「指令沈着」を得る`,
+  t:()=>`ターン開始時、指令の加護が30なら特殊カードを追加する。初回は「Furioso-Replica」、指令沈着を得た後は強化版「Furioso-Crescendo」。使用後に指令の加護30を消費する`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
+   c.abnState.directiveBlessing=Math.max(0,Math.min(30,Number(c.abnState.directiveBlessing)||0));
    if(c.abnState.directiveComposure){c.st.burn=(c.st.burn||0)+3;c.st.bleed=(c.st.bleed||0)+3;L(`　「指令沈着」：${c.name}に火傷+3・出血+3`)}
-   if((c.abnState.directiveBlessing||0)>=30&&registerSpecialCard(S.p[pi],'furiosoReplica')){c.abnState.directiveBlessing-=30;L(`　「神託代行者」：特殊カード「Furioso-Replica」を追加（指令の加護-30）`)}
+   const p=S.p[pi],alreadyHeld=(p.specialHand||[]).some(z=>z.id==='furiosoReplica'||z.id==='furiosoCrescendo')||p.chars.some(z=>actionStates(z).some(st=>st.card&&(st.card.__furiosoSpecial||st.card.__furiosoReplica||st.card.__furiosoCrescendo)));
+   const cardId=c.abnState.directiveComposure?'furiosoCrescendo':'furiosoReplica';
+   if((c.abnState.directiveBlessing||0)>=30&&!alreadyHeld&&registerSpecialCard(p,cardId))L(`　「神託代行者」：特殊カード「${cardId==='furiosoCrescendo'?'Furioso-Crescendo':'Furioso-Replica'}」を追加（指令の加護は使用後に消費）`)
   }
  },
  // ── 動作（フック）を持つタイプ ──
