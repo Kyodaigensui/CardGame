@@ -1072,7 +1072,7 @@ function resolveIndexFingerCommands(){
   if(!c.abnState)c.abnState={};
   const result=Number(c.abnState.directiveResult)||0;
   if(result>0){
-   let gain=result>=2?6:3;
+   let gain=result>=2?7:2;
    if((c.abnState.directiveBlessing||0)>=15)gain=Math.round(gain*1.5);
    const before=c.abnState.directiveBlessing||0;
    c.abnState.directiveBlessing=Math.min(30,before+gain);
@@ -1272,7 +1272,7 @@ function nextTurn(){
    if(c.abnState){c.abnState.surgingActive=false;c.abnState.speedDownNow=0;c.abnState.frostSpeedDown=0;c.abnState.teamDiceBonus=0;c.abnState.skipThisTurn=false;}
   });
   p.deck=sh([...p.deck,...p.disc]);p.disc=[];   // 使った技カードを山札に混ぜる
-  p.cost=Math.min(p.max,p.cost+n+1);draw(p,n+1);
+  p.cost=Math.min(p.max,p.cost+(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='burning_girl'&&p===S.p[1]?1:n+1));draw(p,n+1);
  });
  startTurn();
 }

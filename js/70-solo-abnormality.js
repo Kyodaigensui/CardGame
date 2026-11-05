@@ -19,7 +19,7 @@ const SOLO_BOSSES = [
   {id:'blood_bath', name:'血の風呂', floor:'総記の階', summary:'2回行動。ダイス値低下、3連撃による行動不能、3ダイス防御を使う。'},
   {id:'yearning_heart', name:'熱望する心臓', floor:'総記の階', summary:'心臓の命中で渇望する肺を強化。肺は3ダイス攻撃を行う。'},
   {id:'ice_queen', name:'氷の女王', floor:'総記の階', summary:'中央以外の味方が凍結。寒気を蓄積させ、女王を倒すと解放。'},
-  {id:'burning_girl', name:'燃え尽きた少女', floor:'歴史の階', summary:'2体の「最後のマッチの火」を倒すと本体のHPが半減。5ターン目に自爆ページを使う。'},
+  {id:'burning_girl', name:'燃え尽きた少女', floor:'歴史の階', summary:'保有コスト0から毎ターン+1。HPが最大値の33%分減るごとにコスト-1。コスト5で強力な広域攻撃を行い自滅する。'},
   {id:'happy_teddy', name:'幸せなテディ', floor:'歴史の階', summary:'速度10固定・2回行動・コスト最大値2。マッチごとに「懐かしいあの日の抱擁」のコストが下がる。'},
   {id:'fairy_festival', name:'妖精の祭典', floor:'歴史の階', summary:'女王妖精と2体の妖精の塊。塊を捕食するたび女王が強化される。女王撃破で勝利。'},
   {id:'queen_bee', name:'女王蜂', floor:'歴史の階', summary:'働き蜂が胞子を付与し、胞子を持つキャラが死亡すると働き蜂が増える。女王蜂撃破で勝利。'},
@@ -56,8 +56,8 @@ Object.assign(PK, {
   solo_lung_desc: {t:()=> '3ダイス攻撃を使用する。心臓の強化が重なるとダイス値が上がる。'},
   solo_queen_desc: {t:()=> '戦闘開始時、中央の味方以外を「氷の檻」に変える。氷の檻を撃破すると元の味方がHP75%で復活する。攻撃命中で寒気+1。寒気はターン終了時-1、ターン開始時4以上なら速度-1・ダイス値-2、6以上なら1ターン行動不能になり寒気をすべて失う。'},
   solo_ice_cage_desc: {t:()=> '撃破時に、閉じ込められた味方がHP75%で味方として復活する。'},
-  solo_burning_desc: {t:()=> '4ターンは行動せず、5ターン目に「4本目のマッチの火」を使用して自滅する。最後のマッチの火が倒されるたび、現在HPが半分になる。'},
-  solo_match_desc: {t:()=> '回避ダイスを使う。攻撃ページ使用時、自身のHPを少し失う。倒されると燃え尽きた少女の現在HPが半分になる。'},
+  solo_burning_desc: {t:()=> '保有コスト0から開始し、ターン経過ごとに+1（最大5）。最大HPの33%分HPを失うごとに保有コスト-1。コスト5を保有していると「4本目のマッチの火」（広域攻撃：個別）を使用して自滅する。最後のマッチの火が倒されるたび、現在HPが半分になる。'},
+  solo_match_desc: {t:()=> '攻撃ページと回避ページを使う（どちらもコスト0）。攻撃ページ使用時、自身のHPを少し失う。倒されると燃え尽きた少女の現在HPが半分になる。'},
   solo_teddy_desc: {t:()=> '速度10固定、行動権2、コスト最大値2。マッチが発生するたび「懐かしいあの日の抱擁」のコストが1下がる。'},
   solo_fairy_queen_desc: {t:()=> '3ダイス防御と出血を付与する3ダイス攻撃を使用。毎ターン妖精の塊1体に用意された肉を付与し、HP1なら捕食して回復・被ダメージ+10。ほかに敵がいない間はダイス値+30。死亡すると勝利。'},
   solo_fairy_lump_desc: {t:()=> '低威力の出血攻撃を使う。女王妖精が生存中はHPが1未満にならず、用意された肉がありHP1ならターン終了時に捕食される。'},
@@ -212,7 +212,7 @@ const soloLungAttack = () => soloCard('肺：渇望の三連撃',0,[D('a',2,5),D
 const soloQueenCard = turn => turn%3===0
   ? soloCard('氷の女王：氷の連射',2,[D('a',3,8,[['rupt',1]]),D('a',3,8),D('a',3,8)],{req:'ranged',soloBoss:'queen_cold'})
   : soloCard('氷の女王：凍てつく射撃',1,[D('a',4,10,[['rolldn',1]])],{req:'ranged',soloBoss:'queen_cold'});
-const soloBurnGirlSuicide=()=>soloCard('4本目のマッチの火',0,[D('a',8,12),D('a',8,12)],{soloBoss:'burn_self_destruct'});
+const soloBurnGirlSuicide=girl=>{const bonus=Math.max(0,Math.ceil((girl&&girl.hp||0)/50));return soloCard('4本目のマッチの火',5,[D('a',12+bonus,16+bonus),D('a',12+bonus,16+bonus)],{aoe:'individual',soloBoss:'burn_self_destruct'});};
 const soloMatchFireAttack=()=>soloCard('最後のマッチの火：火を投げる',0,[D('a',3,6)],{soloBoss:'match_fire_self_cost'});
 const soloMatchFireEvade=()=>soloCard('最後のマッチの火：身をかわす',0,[D('e',7,12)]);
 const soloTeddyLight=slot=>soloCard(slot===0?'テディ：小さな一撃':'テディ：じゃれつき',0,[D('a',2,5),D('a',1,4)]);
@@ -266,6 +266,7 @@ function soloPlanEnemy() {
     return list[list.length-1].i;
   };
   let budget=Math.max(0,enemy.cost||0);
+  const availableBudget=budget;
   const chooseTarget=(c)=>{
     if(SOLO.bossId==='funeral_dead_butterflies'&&c.name==='死蝶の葬儀'){const lowest=Math.min(...targets.map(x=>x.c.max>0?x.c.hp/x.c.max:1));const choices=targets.filter(x=>Math.abs((x.c.max>0?x.c.hp/x.c.max:1)-lowest)<1e-9);return choices[Math.floor(rnd()*choices.length)].i;}
     // 「艶やか」の魅了をAIの対象決定そのものに反映する。
@@ -314,7 +315,7 @@ function soloPlanEnemy() {
       else if(SOLO.bossId==='yearning_heart') card=c.name==='熱望する心臓'?(S.turn%3===0?soloHeartGuard():soloHeartAttack()):soloLungAttack();
       else if(SOLO.bossId==='ice_queen') card=soloQueenCard(S.turn);
       else if(SOLO.bossId==='burning_girl') {
-        if(c.name==='燃え尽きた少女')card=S.turn>=5?soloBurnGirlSuicide():null;
+        if(c.name==='燃え尽きた少女')card=S.turn>=5&&budget>=5?soloBurnGirlSuicide(c):null;
         else card=S.turn%2===1?soloMatchFireAttack():soloMatchFireEvade();
       } else if(SOLO.bossId==='happy_teddy') {
         const hugCost=c.abnState.hugCost==null?5:c.abnState.hugCost;
@@ -348,6 +349,7 @@ function soloPlanEnemy() {
   if(SOLO.bossId==='happy_teddy'){enemy.max=2;enemy.cost=2;}
   else if(SOLO.bossId==='abandoned_murderer'){enemy.max=2;enemy.cost=2;}
   else if(SOLO.bossId==='funeral_dead_butterflies'){enemy.max=5;enemy.cost=Math.min(5,budget);}
+  else if(SOLO.bossId==='burning_girl'){enemy.max=5;enemy.cost=Math.min(5,availableBudget);}
   else {enemy.cost=enemy.max=6;}
 }
 
@@ -359,7 +361,7 @@ function startSoloBattle(id) {
   SOLO.active=true;SOLO.bossId=soloBossById(id).id;SOLO.turns=0;SOLO.recordStatus='';
   const boss=soloBossById(SOLO.bossId);
   S={turn:0,p:[newP(PF.name,DK.d[DK.cur],DK.hiers[DK.cur]),newP(boss.name,{},boss.floor||DK.hiers[DK.cur])],over:null,phase:'setup',sp:0,pick:[],cover:null,msg:'',log:[],order:[0,1],stage:0,leave:false,solo:true};
-  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);const lowCostBoss=['happy_teddy','abandoned_murderer'].includes(SOLO.bossId);S.p[1].cost=S.p[1].max=lowCostBoss?2:(SOLO.bossId==='funeral_dead_butterflies'?5:6);
+  S.p[1].chars=soloMakeBossTeam(SOLO.bossId);const lowCostBoss=['happy_teddy','abandoned_murderer'].includes(SOLO.bossId);S.p[1].cost=S.p[1].max=SOLO.bossId==='burning_girl'?0:(lowCostBoss?2:(SOLO.bossId==='funeral_dead_butterflies'?5:6));if(SOLO.bossId==='burning_girl')S.p[1].max=5;
   if(SOLO.bossId==='singing_machine')S.soloSongMachine={activeTurn:0,occupant:null,capturedThisTurn:false,killedEmployees:0};
   SCR='match';render();
 }
@@ -474,6 +476,20 @@ function soloReleaseSongMachineIfDue(){
   if(c.alive)L(`${c.name}が歌う機械から出てきた。HP${before}→${c.hp}（最大HPの30%分を失った）。`);
   else {L(`${c.name}は歌う機械から出る際、HPを失い倒れた。`);soloHandleDeath(c);}
 }
+function soloUpdateBurningGirlCost(girl){
+  if(!SOLO.active||!S||SOLO.bossId!=='burning_girl'||!girl||girl.name!=='燃え尽きた少女')return;
+  if(!girl.abnState)girl.abnState={};
+  const max=Math.max(1,Number(girl.max)||300);
+  const reached=Math.min(3,Math.max(0,Math.floor((max-Math.max(0,girl.hp))/(max*0.33)+1e-9)));
+  const previous=Math.max(0,Math.min(3,Number(girl.abnState.burningCostStage)||0));
+  if(reached<=previous)return;
+  for(let stage=previous;stage<reached;stage++){
+    const p=S.p[1],before=p.cost||0;
+    p.cost=Math.max(0,before-1);
+    L(`燃え尽きた少女は最大HPの${(stage+1)*33}%分を失ったため、保有コスト-1（${before}→${p.cost}）。`);
+  }
+  girl.abnState.burningCostStage=reached;
+}
 function soloHandleDeath(c){
   if(!SOLO.active||!S||!c)return;
   if(SOLO.bossId==='singing_machine'&&c.name==='囚われた職員'&&S.soloSongMachine){
@@ -501,7 +517,7 @@ function soloHandleDeath(c){
     if(!c.abnState.burnBossHalved){
       c.abnState.burnBossHalved=true;
       const girl=S.p[1].chars.find(z=>z.name==='燃え尽きた少女');
-      if(girl&&girl.alive){const old=girl.hp;girl.hp=Math.max(1,Math.ceil(girl.hp*0.5));L(`最後のマッチの火が倒れ、燃え尽きた少女のHPが${old}から${girl.hp}に半減した。`);}
+      if(girl&&girl.alive){const old=girl.hp;girl.hp=Math.max(1,Math.ceil(girl.hp*0.5));soloUpdateBurningGirlCost(girl);L(`最後のマッチの火が倒れ、燃え尽きた少女のHPが${old}から${girl.hp}に半減した。`);}
     }
   }
   if(SOLO.bossId==='queen_bee'&&c.abnState&&c.abnState.sporesFromBee&&(c.st&&c.st.spore||0)>0&&!c.abnState.sporeDeathSpawned){
@@ -539,6 +555,7 @@ hit=function(pa,pb,B,dmg,A,die){
   if(!SOLO.active||!S||!A||!B)return;
   const card=A.card||{};
   const actualDamage=before!=null&&B?Math.max(0,before-B.hp):0;
+  if(SOLO.bossId==='burning_girl'&&B.name==='燃え尽きた少女'&&actualDamage>0)soloUpdateBurningGirlCost(B);
   if(SOLO.bossId==='funeral_dead_butterflies'&&pa===1&&pb===0&&A&&A.name==='死蝶の葬儀'&&actualDamage>0&&B&&B.alive){
     const card=A.card||{},dieIndex=card.d?card.d.indexOf(die):-1;
     if(!B.abnState)B.abnState={};
@@ -595,10 +612,12 @@ hit=function(pa,pb,B,dmg,A,die){
 const __soloOriginalDirect=direct;
 direct=function(pb,B,dmg,kind){
   const beforeAlive=B&&B.alive;
+  const hpBefore=B&&B.hp;
   if(SOLO.active&&S&&SOLO.bossId==='funeral_dead_butterflies'&&B&&B.alive&&B.abnState&&B.abnState.butterflyVulnerableTurn===S.turn&&dmg>0){dmg+=10;L(`死蝶の葬儀のギミック：${B.name}は行動権0のため固定ダメージも+10。`);}
   if(SOLO.active&&S&&SOLO.bossId==='singing_machine'&&S.soloSongMachine&&S.soloSongMachine.occupant&&dmg>0){dmg+=10;L(`歌う機械の内部効果：${B&&B.name||'対象'}の被ダメージ+10`);}
   __soloOriginalDirect(pb,B,dmg,kind);
   if(!SOLO.active||!B)return;
+  if(SOLO.bossId==='burning_girl'&&B.name==='燃え尽きた少女'&&hpBefore>B.hp)soloUpdateBurningGirlCost(B);
   if(SOLO.bossId==='fairy_festival'&&B.name==='妖精の塊'&&!B.alive&&S.p[1].chars.some(z=>z.name==='女王妖精'&&z.alive)){B.hp=1;B.alive=true;}
   else if(beforeAlive&&!B.alive)soloHandleDeath(B);
 };
@@ -629,7 +648,7 @@ combat=function(){
   if(!SOLO.active||!S)return;
   // __soloOriginalCombat() が開始したダイスアニメーションはここで止めない。
   // 敵固有効果と勝敗判定だけを追加し、既存のアニメーションタイマーを維持する。
-  if(S.p[1]){S.p[1].pendingAbn=false;S.p[1].abnOffers=[];S.p[1].abnSelected=null;S.p[1].coin=0;S.p[1].max=(['happy_teddy','abandoned_murderer'].includes(SOLO.bossId)?2:6);if(SOLO.bossId==='anything_helps')S.p[1].cost=Math.max(0,Math.min(S.p[1].max,S.p[1].cost));else S.p[1].cost=S.p[1].max;}
+  if(S.p[1]){S.p[1].pendingAbn=false;S.p[1].abnOffers=[];S.p[1].abnSelected=null;S.p[1].coin=0;S.p[1].max=(['happy_teddy','abandoned_murderer'].includes(SOLO.bossId)?2:SOLO.bossId==='burning_girl'?5:6);if(SOLO.bossId==='anything_helps'||SOLO.bossId==='burning_girl')S.p[1].cost=Math.max(0,Math.min(S.p[1].max,S.p[1].cost));else S.p[1].cost=S.p[1].max;}
   if(SOLO.bossId==='anything_helps'){
     S.p[1].chars.filter(c=>c.name==='何でもお手伝いします'&&c.alive&&c.card&&c.card.soloBoss==='helper_guard'&&c.abnState&&c.abnState.helperDefenseTurn!==S.turn).forEach(c=>{if(!c.nx)c.nx=BF0();c.nx.roll=(c.nx.roll||0)+4;c.abnState.helperDefenseTurn=S.turn;L(`${c.name}の「お手伝い」：次のターンのダイス値+4。`);});
   }
@@ -660,7 +679,7 @@ combat=function(){
   // 燃え尽きた少女は4ターン経過後に自爆ページを使用し、その戦闘中に自滅する。
   if(SOLO.bossId==='burning_girl'&&S.turn>=5&&S.phase==='result'){
     const girl=S.p[1].chars.find(c=>c.name==='燃え尽きた少女');
-    if(girl&&girl.alive){
+    if(girl&&girl.alive&&girl.card&&girl.card.soloBoss==='burn_self_destruct'&&girl.used){
       girl.hp=0;girl.alive=false;
       if(!girl.abnState)girl.abnState={};
       girl.abnState.selfDestructed=true;
