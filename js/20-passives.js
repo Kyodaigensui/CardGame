@@ -80,7 +80,7 @@ const PK={
  yourshield:{t:()=>`自分の速度が2以下、または相手より3以上遅いとき、マッチ対象変更ができる`},
  twinBlade:{t:()=>`マッチ勝利時、体力を1〜2回復`,matchWin:(c,x,loser)=>{const n=R(1,2),old=c.hp;c.hp=Math.min(c.max,c.hp+n);if(c.hp>old)L(`　「ツヴァイの剣術」：${c.name}はHP${c.hp-old}回復`)}},
  indexFinger:{
-  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、属性条件を満たす自分の手札からカード1枚を「指令カード」に指定する。指定カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
+  t:()=>`ターン開始時、対象可能なランダムな敵1体に「指令対象」を付与し、装着可能なカード一枚を手札から指定する。指定カードで指令対象を攻撃するとダイス値+3、指定外カードなら+1。どちらも満たしていないなら、次のターンから被ダメージ+1(重複)`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    const p=S.p[pi],foes=S.p[1-pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
@@ -94,9 +94,9 @@ const PK={
    L(`　「人差し指」：${picked.z.name}を指令対象に指定${selected?`。指令カードは「${selected.n}」`: '。使用可能な手札カードなし'}`);
   }
  },
- caduceus:{t:()=>`人差し指の指令を達成して攻撃すると指令の加護+7、別カードで指令対象を攻撃した場合は+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
+ caduceus:{t:()=>`人差し指パッシブの条件を両方達成したなら指令の加護+7、片方なら+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
  oracle:{
-  t:()=>`ターン開始時、指令の加護が30なら特殊カードを追加する。初回は「Furioso-Replica」、指令沈着を得た後は強化版「Furioso-Crescendo」。使用後に指令の加護30を消費する`,
+  t:()=>`ターン開始時、指令の加護が30なら特殊カード「Furioso-Replica」を追加する。使用後に指令の加護30を消費する`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    c.abnState.directiveBlessing=Math.max(0,Math.min(30,Number(c.abnState.directiveBlessing)||0));
