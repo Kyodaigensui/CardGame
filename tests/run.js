@@ -487,6 +487,10 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('人差し指はランダム敵を指定し、手札のカード名を指令カードにする',lianResult.target&&lianResult.name==='斬撃'&&lianResult.hand.includes('斬撃'),JSON.stringify(lianResult));
  ok('カドゥケウスは両達成+7（15以上なら+11）、片方達成+2、未達成で永続被ダメージ+1',lianResult.fullBase===7&&lianResult.blessing===26&&lianResult.penalty===1&&lianResult.partialGain===2,JSON.stringify(lianResult));
 
+ const reverseIndexMatchCtx=makeCtx();
+ const reverseIndexMatchResult=ev(reverseIndexMatchCtx,`(()=>{startMatch();const lian=mkField(mkC(byKey['リアン'])),bee=mkField(mkC({name:'働き蜂',slot:0,hp:100,spd:[1,1],ps:[]}));S.p[0].chars=[lian];S.p[1].chars=[bee];S.turn=1;S.turnDamageTeam=[false,false];lian.sp=1;bee.sp=10;lian.abnState={directiveTargetPi:1,directiveTargetCi:0,directiveCardName:'指定カード',directiveBlessing:0,directiveResult:0};lian.card={n:'指定カード',c:0,d:[D('d',20,20)]};lian.tgt=0;lian.used=false;bee.card={n:'働き蜂の攻撃',c:0,d:[D('a',1,1)]};bee.tgt=0;bee.used=false;combat();return {blessing:lian.abnState.directiveBlessing,penalty:lian.abnState.directiveTakenBonus||0,log:S.log.filter(x=>x.includes('指令'))}})()`);
+ ok('敵側から先に攻撃してリアンが防御側として指令対象とマッチした場合も、指定カードの指令達成として加護+7を得る',reverseIndexMatchResult.blessing===7&&reverseIndexMatchResult.penalty===0,JSON.stringify(reverseIndexMatchResult));
+
  const oracleCtx=makeCtx();
  const oracleResult=ev(oracleCtx,`(()=>{startMatch();const c=mkField(mkC(byKey['リアン']));S.p[0].chars=[c];c.abnState={directiveBlessing:30};c.abnState.directiveComposure=true;PK.oracle.turn(c,PAS.oracle,0);return {burn:c.st.burn,bleed:c.st.bleed,blessing:c.abnState.directiveBlessing,special:S.p[0].specialHand.map(x=>x.id)}})()`);
  ok('指令沈着は毎ターン火傷3・出血3を付与し、加護30でFurioso-Crescendoを追加しても使用までは消費しない',oracleResult.burn===3&&oracleResult.bleed===3&&oracleResult.blessing===30&&oracleResult.special.includes('furiosoCrescendo'),JSON.stringify(oracleResult));
