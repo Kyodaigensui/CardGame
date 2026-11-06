@@ -615,10 +615,10 @@ const STN={
  mightyTigerBullet:{n:'猛虎標弾',i:'🐅',c:'#e9ad4b',t:'虎標弾と同じコスト軽減に加え、消費した弾数だけ使用カードの全ダイス値を上げる'},
  directiveTarget:{n:'指令対象',i:'📜',c:'#a77dd5',t:'人差し指によって指定された攻撃対象'},
  directiveCard:{n:'指令カード',i:'🪶',c:'#a77dd5',t:'人差し指によって指定されたカード。カード名の表示のみで追加効果はない'},
- directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'人差し指の加護。30を超えて獲得しない'},
- directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値が指令の加護÷10（四捨五入）だけ増加。「Furioso-Replica」の代わりに「Furioso-Crescendo」を獲得する'},
- directiveDamage:{n:'カルマ',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが1増加（戦闘中永続）'},
- axe:{n:'湧き上がる欲望',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ',legend:false},
+ directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30（30を超えて蓄積しない）'},
+ directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる。以後に追加されるFurioso系カードはFurioso-Crescendoに変化する'},
+ directiveDamage:{n:'指令の反動',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが増加（戦闘中永続）'},
+ axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ',legend:false},
  merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ',legend:false},
  parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ',legend:false},
  fairy:{n:'妖精の世話',i:'🧚',c:'#76c98c',t:'効果失敗時の固定ダメージ',legend:false},
@@ -983,10 +983,24 @@ function hit(pa,pb,B,dmg,A,die){
  if(die&&die.fx)fx(pa,A,die.fx,'ダイス的中時',B,cx);
  S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
 }
+// 人差し指：実際に指令対象とのマッチ／一方攻撃が発生した時点で達成を記録する。
+// 相手側の行動からマッチが始まった場合も、リアン側のカードを正しく判定する。
+function recordIndexFingerResult(owner,opponent,isMatch=false){
+ if(!owner||!opponent||!hasPasKind(owner,'indexFinger')||!owner.abnState)return;
+ const targetPi=S.p.findIndex(p=>p.chars.includes(opponent));
+ const targetCi=targetPi<0?-1:S.p[targetPi].chars.indexOf(opponent);
+ if(targetPi!==owner.abnState.directiveTargetPi||targetCi!==owner.abnState.directiveTargetCi)return;
+ const card=owner.card;
+ // マッチは守備・回避カードでも達成。一方攻撃は攻撃ダイスを実際に処理した場合のみ。
+ if(!isMatch&&!(card&&card.d&&card.d.some(d=>d.t==='a')))return;
+ const result=card&&card.n===owner.abnState.directiveCardName?2:1;
+ owner.abnState.directiveResult=Math.max(Number(owner.abnState.directiveResult)||0,result);
+}
 function oneSided(pa,A,pb,B,dice){
  for(const d of dice){
   if(!A.alive||!B.alive)return;
   if(d.t!=='a')continue;
+  recordIndexFingerResult(A,B,false);
   bleed(pa,A);
   if(!A.alive)return;
   const v=abnormalityRoll(A,d,false,B);
@@ -1018,6 +1032,9 @@ function abnormalityMatchWin(winner,loser,wi,li){
  if(hasAbn(winner,'filth')){if(!winner.abnState)winner.abnState={};if(winner.abnState.filthTurn!==S.turn){winner.abnState.filthTurn=S.turn;winner.abnState.filthCount=0}if(winner.abnState.filthCount<2){winner.abnState.filthCount++;S.p[1-wi].chars.forEach(enemy=>{if(!enemy.alive)return;if(!enemy.abnState)enemy.abnState={};enemy.abnState.speedDownNow=(enemy.abnState.speedDownNow||0)+1;enemy.sp=Math.max(0,(enemy.sp||0)-1);enemy.bf.vuln=(enemy.bf.vuln||0)+1;enemy.bf.rolldn=(enemy.bf.rolldn||0)+1;const added=addAbnBleed(enemy,1);L(`　「汚物」：${enemy.name}に速度-1・被ダメージ+1・出血+${added}・出目-1（${winner.abnState.filthCount}/2）`)});}}
 }
 function doMatch(pa,A,pb,B,da=A.card.d,db=B.card.d){
+ // マッチはどちらの速度が先でも成立する。リアンが防御側になった場合も達成扱いにする。
+ recordIndexFingerResult(A,B,true);
+ recordIndexFingerResult(B,A,true);
  abnormalityMatchStart(pa,A,pb,B);
  let i=0,j=0,winA=0,winB=0;
  while(i<da.length&&j<db.length&&A.alive&&B.alive){
@@ -1213,7 +1230,6 @@ function combat(){
    if(ownerPi===1-a.pi){qi=ownerPi;Q=S.p[qi];t=charmOwner;c.tgt=Q.chars.indexOf(charmOwner);L(`　「艶やか」：${c.name}の攻撃対象を魅了の付与者${charmOwner.name}に変更`)}
   }
   if(!t||!t.alive){t=Q.chars.find(x=>x.alive);if(!t){setActionSlot(c,0);continue}}
-  if(hasPasKind(c,'indexFinger')&&t&&t.alive&&c.abnState&&qi===c.abnState.directiveTargetPi&&S.p[qi].chars.indexOf(t)===c.abnState.directiveTargetCi&&c.card&&c.card.d&&c.card.d.some(d=>d.t==='a'))c.abnState.directiveResult=Math.max(Number(c.abnState.directiveResult)||0,c.card.n===c.abnState.directiveCardName?2:1);
   const tStates=actionStates(t),matchSlot=qi!==a.pi&&!(t.abnState&&t.abnState.skipThisTurn)?tStates.findIndex(st=>st.card&&!st.used&&st.tgt===a.ci):-1;
   if(matchSlot>=0){
    setActionSlot(t,matchSlot);t.used=true;
