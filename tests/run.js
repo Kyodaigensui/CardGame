@@ -581,6 +581,14 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('ミミクリー／ダ・カーポのカードデータが定義されている',cards.mimic[0]===19&&cards.mimic[1]===35&&cards.daCapo.length===3&&cards.mimicAwakening.join(',')==='d,e',JSON.stringify(cards));
 }
 
+
+// ───── サプライズプレゼント再付与テスト ─────
+{
+ const giftCtx=makeCtx();
+ const giftResult=ev(giftCtx,`(()=>{startMatch();const owner=mkField(mkC({name:'カード保有者',slot:0,hp:100,spd:[1,1],ps:[]})),first=mkField(mkC({name:'最初の相手',slot:0,hp:100,spd:[1,1],ps:[]})),killer=mkField(mkC({name:'倒した相手',slot:0,hp:100,spd:[1,1],ps:[]})),second=mkField(mkC({name:'次の相手',slot:0,hp:100,spd:[1,1],ps:[]}));owner.abn=[{id:'surprise_present',fx:{surprisePresent:true}}];owner.abnState={surpriseGiven:false};S.p[0].chars=[owner];S.p[1].chars=[first,killer,second];abnormalityMatchStart(0,owner,1,first);const firstGiven=first.abnState&&first.abnState.giftFrom===owner;first.alive=false;passGiftOnDeath(first,killer);const noTransfer=!killer.abnState||!killer.abnState.giftFrom;const reset=owner.abnState.surpriseGiven===false;abnormalityMatchStart(0,owner,1,second);return {firstGiven,noTransfer,reset,secondGiven:second.abnState&&second.abnState.giftFrom===owner}})()`);
+ ok('サプライズプレゼント所持者の死亡時は相手へ移らず、カード保有者が次のマッチで再付与できる',giftResult.firstGiven&&giftResult.noTransfer&&giftResult.reset&&giftResult.secondGiven,JSON.stringify(giftResult));
+}
+
 finish();
 function finish(){
  console.log(`\n合格 ${pass} / 失敗 ${fail}`);
