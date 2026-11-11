@@ -532,6 +532,52 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  ok('幻想体カード由来の効果は一覧から隠し、通常状態異常とリアンの効果は表示する',legendResult.hidden&&legendResult.ordinary,JSON.stringify(legendResult));
 }
 
+// ───── シャオ「龍生九子」リワーク ─────
+{
+ const c=makeCtx();
+ const lvCtx=ev(c,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ']));shao.ps=[PAS.emostack];S.p[0].chars=[shao];const attack={t:'a',r:[5,5]},defense={t:'d',r:[5,5]};S.p[0].lv=1;const lv1=[abnormalityRoll(shao,attack),abnormalityRoll(shao,defense)];S.p[0].lv=2;const lv2=[abnormalityRoll(shao,attack),abnormalityRoll(shao,defense)];S.p[0].lv=4;const lv4=[abnormalityRoll(shao,attack),abnormalityRoll(shao,defense)];return {lv1,lv2,lv4}})()`);
+ ok('龍生九子は感情Lv2で攻撃ダイス+1、Lv4で全ダイス+2に強化される',lvCtx.lv1.join(',')==='5,5'&&lvCtx.lv2.join(',')==='6,5'&&lvCtx.lv4.join(',')==='7,7',JSON.stringify(lvCtx));
+
+ const hitCtx=makeCtx();
+ const hitResult=ev(hitCtx,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ'])),enemy=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));shao.ps=[PAS.emostack];S.p[0].chars=[shao];S.p[1].chars=[enemy];S.p[0].lv=2;S.dm={};S.ev=[];S.fr=[];S.pv=0;S.turn=1;S.turnDamageTeam=[false,false];hit(0,1,enemy,5,shao,D('a',5,5));return {burn:enemy.st.burn,hp:enemy.hp}})()`);
+ ok('龍生九子は感情Lv2以上で攻撃ダイス的中時に火傷1を付与する',hitResult.burn===1&&hitResult.hp===95,JSON.stringify(hitResult));
+
+ const startCtx=makeCtx();
+ const startResult=ev(startCtx,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ'])),ally=mkField(mkC({name:'味方',slot:0,hp:100,spd:[1,1],ps:[]})),enemy=mkField(mkC({name:'敵',slot:0,hp:100,spd:[1,1],ps:[]}));S.p[0].chars=[shao,ally];S.p[1].chars=[enemy];S.p[0].lv=4;S.turn=3;shao.abnState={};PK.emostack.turn(shao,PAS.emostack,0);const first=[shao.st.burn,ally.st.burn,enemy.st.burn];PK.emostack.turn(shao,PAS.emostack,0);return {first,second:[shao.st.burn,ally.st.burn,enemy.st.burn],cards:S.p[0].specialHand.map(x=>x.id).sort(),granted:shao.abnState.xiaoSpecialCardsGranted}})()`);
+ ok('感情Lv4のターン開始時に場の生存者全員へ火傷3を1回付与し、三種の特殊カードを追加する',startResult.first.join(',')==='3,3,3'&&startResult.second.join(',')==='3,3,3'&&startResult.cards.join(',')==='xiaoPulao,xiaoTaotie,xiaoYazi'&&startResult.granted,JSON.stringify(startResult));
+
+ const cardCtx=makeCtx();
+ const cardDefs=ev(cardCtx,`(()=>({pulao:SPECIAL_CARD_DEFS.xiaoPulao,yazi:SPECIAL_CARD_DEFS.xiaoYazi,taotie:SPECIAL_CARD_DEFS.xiaoTaotie}))()`);
+ ok('蒲牢・睚眦・饕餮のカードコスト、広域攻撃方式、ダイス値と効果が定義されている',cardDefs.pulao.c===3&&cardDefs.pulao.aoe==='individual'&&cardDefs.pulao.d[0].r.join(',')==='6,9'&&cardDefs.pulao.d[0].fx[0][0]==='rolldn'&&cardDefs.yazi.c===5&&cardDefs.yazi.aoe==='individual'&&cardDefs.yazi.d.map(d=>d.r.join(',')).join(';')==='5,10;4,9'&&cardDefs.yazi.on[0][0]==='rollup'&&cardDefs.yazi.on[0][1]===2&&cardDefs.taotie.c===7&&cardDefs.taotie.aoe==='sum'&&cardDefs.taotie.d[0].r.join(',')==='25,30'&&cardDefs.taotie.d[0].fx[0][1]===8,JSON.stringify(cardDefs));
+
+ const areaCtx=makeCtx();
+ const areaResult=ev(areaCtx,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ'])),e1=mkField(mkC({name:'敵1',slot:0,hp:500,spd:[1,1],ps:[]})),e2=mkField(mkC({name:'敵2',slot:0,hp:500,spd:[1,1],ps:[]}));shao.ps=[PAS.emostack];S.p[0].chars=[shao];S.p[1].chars=[e1,e2];S.p[0].lv=4;shao.abnState={xiaoSpecialCardsGranted:true};S.p[0].specialHand=[{...SPECIAL_CARD_DEFS.xiaoPulao},{...SPECIAL_CARD_DEFS.xiaoYazi},{...SPECIAL_CARD_DEFS.xiaoTaotie}];S.p[0].cost=10;S.p[0].max=10;S.phase='decide';S.order=[0,1];S.stage=0;S.turnDamageTeam=[false,false];const assignOk=assignSpecial(0,0);pickTgt(0);S.turn=1;combat();const pulao={hp:[e1.hp,e2.hp],down:[e1.nx.rolldn,e2.nx.rolldn],assigned:shao.card&&shao.card.n};nextTurn();return {assignOk,pulao,remaining:S.p[0].specialHand.map(x=>x.id),gone:S.p[0].gone}})()`);
+ ok('蒲牢は特殊カードから装着でき、広域個別で敵へ次ターンダイス値-1を与え、使用後に消滅する',areaResult.assignOk&&areaResult.pulao.down.every(x=>x===1)&&areaResult.remaining.join(',')==='xiaoYazi,xiaoTaotie'&&areaResult.gone===1,JSON.stringify(areaResult));
+
+ const yaziCtx=makeCtx();
+ const yaziResult=ev(yaziCtx,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ'])),enemy=mkField(mkC({name:'敵',slot:0,hp:500,spd:[1,1],ps:[]}));shao.ps=[PAS.emostack];S.p[0].chars=[shao];S.p[1].chars=[enemy];S.p[0].lv=4;shao.abnState={xiaoSpecialCardsGranted:true};S.p[0].specialHand=[{...SPECIAL_CARD_DEFS.xiaoYazi}];S.p[0].cost=10;S.p[0].max=10;S.phase='decide';S.order=[0,1];S.stage=0;S.turnDamageTeam=[false,false];const assigned=assignSpecial(0,0);pickTgt(0);S.turn=1;combat();return {assigned,roll:shao.nx.roll,burn:enemy.st.burn,hp:enemy.hp}})()`);
+ ok('睚眦は使用時に次ターンダイス値+2、2ダイスの的中で火傷を付与する',yaziResult.assigned&&yaziResult.roll===2&&yaziResult.burn===2&&yaziResult.hp<500,JSON.stringify(yaziResult));
+
+ const taotieCtx=makeCtx();
+ const taotieResult=ev(taotieCtx,`(()=>{startMatch();const shao=mkField(mkC(byKey['シャオ'])),enemy=mkField(mkC({name:'敵',slot:0,hp:500,spd:[1,1],ps:[]}));shao.ps=[PAS.emostack];S.p[0].chars=[shao];S.p[1].chars=[enemy];S.p[0].lv=4;shao.abnState={xiaoSpecialCardsGranted:true};S.p[0].specialHand=[{...SPECIAL_CARD_DEFS.xiaoTaotie}];S.p[0].cost=10;S.p[0].max=10;S.phase='decide';S.order=[0,1];S.stage=0;S.turnDamageTeam=[false,false];const assigned=assignSpecial(0,0);pickTgt(0);S.turn=1;combat();return {assigned,burn:enemy.st.burn,hp:enemy.hp}})()`);
+ ok('饕餮は合算25〜30の単ダイスで的中時に火傷8を付与する',taotieResult.assigned&&taotieResult.burn===6&&taotieResult.hp<500,JSON.stringify(taotieResult));
+}
+
+// ───── 赤い霧E.G.Oの帰属・発現テスト ─────
+{
+ const egoCtx=makeCtx();
+ const egoResult=ev(egoCtx,`(()=>{startMatch();const red=mkField(mkC(byKey['カーリー'])),m=mkField(mkC(byKey['ロボトミーE.G.O:ミミック'])),d=mkField(mkC(byKey['ロボトミーE.G.O:ダ・カーポ']));S.p[0].chars=[red,m,d];S.p[0].lv=3;hook('turn',m,0);hook('turn',d,0);return {red:red.at,mp:m.ps.map(x=>x.n),dp:d.ps.map(x=>x.n),cards:S.p[0].specialHand.map(x=>x.id)}})()`);
+ ok('ミミック／ダ・カーポは赤い霧属性を持つパッシブ保持者として追加される',egoResult.red.includes('RedMist')&&egoResult.mp.includes('ミミック')&&egoResult.dp.includes('ダ・カーポ'),JSON.stringify(egoResult));
+ ok('赤い霧属性のパッシブ保有者が感情レベル3以上なら両E.G.O発現カードが追加される',egoResult.cards.includes('mimicAwakening')&&egoResult.cards.includes('daCapoAwakening'),JSON.stringify(egoResult));
+ const ownerAttrCtx=makeCtx();
+ const ownerAttrResult=ev(ownerAttrCtx,`(()=>{startMatch();const red=mkField(mkC(byKey['カーリー'])),m=mkField(mkC(byKey['ロボトミーE.G.O:ミミック'])),d=mkField(mkC(byKey['ロボトミーE.G.O:ダ・カーポ']));m.at=[];d.at=[];S.p[0].chars=[red,m,d];S.p[0].lv=3;hook('turn',m,0);hook('turn',d,0);return S.p[0].specialHand.map(x=>x.id)})()`);
+ ok('味方にカーリーがいても、パッシブ保有者自身が赤い霧属性でなければ発現カードは追加されない',ownerAttrResult.length===0,JSON.stringify(ownerAttrResult));
+ const attrDefs=ev(egoCtx,`['mimicAwakening','mimicry','daCapoAwakening','daCapo'].every(id=>SPECIAL_CARD_DEFS[id].at.includes('RedMist'))`);
+ ok('E.G.O発現カードと発現後の専用カードに赤い霧限定属性が設定されている',attrDefs);
+ const cards=ev(egoCtx,`({mimic:SPECIAL_CARD_DEFS.mimicry.d[0].r,daCapo:SPECIAL_CARD_DEFS.daCapo.d.map(x=>x.r),mimicAwakening:SPECIAL_CARD_DEFS.mimicAwakening.d.map(x=>x.t)})`);
+ ok('ミミクリー／ダ・カーポのカードデータが定義されている',cards.mimic[0]===19&&cards.mimic[1]===35&&cards.daCapo.length===3&&cards.mimicAwakening.join(',')==='d,e',JSON.stringify(cards));
+}
+
 finish();
 function finish(){
  console.log(`\n合格 ${pass} / 失敗 ${fail}`);
