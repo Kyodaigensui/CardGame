@@ -54,6 +54,8 @@ const PAS={
  vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
  rangedres:{n:'青い残響',k:'rangedres'},
  emostack:{n:'龍生九子',k:'emostack'},
+ mimicEgo:{n:'ミミック',k:'mimicEgo'},
+ daCapoEgo:{n:'ダ・カーポ',k:'daCapoEgo'},
  ailres:{n:'あなたの盾',k:'def',v:2},               // 守備ダイス（防御・回避）のダイス値+2
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
  burncheck:{n:'夜明け',k:'burncheck',v:2},
@@ -80,7 +82,7 @@ const PK={
  yourshield:{t:()=>`自分の速度が2以下、または相手より3以上遅いとき、マッチ対象変更ができる`},
  twinBlade:{t:()=>`マッチ勝利時、体力を1〜2回復`,matchWin:(c,x,loser)=>{const n=R(1,2),old=c.hp;c.hp=Math.min(c.max,c.hp+n);if(c.hp>old)L(`　「ツヴァイの剣術」：${c.name}はHP${c.hp-old}回復`)}},
  indexFinger:{
-  t:()=>`ターン開始時、対象可能なランダムな敵1体に「指令対象」を付与し、装着可能なカード一枚を手札から指定する。指定カードで指令対象を攻撃するとダイス値+3、指定外カードなら+1。どちらも満たしていないなら、次のターンから被ダメージ+1(重複)`,
+  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、属性条件を満たす自分の手札からカード1枚を「指令カード」に指定する。指定カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    const p=S.p[pi],foes=S.p[1-pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
@@ -94,9 +96,9 @@ const PK={
    L(`　「人差し指」：${picked.z.name}を指令対象に指定${selected?`。指令カードは「${selected.n}」`: '。使用可能な手札カードなし'}`);
   }
  },
- caduceus:{t:()=>`人差し指パッシブの条件を両方達成したなら指令の加護+7、片方なら+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
+ caduceus:{t:()=>`人差し指の指令を達成して攻撃すると指令の加護+7、別カードで指令対象を攻撃した場合は+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
  oracle:{
-  t:()=>`ターン開始時、指令の加護が30なら特殊カード「Furioso-Replica」を追加する。使用後に指令の加護30を消費する`,
+  t:()=>`ターン開始時、指令の加護が30なら特殊カードを追加する。初回は「Furioso-Replica」、指令沈着を得た後は強化版「Furioso-Crescendo」。使用後に指令の加護30を消費する`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    c.abnState.directiveBlessing=Math.max(0,Math.min(30,Number(c.abnState.directiveBlessing)||0));
@@ -132,14 +134,48 @@ const PK={
   dice:(c,x)=>{const p=ownerOf(c);return p&&p.lv>=x.lv?x.v:0}},
  // 感情レベルが上がるたびに、与ダメージ+v を「1ターン分」得る
  //   戦闘中に上がった → 次のターン1回ぶん（nx） / ターン開始時に上がった → そのターン（bf）
- // 感情レベル2ごとに全ダイス値+1
+ // シャオ「龍生九子」：感情レベル2・4で段階強化
 emostack:{
-  t:()=>`感情レベル2ごとにダイス値+1`,
-  dice:c=>{
+  t:()=>`感情レベル2以上：攻撃ダイス値+1、攻撃ダイス的中時に火傷1。感情レベル4以上：全ダイス値+2に強化。ターン開始時、場の全員に火傷3を付与し、特殊カード「蒲牢」「睚眦」「饕餮」を追加する`,
+  dice:(c,x,d)=>{
     const p=ownerOf(c);
-    return p?Math.floor(p.lv/2):0;
+    if(!p||p.lv<2)return 0;
+    return p.lv>=4?2:(d&&d.t==='a'?1:0);
+  },
+  lvup:(c,x,lv)=>{
+    if(lv===2)L(`　「龍生九子」：${c.name}の感情レベル2。攻撃ダイス強化と火傷付与を獲得`);
+    if(lv===4)L(`　「龍生九子」：${c.name}の感情レベル4。全ダイス強化・全体火傷・三種の特殊カードを解放`);
+  },
+  turn:(c,x,pi)=>{
+    const p=ownerOf(c);
+    if(!p||p.lv<4||!c.alive)return;
+    if(!c.abnState)c.abnState={};
+    if(c.abnState.xiaoBurnTurn!==S.turn){
+      c.abnState.xiaoBurnTurn=S.turn;
+      S.p.forEach(team=>team.chars.forEach(target=>{
+        if(!target.alive)return;
+        target.st.burn=(target.st.burn||0)+3;
+        L(`　「龍生九子」：${target.name}に火傷+3`);
+      }));
+    }
+    if(!c.abnState.xiaoSpecialCardsGranted){
+      const ids=['xiaoPulao','xiaoYazi','xiaoTaotie'];
+      ids.forEach(id=>registerSpecialCard(p,id));
+      c.abnState.xiaoSpecialCardsGranted=true;
+      L(`　「龍生九子」：特殊カード「蒲牢」「睚眦」「饕餮」を追加`);
+    }
   }
 },
+ mimicEgo:{
+  t:()=>`このパッシブの保有者が赤い霧属性で、陣営感情レベル3以上になると「E.G.O発現:ミミック」を追加する`,
+  lvup:(c,x,lv)=>{const p=ownerOf(c);if(!p||lv<3||!(c.at||[]).includes('RedMist'))return;if(!c.abnState)c.abnState={};if(!c.abnState.mimicEgoGranted){registerSpecialCard(p,'mimicAwakening');c.abnState.mimicEgoGranted=true;L(`　「ミミック」：赤い霧属性のパッシブ保有者が「E.G.O発現:ミミック」を追加`)}},
+  turn:(c,x,pi)=>{const p=S.p[pi];if(!p||p.lv<3||!(c.at||[]).includes('RedMist'))return;if(!c.abnState)c.abnState={};if(!c.abnState.mimicEgoGranted){registerSpecialCard(p,'mimicAwakening');c.abnState.mimicEgoGranted=true;L(`　「ミミック」：赤い霧属性のパッシブ保有者が「E.G.O発現:ミミック」を追加`)}}
+ },
+ daCapoEgo:{
+  t:()=>`このパッシブの保有者が赤い霧属性で、陣営感情レベル3以上になると「E.G.O発現:ダ・カーポ」を追加する`,
+  lvup:(c,x,lv)=>{const p=ownerOf(c);if(!p||lv<3||!(c.at||[]).includes('RedMist'))return;if(!c.abnState)c.abnState={};if(!c.abnState.daCapoEgoGranted){registerSpecialCard(p,'daCapoAwakening');c.abnState.daCapoEgoGranted=true;L(`　「ダ・カーポ」：赤い霧属性のパッシブ保有者が「E.G.O発現:ダ・カーポ」を追加`)}},
+  turn:(c,x,pi)=>{const p=S.p[pi];if(!p||p.lv<3||!(c.at||[]).includes('RedMist'))return;if(!c.abnState)c.abnState={};if(!c.abnState.daCapoEgoGranted){registerSpecialCard(p,'daCapoAwakening');c.abnState.daCapoEgoGranted=true;L(`　「ダ・カーポ」：赤い霧属性のパッシブ保有者が「E.G.O発現:ダ・カーポ」を追加`)}}
+ },
  lvbuff:{t:p=>`感情レベルが上がったとき、1ターンの間ダメージ+${p.v}`,need:['v'],
   lvup:(c,x)=>{const k=S.inCombat?'nx':'bf';c[k].dmgup+=x.v;L(`　${c.name}の${x.n}：${S.inCombat?'次のターン':'このターン'}ダメージ+${x.v}`)}},
  vibcheck:{
