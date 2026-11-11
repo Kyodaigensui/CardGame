@@ -8,7 +8,7 @@ const POOL1=[
  {name:"ユジン",title:"シ協会南部支部:部長",slot:1,at:['Shi'],hp:384,spd:[2,6],ps:['lowhp','startdmg','armor']},
  {name:"ヴァレンティン",title:"シ協会南部支部",slot:1,hp:53,spd:[2,6],ps:['lowhp1','startdmg1','armor']},
  {name:"カーリー",title:"赤い霧",size:1,at:['RedMist'],slot:1,hp:60,spd:[1,5],ps:['strongest','bloodlust','mistedge']},
- {name:"ロボトミーE.G.O:ミミック",title:"何もない",size:1,slot:0,hp:1,spd:[1,1],ps:['mimicEgo']},
+ {name:"ロボトミーE.G.O:ミミック",title:"「何もない」",size:1,slot:0,hp:1,spd:[1,1],ps:['mimicEgo']},
  {name:"ロボトミーE.G.O:ダ・カーポ",title:"静かなオーケストラ",size:1,slot:0,hp:1,spd:[1,1],ps:['daCapoEgo']},
  {name:"キムサッガッ",title:"剣契:頭目",size:1,slot:1,hp:55,spd:[3,8],ps:['hongoku','armor']}
 ];
