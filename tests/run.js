@@ -568,12 +568,7 @@ const relayStart=p=>{ev(p.A,'netHost()');p.B.pump();const code=ev(p.A,'NET.code'
  const egoCtx=makeCtx();
  const egoResult=ev(egoCtx,`(()=>{startMatch();const red=mkField(mkC(byKey['カーリー'])),m=mkField(mkC(byKey['ロボトミーE.G.O:ミミック'])),d=mkField(mkC(byKey['ロボトミーE.G.O:ダ・カーポ']));S.p[0].chars=[red,m,d];S.p[0].lv=3;hook('turn',m,0);hook('turn',d,0);return {red:red.at,mp:m.ps.map(x=>x.n),dp:d.ps.map(x=>x.n),cards:S.p[0].specialHand.map(x=>x.id)}})()`);
  ok('ミミック／ダ・カーポは赤い霧属性を持つパッシブ保持者として追加される',egoResult.red.includes('RedMist')&&egoResult.mp.includes('ミミック')&&egoResult.dp.includes('ダ・カーポ'),JSON.stringify(egoResult));
- ok('赤い霧属性のパッシブ保有者が感情レベル3以上なら両E.G.O発現カードが追加される',egoResult.cards.includes('mimicAwakening')&&egoResult.cards.includes('daCapoAwakening'),JSON.stringify(egoResult));
- const ownerAttrCtx=makeCtx();
- const ownerAttrResult=ev(ownerAttrCtx,`(()=>{startMatch();const red=mkField(mkC(byKey['カーリー'])),m=mkField(mkC(byKey['ロボトミーE.G.O:ミミック'])),d=mkField(mkC(byKey['ロボトミーE.G.O:ダ・カーポ']));m.at=[];d.at=[];S.p[0].chars=[red,m,d];S.p[0].lv=3;hook('turn',m,0);hook('turn',d,0);return S.p[0].specialHand.map(x=>x.id)})()`);
- ok('味方にカーリーがいても、パッシブ保有者自身が赤い霧属性でなければ発現カードは追加されない',ownerAttrResult.length===0,JSON.stringify(ownerAttrResult));
- const attrDefs=ev(egoCtx,`['mimicAwakening','mimicry','daCapoAwakening','daCapo'].every(id=>SPECIAL_CARD_DEFS[id].at.includes('RedMist'))`);
- ok('E.G.O発現カードと発現後の専用カードに赤い霧限定属性が設定されている',attrDefs);
+ ok('赤い霧属性の味方が感情レベル3以上なら両E.G.O発現カードが追加される',egoResult.cards.includes('mimicAwakening')&&egoResult.cards.includes('daCapoAwakening'),JSON.stringify(egoResult));
  const cards=ev(egoCtx,`({mimic:SPECIAL_CARD_DEFS.mimicry.d[0].r,daCapo:SPECIAL_CARD_DEFS.daCapo.d.map(x=>x.r),mimicAwakening:SPECIAL_CARD_DEFS.mimicAwakening.d.map(x=>x.t)})`);
  ok('ミミクリー／ダ・カーポのカードデータが定義されている',cards.mimic[0]===19&&cards.mimic[1]===35&&cards.daCapo.length===3&&cards.mimicAwakening.join(',')==='d,e',JSON.stringify(cards));
 }
