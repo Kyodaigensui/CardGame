@@ -645,6 +645,8 @@ const STN={
  directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30（30を超えて蓄積しない）'},
  directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる。以後に追加されるFurioso系カードはFurioso-Crescendoに変化する'},
  directiveDamage:{n:'指令の反動',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが増加（戦闘中永続）'},
+ mimicEgoBuff:{n:'E.G.O発現:ミミック',i:'🪞',c:'#9bd5e8',t:'ダイス値+1。攻撃命中時に出血1を付与し、与ダメージの1/3を回復。対象の出血3ごとに追加ダメージ+1（最大+3）'},
+ daCapoEgoBuff:{n:'E.G.O発現:ダ・カーポ',i:'🎼',c:'#c5a1df',t:'被ダメージ-1。攻撃命中時に振動1を付与。対象の振動4ごとに追加ダメージ+1（最大+3）'},
  axe:{n:'斧の反動',i:'🪓',c:'#c77b54',t:'攻撃が的中しなかったことによる固定ダメージ',legend:false},
  merry:{n:'愉快ないたずら',i:'🎭',c:'#bf8bc9',t:'最初のダイスで最小値を選ぶと受ける固定ダメージ',legend:false},
  parasol:{n:'日傘の反射',i:'☂️',c:'#8a9bb8',t:'攻撃を反射したダメージ',legend:false},
@@ -1390,6 +1392,8 @@ function chHTML(pi,ci,view){
  if(ad.directiveCardName)special.push(specialBadge('directiveCard',`指令カード：${ad.directiveCardName}`));
  if((ad.directiveBlessing||0)>0)special.push(specialBadge('directiveBlessing','指令の加護',`${ad.directiveBlessing}/30`));
  if(ad.directiveComposure)special.push(specialBadge('directiveComposure','指令沈着'));
+ if(ad.mimicBuff)special.push(specialBadge('mimicEgoBuff','E.G.O発現:ミミック'));
+ if(ad.daCapoBuff)special.push(specialBadge('daCapoEgoBuff','E.G.O発現:ダ・カーポ'));
  if((ad.directiveTakenBonus||0)>0)special.push(specialBadge('directiveDamage','被ダメージ',`+${ad.directiveTakenBonus}`));
  if(hasAbn(c,'gaze'))special.push(specialBadge('gazeTaken','与・被ダメージ×2'));
  const globalMusicTaken=globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
@@ -1595,7 +1599,7 @@ function renderRules(){
   <h3>行動阻害・被ダメージ増加などの特殊デバフ</h3>
   <ul>${['incap','freeze','iceShard','speedDown','hiveMark','requestMark','takenPlus','globalMusic','globalBlackening','gazeTaken'].filter(k=>STN[k].legend!==false).map(st).join('')}</ul>
   <h3>バフ・デバフ（1ターンだけ。多くは「次のターン」から効く）</h3>
-  <ul>${['dmgup','guard','roll','atk','rolldn','vuln','dmgdn','directiveTarget','directiveCard','directiveBlessing','directiveComposure','directiveDamage'].filter(k=>STN[k].legend!==false).map(st).join('')}</ul></section>
+  <ul>${['dmgup','guard','roll','atk','rolldn','vuln','dmgdn','directiveTarget','directiveCard','directiveBlessing','directiveComposure','directiveDamage','mimicEgoBuff','daCapoEgoBuff'].filter(k=>STN[k].legend!==false).map(st).join('')}</ul></section>
 
  <section><h2>9. 属性</h2>
   <p>キャラが持つ「属性」は、同じ属性が付いた専用カードを使えるようにします。</p>
