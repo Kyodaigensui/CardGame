@@ -75,7 +75,7 @@ const ABN_CARDS=[
  {id:'meal',n:'食事',hierarchy:'文学の階',mood:'mixed',levels:[3,4],desc:'攻撃が命中した相手が状態異常またはデバフを2種類以上持っている場合、戦場の全キャラクターがHPを2〜3回復する。',fx:{meal:true}},
  {id:'cocoon',n:'繭',hierarchy:'文学の階',mood:'positive',levels:[1,2],desc:'攻撃が命中し、ダイスの基礎出目が最大値だった場合、相手に次のターン速度-1・被ダメージ+1・出目-1を付与する。',fx:{cocoon:true}},
  {id:'vigilance',n:'警戒',hierarchy:'文学の階',mood:'mixed',levels:[3,4],desc:'このキャラクターとマッチする相手の出目-1。マッチ勝利時、50%の確率で相手に次のターン速度-1・被ダメージ+1を付与する。',fx:{vigilance:true}},
- {id:'surprise_present',n:'サプライズプレゼント',hierarchy:'文学の階',mood:'mixed',levels:[1,2],desc:'このカードを受け取ってから初めてマッチする相手にプレゼントを付与。持ち主が付与者以外とマッチすると40%で2〜7ダメージと出血2を受け、持ち主の死亡時は倒した相手へプレゼントが移る。',fx:{surprisePresent:true}},
+ {id:'surprise_present',n:'サプライズプレゼント',hierarchy:'文学の階',mood:'mixed',levels:[1,2],desc:'このカードを持つキャラクターが最初にマッチした相手へプレゼントを付与。プレゼントを持つキャラクターが付与者以外とマッチすると40%で2〜7ダメージと出血2を受ける。プレゼントを持つキャラクターが死亡すると、カード保有者が次のマッチで別の相手に再付与できる。',fx:{surprisePresent:true}},
  {id:'merry_trick',n:'愉快ないたずら',hierarchy:'文学の階',mood:'negative',levels:[3,4],desc:'各カードの最初のダイスは必ず最小値か最大値になる。最小値を選んだ場合、2〜7ダメージを受ける。',fx:{merryTrick:true}},
  {id:'filth',n:'汚物',hierarchy:'文学の階',mood:'mixed',levels:[5,5],desc:'マッチ勝利時、全ての敵に速度-1・被ダメージ+1・出血1・出目-1を付与する。1ターンに2回まで。',fx:{filth:true}},
  {id:'old_parasol',n:'古びた日傘',hierarchy:'文学の階',mood:'negativeMany',levels:[5,5],desc:'速度+2〜3。被ダメージ時、30%の確率でダメージを0にして、攻撃者へ同量を反射する。',fx:{oldParasol:true}},
@@ -866,11 +866,18 @@ function abnStatusKindCount(c){
  return kinds.size;
 }
 function passGiftOnDeath(c,recipient){
+ // プレゼントの所持者が死亡したら、倒した相手には移さず、
+ // 付与元の幻想体カード保有者が生存している場合だけ再付与権を戻す。
  if(!c||!c.abnState||!c.abnState.giftFrom)return false;
  const from=c.abnState.giftFrom;c.abnState.giftFrom=null;
- if(recipient&&recipient.alive&&recipient!==from){if(!recipient.abnState)recipient.abnState={};recipient.abnState.giftFrom=from;L(`　「サプライズプレゼント」：${recipient.name}にプレゼントが移った`);return true}
- const pi=S.p.findIndex(p=>p.chars.includes(c));if(pi>=0)S.p[pi].giftPending=from;
- L(`　「サプライズプレゼント」：プレゼントは次のマッチまで待機する`);return false;
+ if(from&&from.alive&&hasAbn(from,'surprise_present')){
+  if(!from.abnState)from.abnState={};
+  from.abnState.surpriseGiven=false;
+  L(`　「サプライズプレゼント」：${c.name}の死亡により、${from.name}が次のマッチで再付与できるようになった`);
+  return true;
+ }
+ L(`　「サプライズプレゼント」：付与者が不在のためプレゼントは消滅した`);
+ return false;
 }
 function hasStatusAbn(c){
  if(!c)return false;
@@ -1056,10 +1063,6 @@ function abnormalityMatchStart(pa,A,pb,B){
   owner.abnState.surpriseGiven=true;
   if(!opponent.abnState)opponent.abnState={};opponent.abnState.giftFrom=owner;
   L(`　「サプライズプレゼント」：${owner.name}が初マッチの相手${opponent.name}にプレゼントを付与`);
- });
- // 死亡時に移動待ちになったプレゼントを、その陣営が次にマッチした相手へ渡す。
- [[pa,A,pb,B],[pb,B,pa,A]].forEach(([pi,owner,oi,opponent])=>{
-  const p=S.p[pi];if(p&&p.giftPending&&opponent&&opponent.alive){if(!opponent.abnState)opponent.abnState={};opponent.abnState.giftFrom=p.giftPending;p.giftPending=null;L(`　「サプライズプレゼント」：${opponent.name}にプレゼントが移った`)}
  });
  // プレゼントを持つキャラクターが付与者以外とマッチすると、40%で損害を受ける。
  [[pa,A,pb,B],[pb,B,pa,A]].forEach(([pi,carrier,oi,opponent])=>{
