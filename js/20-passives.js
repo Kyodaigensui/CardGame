@@ -27,8 +27,8 @@ const PAS={
  tough:{n:'頑強',k:'maxhp',v:6},
  swift:{n:'俊敏',k:'spd',v:2},
  sharp:{n:'鋭利',k:'atk',v:1},
- wall:{n:'堅守',k:'def',v:2},
- float:{n:'身軽',k:'eva',v:2},
+ wall:{n:'堅守',k:'def',v:1},
+ float:{n:'身軽',k:'eva',v:1},
  armor:{n:'重装',k:'guard',v:1},
  heal:{n:'再生',k:'regen',v:2},
  lib:{n:'蔵書の加護',k:'ts',fx:[['draw',1]]},
@@ -36,7 +36,7 @@ const PAS={
  fervor:{n:'高揚',k:'ts',fx:[['coin',1]]},
  strongest:{n:'最強',k:'catchup',v:2},
  bloodlust:{n:'赤い霧',k:'killup',v:2},
- hongoku:{n:'本国剣術',k:'atk',v:2},
+ hongoku:{n:'本国剣術',k:'atk',v:1},
  yourshield:{n:'衝撃相殺グレートソード',k:'yourshield'},
  twinBlade:{n:'ツヴァイの剣術',k:'twinBlade'},
  debuffup:{n:'狙撃',k:'debuffup',v:1},
@@ -44,14 +44,14 @@ const PAS={
  ailmentup1:{n:'スティグマ工房の武器',k:'ailmentup',v:1},
  mistedge:{n:'E.G.Oプロトタイプ',k:'cardup',at:'RedMist',v:1},   // 赤い霧属性のカードのダイス値+v（at＝属性名。ATTRのキー）
  aim:{n:'精密射撃',k:'cardup',at:'ranged',v:1},         // 遠距離属性のカードのダイス値+v
- lowhp:{n:'死の目',k:'lowhp',pct:20,v:2},          // HPが最大値の pct% 以下のとき、ダイス値+v
+ lowhp:{n:'死の目',k:'lowhp',pct:20,v:1},          // HPが最大値の pct% 以下のとき、ダイス値+v
  lowhp1:{n:'死線足掻き',k:'lowhp',pct:80,v:1},
  startdmg:{n:'疲弊',k:'startdmg',pct:90},      // 戦闘開始時、HPが最大値の pct% 減少
  startdmg1:{n:'疲弊',k:'startdmg',pct:25},
  emolv:{n:'熱血',k:'emolv',lv:2,v:1},      // 感情レベルが lv 以上のとき、全ダイス値+v
  lvbuff:{n:'臨戦無退',k:'lvbuff',v:2},            // 感情レベルが上がったとき、1ターンの間ダメージ+v
  ailmentup2:{n:'制式服-リウ協会',k:'ailmentup',v:2},
- vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:2},
+ vibcheck:{n:'共鳴',k:'vibcheck',min:3,v:1},
  rangedres:{n:'青い残響',k:'rangedres'},
  emostack:{n:'龍生九子',k:'emostack'},
  mimicEgo:{n:'ミミック',k:'mimicEgo'},
@@ -60,9 +60,9 @@ const PAS={
  tornMemory:{n:'引き裂かれた追憶',k:'tornMemory'},
  graspGaze:{n:'倒れることすらできぬようつかむ掌',k:'graspGaze'},
  contemptAwe:{n:'お前ら全員面白いものを見せてやろう',k:'contemptAwe'},
- ailres:{n:'あなたの盾',k:'def',v:2},               // 守備ダイス（防御・回避）のダイス値+2
+ ailres:{n:'あなたの盾',k:'def',v:1},               // 守備ダイス（防御・回避）のダイス値+1
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
- burncheck:{n:'夜明け',k:'burncheck',v:2},
+ burncheck:{n:'夜明け',k:'burncheck',v:1},
  unstableego:{n:'不安定な自我の殻',k:'unstableEgo'},
  waxenwings:{n:'蜜蝋の翼',k:'waxenwings'},
  tianTui:{n:'天退星',k:'tianTui'},
@@ -117,7 +117,7 @@ const PK={
   kill:(A,x,B)=>{if(ownerOf(A)!==ownerOf(B))return;A.kb=(A.kb||0)+3;L(`　「残虐性凶弾」：味方${B.name}を撃破。${A.name}のダイス値+3（累計+${A.kb}）`)}
  },
  tornMemory:{
-  t:()=>`攻撃的中時、「引き裂かれた追憶」を1獲得。7以上ならターン開始時に特殊カード「対象調整射撃」を得る。`,
+  t:()=>`攻撃的中時、「引き裂かれた追憶」を1〜2獲得。7以上ならターン開始時に特殊カード「対象調整射撃」を得る。`,
   turn:(c,x,pi)=>{
    if(!c.alive||!c.abnState||(Number(c.abnState.tornMemory)||0)<7)return;
    const p=S.p[pi],held=(p.specialHand||[]).some(z=>z.id==='targetAdjustment')||p.chars.some(z=>actionStates(z).some(st=>st.card&&st.card.__specialCardId==='targetAdjustment'));
@@ -125,7 +125,7 @@ const PK={
   }
  },
  graspGaze:{
-  t:()=>`攻撃的中時、相手に「視線」を1付与。攻撃ダイスの的中時効果で視線を付与する場合、さらに1付与する。`
+  t:()=>`攻撃的中時、相手に「視線」を1〜2付与。攻撃ダイスの的中時効果で視線を付与する場合、さらに1付与する。`
  },
  contemptAwe:{
   t:()=>`相手側の「視線」の合計が7以上、または相手に「軽蔑」があれば「畏敬」を得る。「畏敬」中に味方が自身へ「対象調整射撃」を使うと、ダメージを0にして撃破効果を強制発動する。`,
@@ -221,7 +221,7 @@ emostack:{
   t:()=>`サルヴァドールが死亡し、フィリップが唯一の生存味方になったとき、「蜜蝋の翼」を得て、最大HPの50%分回復し、行動権2を得る`,
  },
  waxenwings:{
-  t:()=>`ダイス値+2。相手が火傷中ならさらに+2。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。サルヴァドール死亡時にフィリップが唯一の生存者なら、場の枠は1つのまま行動権2を得る`,
+  t:()=>`ダイス値+1。相手が火傷中ならさらに+1。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。サルヴァドール死亡時にフィリップが唯一の生存者なら、場の枠は1つのまま行動権2を得る`,
   turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach(p=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
  },
  tianTui:{

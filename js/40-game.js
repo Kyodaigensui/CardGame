@@ -822,7 +822,7 @@ function abnormalityRoll(c,d,inMatch=false,opponent=null){
  // 「警戒」を持つ相手とマッチすると、その相手のダイス値を1下げる。
  if(!ignoreBuffDebuffs&&inMatch&&opponent&&hasAbn(opponent,'vigilance'))bonus-=1;
  if(hasPasKind(c,'waxenwings')){
-  bonus+=2;if(opponent&&opponent.st&&(opponent.st.burn||0)>0)bonus+=2;
+  bonus+=1;if(opponent&&opponent.st&&(opponent.st.burn||0)>0)bonus+=1;
   if(d.t==='a'){
    const burnFx=fx=>Array.isArray(fx)&&fx.some(e=>Array.isArray(e)&&e[0]==='burn');
    if(burnFx(d.fx)||burnFx(c.card&&c.card.hit))bonus+=3;
@@ -985,9 +985,9 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&hasAbn(B,'old_parasol')&&A&&A.alive&&rnd()<0.3){const reflected=Math.min(A.hp,dmg),ai=S.p[pa].chars.indexOf(A),rdk=`${pa}-${ai}`;A.hp=Math.max(0,A.hp-reflected);S.dm[rdk]=(S.dm[rdk]||0)+reflected;if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pb]=true;L(`　「古びた日傘」：${B.name}が被ダメージを無効化し、${A.name}へ${reflected}ダメージを反射`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`);passGiftOnDeath(A,B);checkPhillipAwakening(pa)}return;}
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
  B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;
- if(A&&A.alive&&hasPasKind(A,'tornMemory')){if(!A.abnState)A.abnState={};A.abnState.tornMemory=(A.abnState.tornMemory||0)+1;L(`　「引き裂かれた追憶」：${A.name}は追憶+1（${A.abnState.tornMemory}）`)}
+ if(A&&A.alive&&hasPasKind(A,'tornMemory')){if(!A.abnState)A.abnState={};const gained=R(1,2);A.abnState.tornMemory=(A.abnState.tornMemory||0)+gained;L(`　「引き裂かれた追憶」：${A.name}は追憶+${gained}（${A.abnState.tornMemory}）`)}
  if(B.alive&&A&&die&&die.t==='a'&&hasPasKind(A,'graspGaze')){
-  const extra=die.fx&&die.fx.some(e=>e[0]==='gaze')?1:0;B.st.gaze=Math.min(7,(B.st.gaze||0)+1+extra);L(`　「倒れることすらできぬようつかむ掌」：${B.name}に視線+${1+extra}（${B.st.gaze}/7）`);refreshJiasForTarget(pb);
+  const extra=die.fx&&die.fx.some(e=>e[0]==='gaze')?1:0,gained=R(1,2)+extra;B.st.gaze=Math.min(7,(B.st.gaze||0)+gained);L(`　「倒れることすらできぬようつかむ掌」：${B.name}に視線+${gained}（${B.st.gaze}/7）`);refreshJiasForTarget(pb);
  }
  if(A&&A.card&&A.card.id==='daCapo'&&die&&die.t==='a'){
   if(die.r[0]===4&&die.r[1]===8){const targetPi=S.p.findIndex(q=>q.chars.includes(B));if(targetPi>=0){S.p[targetPi].cost=Math.max(0,S.p[targetPi].cost-2);L(`　「ダ・カーポ」：${S.p[targetPi].name}のコスト-2`)}}
@@ -1218,7 +1218,7 @@ function combat(){
     const firstDie=c.card.d[0];setActionSlot(c,a.slot);const firstValue=abnormalityRoll(c,firstDie,false,t);
     if(qi===a.pi&&hasPasKind(t,'contemptAwe')&&(Number(t.st&&t.st.awe)||0)>0){
      // 畏敬中のジア・ファンはダメージを受けず、撃破効果だけを強制発動する。
-     if(hasPasKind(c,'tornMemory')){c.abnState.tornMemory=(c.abnState.tornMemory||0)+1;L(`　「引き裂かれた追憶」：${c.name}は追憶+1（${c.abnState.tornMemory}）`)}
+     if(hasPasKind(c,'tornMemory')){const gained=R(1,2);c.abnState.tornMemory=(c.abnState.tornMemory||0)+gained;L(`　「引き裂かれた追憶」：${c.name}は追憶+${gained}（${c.abnState.tornMemory}）`)}
      forceDefeat(a.pi,c,qi,t,'「畏敬」');firstKilled=true;
     }else{
      L(`【対象調整射撃】${c.name}の第1ダイス[${firstValue}] → ${t.name}（指定対象のみ）`);
@@ -1511,7 +1511,7 @@ function chHTML(pi,ci,view){
  const sc=isMine&&S.handMode!=='special'&&S.sel!=null?p.hand[S.sel]:null;
  if(sc&&!isCh(sc)&&sc.req&&!c.at.includes(sc.req))cls+=' dimc';   // 使えないキャラを暗くする
  if(isMine&&c.alive)cls+=' mine'+(S.pend===ci?' pend':'');
- const pendingShooter=decide&&S.pend!=null?S.p[view].chars[S.pend]:null;const canPickTarget=!!(decide&&pendingShooter&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable)&&(pi!==view||(pi===view&&ci!==S.pend&&hasPasKind(pendingShooter,'cruelBullet'))));if(canPickTarget)cls+=' tgt';
+ const pendingShooter=decide&&S.pend!=null?S.p[view].chars[S.pend]:null;const canPickTarget=!!(decide&&pendingShooter&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable)&&(pi!==view||(pi===view&&ci!==S.pend&&hasPasKind(pendingShooter,'cruelBullet'))));if(canPickTarget)cls+=' tgt';if(canPickTarget&&pi===view)cls+=' ally-tgt';
  const ev=canPickTarget?`onclick="pickTgt(${ci},${pi})"`:isMine?`onclick="mine(${ci})" ondragover="event.preventDefault()" ondrop="event.preventDefault();assign(${ci},+event.dataTransfer.getData('text/plain'))"`:'';
  let a='';
  if(isMine||!decide||(NET.on&&pi===view)){
@@ -1765,40 +1765,44 @@ function renderDeck(){
 function drawArrows(){
  const svg=document.getElementById('arr'),bd=document.getElementById('board');if(!svg||!bd)return;
  const decide=S.phase==='decide',view=NET.on?NET.me:(typeof SOLO!=='undefined'&&SOLO.active?0:(decide?act():0)),B=bd.getBoundingClientRect();
- let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker></defs>';
+ let h='<defs><marker id="as" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#a879ff"/></marker><marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#35c9d0"/></marker><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d9a93f"/></marker><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#d65a4f"/></marker><marker id="af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0L9,4.5L0,9z" fill="#ff77aa"/></marker></defs>';
  const center=r=>({x:r.left+r.width/2,y:r.top+r.height/2});
  const matchingSlot=(sourceCi,target)=>{
   if(!target||(target.actionRights||1)<=1)return null;
   const i=actionStates(target).findIndex(st=>st.card&&st.tgt===sourceCi);
   return i>=0?i:null;
  };
- const add=(pi,ci,qi,ti,area=null,slot=0,targetSlot=null)=>{
+ const add=(pi,ci,qi,ti,area=null,slot=0,targetSlot=null,friendly=false)=>{
   const sourceChar=S.p[pi].chars[ci],targetChar=S.p[qi].chars[ti];
   const a=document.getElementById(`ch-${pi}-${ci}`),b=document.getElementById(`ch-${qi}-${ti}`);if(!a||!b)return;
   const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect(),ac=center(ra),bc=center(rb),sourceAbove=ac.y<bc.y;
   // 複数行動権側は、対面側の該当スロット中央から線を出す。
   const sourceEl=sourceChar&&sourceChar.actionRights>1?document.getElementById(`ch-${pi}-${ci}-slot-${slot}`):null;
   const sr=sourceEl?sourceEl.getBoundingClientRect():null,sc=sr?center(sr):null;
-  const x1=(sc?sc.x:ac.x)-B.left;
-  const y1=(sc?sc.y:(sourceAbove?ra.bottom:ra.top))-B.top;
-  // 相手も複数行動権なら、こちらを対象にしている行動権の中央に接続する。
-  // 対応するマッチがない場合や単独行動権の場合は、キャラ枠の対面辺中央へ接続する。
   const targetEl=targetSlot!=null&&targetChar&&targetChar.actionRights>1?document.getElementById(`ch-${qi}-${ti}-slot-${targetSlot}`):null;
   const tr=targetEl?targetEl.getBoundingClientRect():null,tc=tr?center(tr):null;
+  const x1=(sc?sc.x:ac.x)-B.left;
+  const y1=(sc?sc.y:(sourceAbove?ra.bottom:ra.top))-B.top;
   const x2=(tc?tc.x:bc.x)-B.left;
   const y2=(tc?tc.y:(sourceAbove?rb.top:rb.bottom))-B.top;
-  const own=pi===view,stroke=area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(own?'#d9a93f':'#d65a4f'),marker=area==='sum'?'as':area==='individual'?'ai':(own?'ag':'ar');
-  h+=`<line class="action-arrow${sourceEl?' split-action-arrow':''}" data-source-slot="${slot+1}"${targetSlot!=null?' data-target-slot="'+(targetSlot+1)+'"':''} x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+  // 味方を狙う矢印はピンクの破線＋専用矢印で敵への矢印と区別する。
+  const stroke=friendly?'#ff77aa':area==='sum'?'#a879ff':area==='individual'?'#35c9d0':(pi===view?'#d9a93f':'#d65a4f');
+  const marker=friendly?'af':area==='sum'?'as':area==='individual'?'ai':(pi===view?'ag':'ar');
+  h+=`<line class="action-arrow${sourceEl?' split-action-arrow':''}${friendly?' friendly-target-arrow':''}" data-source-slot="${slot+1}"${targetSlot!=null?' data-target-slot="'+(targetSlot+1)+'"':''} x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${friendly?4:3}"${friendly?' stroke-dasharray="8 5"':''} stroke-linecap="round" marker-end="url(#${marker})"/>`;
  };
  if(S.anim){
   const f=S.anim.i>=0&&S.anim.frames[S.anim.i];
-  if(f&&f.ar)add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null,f.arSlot&&f.arSlot[0]||0,f.arTargetSlot&&f.arTargetSlot[1]!=null?f.arTargetSlot[1]:null);
+  if(f&&f.ar){const friendly=f.ar[0][0]===f.ar[1][0];add(f.ar[0][0],f.ar[0][1],f.ar[1][0],f.ar[1][1],f.aoe||null,f.arSlot&&f.arSlot[0]||0,f.arTargetSlot&&f.arTargetSlot[1]!=null?f.arTargetSlot[1]:null,friendly)}
  }else[0,1].forEach(pi=>{
   if(decide&&!(pi===view||(S.stage===1&&pi===S.order[0])))return;
   S.p[pi].chars.forEach((c,ci)=>actionStates(c).forEach((st,slot)=>{
    if(!st.card||st.tgt==null)return;
-   if(st.card.aoe)S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe,slot,null)});
-   else {const target=S.p[1-pi].chars[st.tgt],targetSlot=matchingSlot(ci,target);add(pi,ci,1-pi,st.tgt,null,slot,targetSlot)}
+   // 通常の広域攻撃は敵全員へ。対象調整射撃は指定された第1対象への矢印を表示する。
+   if(st.card.aoe&&st.card.aoe!=='targetAdjust')S.p[1-pi].chars.forEach((enemy,ti)=>{if(enemy.alive)add(pi,ci,1-pi,ti,st.card.aoe,slot,null,false)});
+   else {
+    const targetPi=st.tgtPi==null?1-pi:st.tgtPi,target=S.p[targetPi]&&S.p[targetPi].chars[st.tgt];
+    if(target&&target.alive){const targetSlot=matchingSlot(ci,target);add(pi,ci,targetPi,st.tgt,null,slot,targetSlot,targetPi===pi)}
+   }
   }));
  });
  svg.innerHTML=h;
