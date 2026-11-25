@@ -108,7 +108,7 @@ function netApplyDecide(m){
    if(!Array.isArray(op))throw new Error('op');
    if(op[0]==='A')assign(op[1],op[2]);
    else if(op[0]==='AS'){if(!assignSpecial(op[1],op[2]))throw new Error('special')}
-   else if(op[0]==='P'){S.pend=op[1];pickTgt(op[2])}
+   else if(op[0]==='P'){S.pend=op[1];pickTgt(op[2],op[3])}
    else if(op[0]==='R')redir(op[1]);
    else if(op[0]==='U')unassign(op[1],{stopPropagation(){}});
    else if(op[0]==='ABN'){

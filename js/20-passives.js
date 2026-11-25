@@ -56,6 +56,10 @@ const PAS={
  emostack:{n:'龍生九子',k:'emostack'},
  mimicEgo:{n:'ミミック',k:'mimicEgo'},
  daCapoEgo:{n:'ダ・カーポ',k:'daCapoEgo'},
+ cruelBullet:{n:'残虐性凶弾',k:'cruelBullet'},
+ tornMemory:{n:'引き裂かれた追憶',k:'tornMemory'},
+ graspGaze:{n:'倒れることすらできぬようつかむ掌',k:'graspGaze'},
+ contemptAwe:{n:'お前ら全員面白いものを見せてやろう',k:'contemptAwe'},
  ailres:{n:'あなたの盾',k:'def',v:2},               // 守備ダイス（防御・回避）のダイス値+2
  burnres:{n:'耐火',k:'ailres',v:2,kinds:['burn']},      // kinds を書くと、その種類だけ（burn / bleed / rupt）
  burncheck:{n:'夜明け',k:'burncheck',v:2},
@@ -82,7 +86,7 @@ const PK={
  yourshield:{t:()=>`自分の速度が2以下、または相手より3以上遅いとき、マッチ対象変更ができる`},
  twinBlade:{t:()=>`マッチ勝利時、体力を1〜2回復`,matchWin:(c,x,loser)=>{const n=R(1,2),old=c.hp;c.hp=Math.min(c.max,c.hp+n);if(c.hp>old)L(`　「ツヴァイの剣術」：${c.name}はHP${c.hp-old}回復`)}},
  indexFinger:{
-  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、装着可能な手札のカード一枚を「指令カード」に指定する。指令カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
+  t:()=>`ターン開始時、対象不可能な敵を除くランダムな敵1体に「指令対象」を付与し、属性条件を満たす自分の手札からカード1枚を「指令カード」に指定する。指定カードで攻撃するとダイス値+3、別カードで攻撃すると+1。どちらもできなければ、次のターンから被ダメージ+1（重複・永続）`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    const p=S.p[pi],foes=S.p[1-pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
@@ -98,7 +102,7 @@ const PK={
  },
  caduceus:{t:()=>`人差し指の指令を達成して攻撃すると指令の加護+7、別カードで指令対象を攻撃した場合は+2。指令の加護が15以上なら獲得量1.5倍。指令の加護は最大30`},
  oracle:{
-  t:()=>`ターン開始時、指令の加護が30なら特殊カードを追加する。特殊カード使用後に指令の加護30を消費する`,
+  t:()=>`ターン開始時、指令の加護が30なら特殊カードを追加する。初回は「Furioso-Replica」、指令沈着を得た後は強化版「Furioso-Crescendo」。使用後に指令の加護30を消費する`,
   turn:(c,x,pi)=>{
    if(!c.alive)return;if(!c.abnState)c.abnState={};
    c.abnState.directiveBlessing=Math.max(0,Math.min(30,Number(c.abnState.directiveBlessing)||0));
@@ -107,6 +111,25 @@ const PK={
    const cardId=c.abnState.directiveComposure?'furiosoCrescendo':'furiosoReplica';
    if((c.abnState.directiveBlessing||0)>=30&&!alreadyHeld&&registerSpecialCard(p,cardId))L(`　「神託代行者」：特殊カード「${cardId==='furiosoCrescendo'?'Furioso-Crescendo':'Furioso-Replica'}」を追加（指令の加護は使用後に消費）`)
   }
+ },
+ cruelBullet:{
+  t:()=>`攻撃対象に味方を指定できる（広域攻撃の自動対象には含まれない）。味方への与ダメージ+200%。味方を撃破するたび、ダイス値+3（永続）`,
+  kill:(A,x,B)=>{if(ownerOf(A)!==ownerOf(B))return;A.kb=(A.kb||0)+3;L(`　「残虐性凶弾」：味方${B.name}を撃破。${A.name}のダイス値+3（累計+${A.kb}）`)}
+ },
+ tornMemory:{
+  t:()=>`攻撃的中時、「引き裂かれた追憶」を1獲得。7以上ならターン開始時に特殊カード「対象調整射撃」を得る。`,
+  turn:(c,x,pi)=>{
+   if(!c.alive||!c.abnState||(Number(c.abnState.tornMemory)||0)<7)return;
+   const p=S.p[pi],held=(p.specialHand||[]).some(z=>z.id==='targetAdjustment')||p.chars.some(z=>actionStates(z).some(st=>st.card&&st.card.__specialCardId==='targetAdjustment'));
+   if(!held&&registerSpecialCard(p,'targetAdjustment'))L(`　「引き裂かれた追憶」：${c.name}は特殊カード「対象調整射撃」を獲得`);
+  }
+ },
+ graspGaze:{
+  t:()=>`攻撃的中時、相手に「視線」を1付与。攻撃ダイスの的中時効果で視線を付与する場合、さらに1付与する。`
+ },
+ contemptAwe:{
+  t:()=>`相手側の「視線」の合計が7以上、または相手に「軽蔑」があれば「畏敬」を得る。「畏敬」中に味方が自身へ「対象調整射撃」を使うと、ダメージを0にして撃破効果を強制発動する。`,
+  turn:(c)=>{if(c.alive&&typeof refreshJiaAwe==='function')refreshJiaAwe(c)}
  },
  // ── 動作（フック）を持つタイプ ──
  maxhp:{t:p=>`最大HP+${p.v}`,
@@ -195,10 +218,10 @@ emostack:{
  ailres:{t:p=>`${p.kinds?p.kinds.map(k=>STN[k].n).join('・'):'状態異常（火傷・出血・破裂）'}で受けるダメージ-${p.v}`,need:['v'],
  ailres:(c,x,kind)=>(!x.kinds||x.kinds.includes(kind))?x.v:0},
  unstableEgo:{
-  t:()=>`サルヴァドールが死亡し、フィリップが唯一の生存味方になったとき、「蜜蝋の翼」を帰属枠を無視して獲得する`,
+  t:()=>`サルヴァドールが死亡し、フィリップが唯一の生存味方になったとき、「蜜蝋の翼」を得て、最大HPの50%分回復し、行動権2を得る`,
  },
  waxenwings:{
-  t:()=>`行動権が2に増加。ダイス値+2、相手が火傷中ならさらに+2、火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。`,
+  t:()=>`ダイス値+2。相手が火傷中ならさらに+2。火傷を付与する攻撃ダイスはさらに+3。ターン開始時、場の生存者全員に火傷3を付与。自身の被ダメージ1.2倍。サルヴァドール死亡時にフィリップが唯一の生存者なら、場の枠は1つのまま行動権2を得る`,
   turn:(c,x,pi)=>{if(!c.abnState)c.abnState={};if(c.abnState.waxenBurnTurn===S.turn)return;c.abnState.waxenBurnTurn=S.turn;const n=3;S.p.forEach(p=>p.chars.forEach(z=>{if(!z.alive)return;if(!z.st)z.st={burn:0,bleed:0,rupt:0,vib:0};z.st.burn=(z.st.burn||0)+n;L(`　「蜜蝋の翼」：${z.name}に火傷+${n}`)}))},
  },
  tianTui:{

@@ -2,18 +2,18 @@ const key=x=>x.n||x.name,byKey={};
 [...SKILLS,...CHARS].forEach(c=>byKey[key(c)]=c);
 
 // フィリップ「蜜蝋の翼」用の複数行動スロット。通常キャラは従来どおり1スロット。
-const ACTION_FIELDS=['card','tgt','used','hitFired','stock','redirBy','tgt0','effectiveCost','bulletSpent','bulletKind','bulletDieBonus','bulletCommitted'];
+const ACTION_FIELDS=['card','tgt','tgtPi','tgtPi0','used','hitFired','stock','redirBy','tgt0','effectiveCost','bulletSpent','bulletKind','bulletDieBonus','bulletCommitted'];
 const actionStates=c=>c?(c._actionStates||[c]):[];
 const setActionSlot=(c,i)=>{if(c&&c._actionStates)c._actionSlot=Math.max(0,Math.min(c._actionStates.length-1,Number(i)||0))};
 const setupActionSlots=(c,count=2)=>{
  if(!c||c._actionStates)return;
  const states=[{
-  card:c.card||null,tgt:c.tgt==null?null:c.tgt,used:!!c.used,
+  card:c.card||null,tgt:c.tgt==null?null:c.tgt,tgtPi:c.tgtPi==null?null:c.tgtPi,tgtPi0:c.tgtPi0==null?null:c.tgtPi0,used:!!c.used,
   hitFired:Array.isArray(c.hitFired)?c.hitFired:[],stock:c.stock||null,
   redirBy:c.redirBy==null?null:c.redirBy,tgt0:c.tgt0==null?null:c.tgt0,
   effectiveCost:c.effectiveCost==null?null:c.effectiveCost,bulletSpent:c.bulletSpent||0,bulletKind:c.bulletKind||null,bulletDieBonus:c.bulletDieBonus||0,bulletCommitted:!!c.bulletCommitted
  }];
- for(let i=1;i<count;i++)states.push({card:null,tgt:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null,effectiveCost:null,bulletSpent:0,bulletKind:null,bulletDieBonus:0,bulletCommitted:false});
+ for(let i=1;i<count;i++)states.push({card:null,tgt:null,tgtPi:null,tgtPi0:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null,effectiveCost:null,bulletSpent:0,bulletKind:null,bulletDieBonus:0,bulletCommitted:false});
  Object.defineProperty(c,'_actionStates',{value:states,writable:true,configurable:true,enumerable:true});
  Object.defineProperty(c,'_actionSlot',{value:0,writable:true,configurable:true,enumerable:true});
  for(const field of ACTION_FIELDS){
@@ -83,8 +83,10 @@ const ABN_CARDS=[
 ];
 const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
 const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
-const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。最終ダイス以外はバフ・デバフの影響を受けない。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>({...D('a',3,6),__ignoreBuffDebuffs:true})).concat([D('a',5,10)])},furiosoCrescendo:{id:'furiosoCrescendo',n:'Furioso-Crescendo',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。Furioso-Replicaより全ダイスの出目が+1され、バフ・デバフの影響を受ける。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,7)).concat([D('a',6,11)])},xiaoPulao:{id:'xiaoPulao',n:'蒲牢',c:3,once:true,aoe:'individual',desc:'広域攻撃：個別。6〜9の単ダイス。的中した相手に次のターン、ダイス値-1。使用時に消滅する',d:[D('a',6,9,[['rolldn',1]])]},xiaoYazi:{id:'xiaoYazi',n:'睚眦',c:5,once:true,aoe:'individual',desc:'広域攻撃：個別。5〜10、4〜9の2ダイス。的中時に火傷1。使用時、次のターンにダイス値+2。使用時に消滅する',on:[['rollup',2]],d:[D('a',5,10,[['burn',1]]),D('a',4,9,[['burn',1]])]},xiaoTaotie:{id:'xiaoTaotie',n:'饕餮',c:7,once:true,aoe:'sum',desc:'広域攻撃：合算。25〜30の単ダイス。的中時に火傷8。使用時に消滅する',d:[D('a',25,30,[['burn',8]])]},mimicAwakening:{id:'mimicAwakening',at:['RedMist'],n:'E.G.O発現:ミミック',c:5,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト6回復し、強化状態と「ミミクリー」を獲得する',d:[D('d',8,15),D('e',8,15)]},mimicry:{id:'mimicry',at:['RedMist'],n:'ミミクリー',c:5,once:true,desc:'単ダイス19〜35。的中時、与えたダメージ分HP回復し、出血10を付与する',d:[D('a',19,35,[['bleed',10]])]},daCapoAwakening:{id:'daCapoAwakening',at:['RedMist'],n:'E.G.O発現:ダ・カーポ',c:4,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト5回復し、強化状態と「ダ・カーポ」を獲得する',d:[D('d',8,15),D('e',8,15)]},daCapo:{id:'daCapo',at:['RedMist'],n:'ダ・カーポ',c:6,once:true,aoe:'individual',desc:'広域攻撃：個別。4〜8（コスト-2）、4〜9（次ターン速度1固定）、5〜9（このターンダイス値-1）の3ダイス。使用時に消滅する',d:[D('a',4,8),D('a',4,9),D('a',5,9)]}};
+const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。最終ダイス以外はバフ・デバフの影響を受けない。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>({...D('a',3,6),__ignoreBuffDebuffs:true})).concat([D('a',5,10)])},furiosoCrescendo:{id:'furiosoCrescendo',n:'Furioso-Crescendo',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。Furioso-Replicaより全ダイスの出目が+1され、バフ・デバフの影響を受ける。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,7)).concat([D('a',6,11)])},xiaoPulao:{id:'xiaoPulao',n:'蒲牢',c:3,once:true,aoe:'individual',desc:'広域攻撃：個別。6〜9の単ダイス。的中した相手に次のターン、ダイス値-1。使用時に消滅する',d:[D('a',6,9,[['rolldn',1]])]},xiaoYazi:{id:'xiaoYazi',n:'睚眦',c:5,once:true,aoe:'individual',desc:'広域攻撃：個別。5〜10、4〜9の2ダイス。的中時に火傷1。使用時、次のターンにダイス値+2。使用時に消滅する',on:[['rollup',2]],d:[D('a',5,10,[['burn',1]]),D('a',4,9,[['burn',1]])]},xiaoTaotie:{id:'xiaoTaotie',n:'饕餮',c:7,once:true,aoe:'sum',desc:'広域攻撃：合算。25〜30の単ダイス。的中時に火傷8。使用時に消滅する',d:[D('a',25,30,[['burn',8]])]},mimicAwakening:{id:'mimicAwakening',at:['RedMist'],n:'E.G.O発現:ミミック',c:5,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト6回復し、強化状態と「ミミクリー」を獲得する',d:[D('d',8,15),D('e',8,15)]},mimicry:{id:'mimicry',at:['RedMist'],n:'ミミクリー',c:5,once:true,desc:'単ダイス19〜35。的中時、与えたダメージ分HP回復し、出血10を付与する',d:[D('a',19,35,[['bleed',10]])]},daCapoAwakening:{id:'daCapoAwakening',at:['RedMist'],n:'E.G.O発現:ダ・カーポ',c:4,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト5回復し、強化状態と「ダ・カーポ」を獲得する',d:[D('d',8,15),D('e',8,15)]},daCapo:{id:'daCapo',at:['RedMist'],n:'ダ・カーポ',c:6,once:true,aoe:'individual',desc:'広域攻撃：個別。4〜8（コスト-2）、4〜9（次ターン速度1固定）、5〜9（このターンダイス値-1）の3ダイス。使用時に消滅する',d:[D('a',4,8),D('a',4,9),D('a',5,9)]},targetAdjustment:{id:'targetAdjustment',n:'対象調整射撃',c:0,req:'ranged',once:true,aoe:'targetAdjust',desc:'広域攻撃：特殊。1ダイス目は指定対象のみ、2ダイス目はランダムな敵1体。1ダイス目で対象を撃破した場合、2ダイス目は敵全員にも命中する。使用後、引き裂かれた追憶をすべて消耗する',d:[D('a',4,9),D('a',10,11)]}};
 const registerSpecialCard=(p,id)=>{const c=SPECIAL_CARD_DEFS[id];if(!p||!c||!Array.isArray(p.specialHand))return false;if(p.specialHand.some(x=>x.id===id))return false;p.specialHand.push({...c});return true};
+function refreshJiaAwe(jia){if(!S||!jia||!hasPasKind(jia,'contemptAwe'))return;const pi=S.p.findIndex(p=>p.chars.includes(jia));if(pi<0)return;const foes=S.p[1-pi].chars;const gaze=foes.reduce((n,z)=>n+(Number(z.st&&z.st.gaze)||0),0),hasContempt=foes.some(z=>(Number(z.st&&z.st.contempt)||0)>0);if(gaze>=7||hasContempt){if(!jia.st)jia.st={};if(!(jia.st.awe>0)){jia.st.awe=1;L(`　「お前ら全員面白いものを見せてやろう」：${jia.name}は畏敬を得た`)}}}
+function refreshJiasForTarget(targetPi){if(!S)return;S.p[1-targetPi].chars.forEach(refreshJiaAwe)}
 const defDeck=pool=>{const d={};SKILLS.slice(0,10).forEach(s=>d[s.n]=1);pool.slice(0,5).forEach(c=>d[c.name]=1);return d};   // 初期デッキ：技10＋キャラ5
 // ===== プレイヤー名とデッキの保存 =====
 // 名前ごとにデッキ2つを、このブラウザ（localStorage）へ保存する。別の端末・別のブラウザへは自動では引き継がれない（バックアップで持ち運べる）
@@ -407,7 +409,7 @@ function assignSpecial(ci,hi){
   if(used(p)-oldCost+effectiveCost>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}。虎標弾適用後コスト${effectiveCost}）`;render();return false}
   logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
   st.card=assigned;st.effectiveCost=effectiveCost;st.bulletSpent=bullet.spent;st.bulletKind=bullet.kind;st.bulletDieBonus=bullet.dieBonus;st.bulletCommitted=false;
-  st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+  st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
   S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`行動${slot+1}の攻撃対象を選んでください`;
   render();return true;
  }
@@ -419,8 +421,18 @@ function assignSpecial(ci,hi){
   if(used(p)-oldCost+def.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}）`;render();return false}
   const assigned={...def,__specialCardId:card.id,d:def.d.map(d=>({...d,r:[...d.r],fx:d.fx?d.fx.map(x=>[...x]):d.fx}))};
   logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
-  st.card=assigned;st.effectiveCost=assigned.c;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=true;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+  st.card=assigned;st.effectiveCost=assigned.c;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=true;st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
   S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`「${assigned.n}」を${c.name}に装着しました`;render();return true;
+ }
+ if(card.id==='targetAdjustment'){
+  if(!hasPasKind(c,'cruelBullet')||c.name!=='クボ'){S.msg='「対象調整射撃」は「残虐性凶弾」を持つクボだけが使用できます';render();return false}
+  const states=actionStates(c);let slot=states.findIndex(st=>!st.card);if(slot<0)slot=0;
+  const st=states[slot],old=st.card,oldCost=old?(st.effectiveCost==null?old.c:st.effectiveCost):0,def=SPECIAL_CARD_DEFS.targetAdjustment;
+  if(used(p)-oldCost+def.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}）`;render();return false}
+  const assigned={...def,__specialCardId:'targetAdjustment',d:def.d.map(d=>({...d,r:[...d.r]}))};
+  logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
+  Object.assign(st,{card:assigned,effectiveCost:0,bulletSpent:0,bulletKind:null,bulletDieBonus:0,bulletCommitted:true,tgt:null,tgtPi:null,tgtPi0:null,used:false,hitFired:[],stock:null,redirBy:null,tgt0:null});
+  S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg='「対象調整射撃」の第1対象を選んでください';render();return true;
  }
  if(['xiaoPulao','xiaoYazi','xiaoTaotie'].includes(card.id)){
   if(!hasPasKind(c,'emostack')||!ownerOf(c)||ownerOf(c).lv<4){S.msg='「龍生九子」を持ち、感情レベル4以上のキャラクターだけが使用できます';render();return false}
@@ -430,7 +442,7 @@ function assignSpecial(ci,hi){
   if(used(p)-oldCost+assigned.c>p.cost){S.msg=`コストが足りません（残り${p.cost-used(p)+oldCost}）`;render();return false}
   logOp(['AS',ci,hi]);p.specialHand.splice(hi,1);if(old)returnAssignedCard(p,old);
   st.card=assigned;st.effectiveCost=assigned.c;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=true;
-  st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+  st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
   S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.handMode=p.specialHand.length?'special':'normal';S.msg=`「${assigned.n}」の攻撃対象を選んでください`;
   render();return true;
  }
@@ -476,7 +488,7 @@ function assign(ci,hi){
  let assigned=card;
  if(card.n==='超絶猛虎殺撃乱斬'&&hasPasKind(c,'tianTui'))assigned={...card,aoe:'individual',__rayhonAoe:true,d:card.d.map(d=>({...d,r:[...d.r],fx:d.fx?d.fx.map(x=>[...x]):d.fx}))};
  st.card=assigned;st.effectiveCost=effectiveCost;st.bulletSpent=bullet.spent;st.bulletKind=bullet.kind;st.bulletDieBonus=bullet.dieBonus;st.bulletCommitted=false;
- st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
+ st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;
  S.pend=ci;S.pendActionSlot=slot;S.sel=null;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render();
 }
 function mine(ci){
@@ -492,27 +504,29 @@ const redirKey=(ci,slot)=>`${ci}:${slot}`;
 function undoRedir(yi,slot=null){
  const y=S.p[act()].chars[yi];
  const keys=new Set(slot==null?actionStates(y).map((_,i)=>redirKey(yi,i)):[redirKey(yi,slot)]);
- S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(keys.has(st.redirBy)){st.tgt=st.tgt0;st.redirBy=null;st.tgt0=null}}));
+ S.p[1-act()].chars.forEach(z=>actionStates(z).forEach(st=>{if(keys.has(st.redirBy)){st.tgt=st.tgt0;st.tgtPi=st.tgtPi0;st.redirBy=null;st.tgt0=null;st.tgtPi0=null}}));
 }
-function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)returnAssignedCard(p,st.card);st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
+function unassign(ci,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct())return;logOp(['U',ci]);undoRedir(ci);const p=S.p[act()],c=p.chars[ci];actionStates(c).forEach(st=>{if(st.card)returnAssignedCard(p,st.card);st.card=null;st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});if(S.pend===ci)S.pend=null;S.pendActionSlot=0;S.msg='';render()}
 function chooseTarget(ci,slot,e){if(e&&e.stopPropagation)e.stopPropagation();if(!canAct()||NET.on)return;const c=S.p[act()].chars[ci],st=actionStates(c)[slot];if(!c||!st||!st.card)return;S.pend=ci;S.pendActionSlot=slot;S.msg=`行動${slot+1}の攻撃対象を選んでください`;render()}
-function pickTgt(ci){
+function pickTgt(ci,targetPi=null){
  if(!canAct()||S.p[act()].pendingAbn)return;
- if(S.pend==null||!S.p[1-act()].chars[ci].alive||(S.p[1-act()].chars[ci].abnState&&S.p[1-act()].chars[ci].abnState.soloUntargetable))return;
- const yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[1-act()].chars[ci],yst=actionStates(y)[slot];
- logOp(['P',yi,ci]);undoRedir(yi,slot);
- // 相手の行動が決まっていて、自分の速度が相手より規定値以上高いなら、相手のマッチ対象を変更できる。
- const swordRedirect=hasPasKind(z,'yourshield')&&(z.sp<=2||y.sp-z.sp>=3);
- const speedRedirect=y.sp-z.sp>=C.REDIR;
- const zs=actionStates(z),zSlots=zs.map((st,i)=>({st,i})).filter(({st})=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&(speedRedirect||swordRedirect)).map(x=>x.i);
+ if(S.pend==null)return;
+ const pi=targetPi==null?1-act():Number(targetPi),yi=S.pend,slot=S.pendActionSlot||0,y=S.p[act()].chars[yi],z=S.p[pi]&&S.p[pi].chars[ci],yst=y&&actionStates(y)[slot];
+ if(!z||!z.alive||(z.abnState&&z.abnState.soloUntargetable)||!yst)return;
+ if(pi===act()&&(!hasPasKind(y,'cruelBullet')||ci===yi))return;
+ logOp(['P',yi,ci,pi]);undoRedir(yi,slot);
+ // 味方指定はクボの固有効果。速度差による対象変更は敵を指定した場合だけ行う。
+ const swordRedirect=pi!==act()&&hasPasKind(z,'yourshield')&&(z.sp<=2||y.sp-z.sp>=3);
+ const speedRedirect=pi!==act()&&y.sp-z.sp>=C.REDIR;
+ const zs=actionStates(z),zSlots=pi!==act()?zs.map((st,i)=>({st,i})).filter(({st})=>st.card&&st.tgt!=null&&st.tgt!==yi&&st.redirBy==null&&!noSpd(st.card)&&!noSpd(yst.card)&&(speedRedirect||swordRedirect)).map(x=>x.i):[];
  if(zSlots.length){S.ask={yi,zi:ci,ySlot:slot,zSlots,reason:swordRedirect?'「衝撃相殺グレートソード」または速度差':'速度差'};S.pend=null;S.pendActionSlot=0;S.msg='';render();const q=document.querySelector('.ask');if(q)q.scrollIntoView({block:'center'});return}
- yst.tgt=ci;S.pend=null;S.pendActionSlot=0;S.msg='';render();
+ yst.tgt=ci;yst.tgtPi=pi;S.pend=null;S.pendActionSlot=0;S.msg='';render();
 }
 function redir(yes,zSlot=null){
  if(!canAct()||!S.ask)return;const a=S.ask,choices=a.zSlots||[a.zSlot||0];if(yes&&zSlot==null)zSlot=choices[0];if(yes&&!choices.includes(zSlot))return;logOp(['R',yes,zSlot]);
  const y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],ys=actionStates(y)[a.ySlot||0];
- ys.tgt=a.zi;
- if(yes){const zs=actionStates(z)[zSlot];zs.tgt0=zs.tgt;zs.tgt=a.yi;zs.redirBy=redirKey(a.yi,a.ySlot||0)}
+ ys.tgt=a.zi;ys.tgtPi=1-act();
+ if(yes){const zs=actionStates(z)[zSlot];zs.tgt0=zs.tgt;zs.tgtPi0=zs.tgtPi;zs.tgt=a.yi;zs.tgtPi=act();zs.redirBy=redirKey(a.yi,a.ySlot||0)}
  S.ask=null;render();
 }
 const askHTML=()=>{if(!S.ask)return '';const a=S.ask,y=S.p[act()].chars[a.yi],z=S.p[1-act()].chars[a.zi],choices=a.zSlots||[a.zSlot||0];return `<div class="ask"><b>${y.name}・行動${(a.ySlot||0)+1}</b>（速度${y.sp}）は <b>${z.name}</b>（速度${z.sp}）に対し、${a.reason||'速度差'}でマッチ対象を変更できます。変更する行動権を選んでください。${choices.map(slot=>`<div style="margin-top:6px"><b>${z.name}・行動${slot+1}</b><button class="go" onclick="redir(true,${slot})">この行動の対象を${y.name}に変更する</button></div>`).join('')}<button class="sub" style="margin-top:8px" onclick="redir(false)">変更しない</button></div>`};
@@ -624,6 +638,9 @@ const STN={
  bleed:{n:'出血',i:'🩸',c:'#e0455a',t:'行動のたびに数値分のダメージを受ける。ターン終了時に数値が約2/3に減る'},
  rupt:{n:'破裂',i:'💥',c:'#b17cf0',t:'ダメージを受けるたびに数値分の追加ダメージを受ける。ターン終了時に数値が約2/3に減る'},
  vib:{n:'振動',i:'〰',c:'#5cc8f5',t:'「振動爆発」を持つダイスでダメージを受けると、数値÷2枚の手札が山札に戻り、振動は消える'},
+ gaze:{n:'視線',i:'👁',c:'#b17cf0',t:'1につき与ダメージ・被ダメージ+10%。最大7。ターン終了時に7なら全て除去し、次のターンに軽蔑を得る'},
+ contempt:{n:'軽蔑',i:'😒',c:'#9b83aa',t:'与ダメージ・被ダメージ-50%。ターン終了時に数値が減少する'},
+ awe:{n:'畏敬',i:'✧',c:'#d4a6d8',t:'与ダメージ・被ダメージ-70%。ターン終了時に数値が減少する'},
  incap:{n:'行動不能',i:'⛔',c:'#e05252',t:'このターン行動を決定・実行できない'},
  freeze:{n:'凍結',i:'❄',c:'#89c8ff',t:'氷の女王が生存している間、行動できない'},
  iceShard:{n:'氷の欠片',i:'🧊',c:'#78c7ff',t:'3以上になると次のターン行動不能になり、氷の欠片をすべて失う',legend:false},
@@ -644,6 +661,7 @@ const STN={
  directiveCard:{n:'指令カード',i:'🪶',c:'#a77dd5',t:'人差し指によって指定されたカード。カード名の表示のみで追加効果はない'},
  directiveBlessing:{n:'指令の加護',i:'✦',c:'#d8b45a',t:'神託代行者が蓄積するトークン。最大30（30を超えて蓄積しない）'},
  directiveComposure:{n:'指令沈着',i:'🕯',c:'#bd9c78',t:'毎ターン開始時に火傷3・出血3。指令カードの攻撃ダイス値を指令の加護÷10（四捨五入）だけ上げる。以後に追加されるFurioso系カードはFurioso-Crescendoに変化する'},
+ tornMemory:{n:'引き裂かれた追憶',i:'🪶',c:'#c5a1df',t:'数値1につき与ダメージ+10%。ターン経過で減少しない'},
  directiveDamage:{n:'指令の反動',i:'💢',c:'#d96a6a',t:'人差し指の指令を達成できなかった回数分、受けるダメージが増加（戦闘中永続）'},
  mimicEgoBuff:{n:'E.G.O発現:ミミック',i:'🪞',c:'#9bd5e8',t:'ダイス値+1。攻撃命中時に出血1を付与し、与ダメージの1/3を回復。対象の出血3ごとに追加ダメージ+1（最大+3）'},
  daCapoEgoBuff:{n:'E.G.O発現:ダ・カーポ',i:'🎼',c:'#c5a1df',t:'被ダメージ-1。攻撃命中時に振動1を付与。対象の振動4ごとに追加ダメージ+1（最大+3）'},
@@ -667,11 +685,11 @@ const addSt=(tc,k,v)=>{if(tc&&tc.alive)tc.st[k]+=v};
 // 効果の種類を増やすときは、FXT（表示）とFXA（処理）に1行ずつ足す。debuffは tc（相手）に、buffは自分(ch)に付く
 const FXT={draw:v=>`ドロー${v}`,cost:v=>`コスト+${v}`,heal:v=>`HP+${v}`,coin:v=>`コイン+${v}`,
  dmgup:v=>`次ターン与ダメージ+${v}`,guardup:v=>`次ターン被ダメージ-${v}`,rollup:v=>`次ターンのマッチ数値+${v}`,atk:v=>`次ターンの攻撃ダイス+${v}`,
- burn:v=>`相手に火傷${v}`,bleed:v=>`相手に出血${v}`,rupt:v=>`相手に破裂${v}`,vib:v=>`相手に振動${v}`,vibex:()=>'振動爆発',
+ burn:v=>`相手に火傷${v}`,bleed:v=>`相手に出血${v}`,rupt:v=>`相手に破裂${v}`,vib:v=>`相手に振動${v}`,gaze:v=>`相手に視線${v}`,contempt:v=>`相手に軽蔑${v}`,vibex:()=>'振動爆発',
  rolldn:v=>`相手の次ターンのダイス値-${v}`,vuln:v=>`相手の次ターンの被ダメージ+${v}`,dmgdn:v=>`相手の次ターンの与ダメージ-${v}`};
 const FXA={draw:(p,pi,ch,v)=>draw(p,v),cost:(p,pi,ch,v)=>{p.cost=Math.min(p.max,p.cost+v)},heal:(p,pi,ch,v)=>{ch.hp=Math.min(ch.max,ch.hp+v)},coin:(p,pi,ch,v)=>coin(pi,v),
  dmgup:(p,pi,ch,v)=>{ch.nx.dmgup+=v},guardup:(p,pi,ch,v)=>{ch.nx.guard+=v},rollup:(p,pi,ch,v)=>{ch.nx.roll+=v},atk:(p,pi,ch,v)=>{ch.nx.atk+=v},
- burn:(p,pi,ch,v,tc)=>addSt(tc,'burn',v+pv(ch,'ailmentup')),bleed:(p,pi,ch,v,tc)=>addAbnBleed(tc,v+pv(ch,'ailmentup')),rupt:(p,pi,ch,v,tc)=>addSt(tc,'rupt',v+pv(ch,'ailmentup')),vib:(p,pi,ch,v,tc)=>addSt(tc,'vib',v+pv(ch,'ailmentup')),   // 状態異常付与量(ailmentup)を加算
+ burn:(p,pi,ch,v,tc)=>addSt(tc,'burn',v+pv(ch,'ailmentup')),bleed:(p,pi,ch,v,tc)=>addAbnBleed(tc,v+pv(ch,'ailmentup')),rupt:(p,pi,ch,v,tc)=>addSt(tc,'rupt',v+pv(ch,'ailmentup')),vib:(p,pi,ch,v,tc)=>addSt(tc,'vib',v+pv(ch,'ailmentup')),gaze:(p,pi,ch,v,tc)=>{if(tc&&tc.alive){tc.st.gaze=Math.min(7,(tc.st.gaze||0)+v);const tpi=S.p.findIndex(q=>q.chars.includes(tc));if(tpi>=0)refreshJiasForTarget(tpi)}},contempt:(p,pi,ch,v,tc)=>{if(tc&&tc.alive){tc.st.contempt=(tc.st.contempt||0)+v;const tpi=S.p.findIndex(q=>q.chars.includes(tc));if(tpi>=0)refreshJiasForTarget(tpi)}},   // 状態異常付与量(ailmentup)を加算
 
  vibex:(p,pi,ch,v,tc)=>vibex(tc),
  rolldn:(p,pi,ch,v,tc)=>addNx(tc,'rolldn',v+pv(ch,'debuffup')),vuln:(p,pi,ch,v,tc)=>addNx(tc,'vuln',v+pv(ch,'debuffup')),dmgdn:(p,pi,ch,v,tc)=>addNx(tc,'dmgdn',v+pv(ch,'debuffup'))};   // デバフ付与量パッシブ(debuffup)を加算
@@ -686,7 +704,7 @@ const FXA={draw:(p,pi,ch,v)=>draw(p,v),cost:(p,pi,ch,v)=>{p.cost=Math.min(p.max,
 //   {and:['kill',['dmg',8]]}  複数条件をすべて満たすとき
 // 例："斬撃":{hit:[['draw',1],['coin',2,'kill']]}   ← ドローは的中で、コイン+2は倒したときだけ
 // 条件を増やすときは COND に1行足す（t＝表示文、f＝判定。x={A:使用者,B:相手,dmg:与ダメージ}）
-const STK={burn:'火傷',bleed:'出血',rupt:'破裂',vib:'振動',cold:'寒気',spore:'胞子',incap:'行動不能',freeze:'凍結',iceShard:'氷の欠片',speedDown:'速度低下',hiveMark:'蜂の標的',requestMark:'依頼対象',takenPlus:'被ダメージ増加',globalMusic:'音楽の影響',globalBlackening:'黒化の影響',gazeTaken:'眼差し'};
+const STK={burn:'火傷',bleed:'出血',rupt:'破裂',vib:'振動',cold:'寒気',spore:'胞子',incap:'行動不能',freeze:'凍結',iceShard:'氷の欠片',speedDown:'速度低下',hiveMark:'蜂の標的',requestMark:'依頼対象',takenPlus:'被ダメージ増加',globalMusic:'音楽の影響',globalBlackening:'黒化の影響',gazeTaken:'眼差し',gaze:'視線',contempt:'軽蔑',awe:'畏敬'};
 const statusValue=(c,k)=>{
  if(c&&c.st&&Number(c.st[k])>0)return Number(c.st[k]);
  const a=c&&c.abnState||{};
@@ -713,9 +731,9 @@ const COND={
 const condKey=c=>Array.isArray(c)?c:[c];
 const condTest=(c,x)=>c.and?c.and.every(y=>condTest(y,x)):(([k,...a])=>COND[k].f(x,...a))(condKey(c));
 const condText=c=>c.and?c.and.map(condText).join('、かつ'):(([k,...a])=>COND[k].t(...a))(condKey(c));
-const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib/cold/spore/incap/freeze/iceShard/speedDown/hiveMark/requestMark/takenPlus/globalMusic/globalBlackening/gazeTaken のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
+const condOk=(c,path)=>{if(c.and){c.and.forEach(y=>condOk(y,path));return}const [k,a]=condKey(c);if(!COND[k])throw new Error(`未定義の条件「${k}」（${path}）`);if((k==='foeSt'||k==='foeStGe')&&!STK[a])throw new Error(`${k}の状態は burn/bleed/rupt/vib/cold/spore/incap/freeze/iceShard/speedDown/hiveMark/requestMark/takenPlus/globalMusic/globalBlackening/gazeTaken/gaze/contempt/awe のどれか（${path}）`);if(k==='foeStGe'&&!Number.isFinite(condKey(c)[2]))throw new Error(`foeStGe は ['foeStGe','vib',5] のように数値が必要です（${path}）`)};
 const fxText=(l,showCond=true)=>l.map(([k,v,c])=>(showCond&&c?`［${condText(c)}］`:'')+FXT[k](v)).join('、');
-const fxLine=(s,dl=true)=>(s.aoe?`<div class="fx area-${s.aoe}">広域攻撃：${s.aoe==='sum'?'合算':s.aoe==='random'?'乱射':'個別'}（広域攻撃は遠距離攻撃より先に発動）</div>`:'')+(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
+const fxLine=(s,dl=true)=>(s.aoe?`<div class="fx area-${s.aoe}">広域攻撃：${s.aoe==='sum'?'合算':s.aoe==='random'?'乱射':s.aoe==='targetAdjust'?'特殊':'個別'}（広域攻撃は遠距離攻撃より先に発動）</div>`:'')+(s.req?`<div class="fx req">${ATTR[s.req].n}属性限定${ATTR[s.req].noSpeed?'（速度無視で先に発動）':''}</div>`:'')+(s.once?'<div class="fx">使い捨て（使用すると消滅）</div>':'')+(s.on?`<div class="fx">発動時：${fxText(s.on)}</div>`:'')+(s.hit?`<div class="fx">的中時：${fxText(s.hit)}</div>`:'')+(dl?(s.d||[]).map((x,i)=>x.fx?`<div class="fx">ダイス${i+1}的中時：${fxText(x.fx)}</div>`:'').join(''):'');
 function fx(pi,ch,list,label,tc,ctx){
  if(!list)return;const p=S.p[pi],x=ctx||{A:ch,B:tc,dmg:0};
  list=list.filter(e=>!e[2]||condTest(e[2],x));       // 条件を満たす効果だけ発動
@@ -925,6 +943,15 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&hasAbn(A,'vines')&&A.abnState&&A.abnState.vineTarget===B){const extra=R(2,4);dmg+=extra;L(`　「蔓」：${B.name}への追加ダメージ+${extra}`)}
  const up=A.bf.dmgup-A.bf.dmgdn;
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
+ if(dmg>0){
+  let mult=1;
+  const memoryStacks=Math.max(0,Number(A&&A.abnState&&A.abnState.tornMemory)||0);
+  if(hasPasKind(A,'tornMemory')&&memoryStacks>0)mult*=1+memoryStacks*0.1;
+  if(pa===pb&&hasPasKind(A,'cruelBullet'))mult*=3;
+  if(A&&A.st){if(A.st.gaze>0)mult*=1+Math.min(7,A.st.gaze)*0.1;if(A.st.contempt>0)mult*=0.5;if(A.st.awe>0)mult*=0.3}
+  if(B.st){if(B.st.gaze>0)mult*=1+Math.min(7,B.st.gaze)*0.1;if(B.st.contempt>0)mult*=0.5;if(B.st.awe>0)mult*=0.3}
+  if(mult!==1){dmg=Math.max(0,Math.round(dmg*mult));L(`　視線・軽蔑・畏敬などの効果で与ダメージを補正（×${mult.toFixed(2)}）`)}
+ }
  if(dmg>0&&hasAbn(A,'frost_sword')&&(B.abnState&&(B.abnState.speedDownNow||B.abnState.frostSpeedDown))){const extra=R(1,2);dmg+=extra;L(`　霜の剣：速度低下中の${B.name}に追加ダメージ+${extra}`)}
  if(dmg>0&&hasAbn(A,'gaze')){dmg*=2;L(`　${A.name}の「眼差し」：与ダメージ2倍`)}
  if(dmg>0&&A.card&&A.card.req==='ranged'&&B.ps.some(p=>p.k==='rangedres')){
@@ -958,6 +985,10 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&hasAbn(B,'old_parasol')&&A&&A.alive&&rnd()<0.3){const reflected=Math.min(A.hp,dmg),ai=S.p[pa].chars.indexOf(A),rdk=`${pa}-${ai}`;A.hp=Math.max(0,A.hp-reflected);S.dm[rdk]=(S.dm[rdk]||0)+reflected;if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pb]=true;L(`　「古びた日傘」：${B.name}が被ダメージを無効化し、${A.name}へ${reflected}ダメージを反射`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`);passGiftOnDeath(A,B);checkPhillipAwakening(pa)}return;}
  const dk=`${pb}-${S.p[pb].chars.indexOf(B)}`;S.dm[dk]=(S.dm[dk]||0)+dmg;
  B.hp-=dmg;if(!B.abnState)B.abnState={};B.abnState.damagedTurn=S.turn;
+ if(A&&A.alive&&hasPasKind(A,'tornMemory')){if(!A.abnState)A.abnState={};A.abnState.tornMemory=(A.abnState.tornMemory||0)+1;L(`　「引き裂かれた追憶」：${A.name}は追憶+1（${A.abnState.tornMemory}）`)}
+ if(B.alive&&A&&die&&die.t==='a'&&hasPasKind(A,'graspGaze')){
+  const extra=die.fx&&die.fx.some(e=>e[0]==='gaze')?1:0;B.st.gaze=Math.min(7,(B.st.gaze||0)+1+extra);L(`　「倒れることすらできぬようつかむ掌」：${B.name}に視線+${1+extra}（${B.st.gaze}/7）`);refreshJiasForTarget(pb);
+ }
  if(A&&A.card&&A.card.id==='daCapo'&&die&&die.t==='a'){
   if(die.r[0]===4&&die.r[1]===8){const targetPi=S.p.findIndex(q=>q.chars.includes(B));if(targetPi>=0){S.p[targetPi].cost=Math.max(0,S.p[targetPi].cost-2);L(`　「ダ・カーポ」：${S.p[targetPi].name}のコスト-2`)}}
   if(die.r[0]===4&&die.r[1]===9){if(!B.abnState)B.abnState={};B.abnState.speedFixedNext=true;L(`　「ダ・カーポ」：${B.name}の次ターン速度を1に固定`)}
@@ -967,7 +998,7 @@ function hit(pa,pb,B,dmg,A,die){
  if(A&&A.abnState&&A.abnState.daCapoBuff){const vv=1+pv(A,'ailmentup');B.st.vib=(B.st.vib||0)+vv;L(`　「E.G.O発現:ダ・カーポ」：${B.name}に振動+${vv}`)}
  if(A&&A.card&&A.card.id==='mimicry'){const heal=Math.min(A.max-A.hp,dmg);if(heal>0){A.hp+=heal;L(`　「ミミクリー」：${A.name}はHP${heal}回復`)}}
 
-if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pa]=true;coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');
+if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pa]=true;if(pa!==pb){coin(pa,1);moodEvent(pa,'positive');moodEvent(pb,'negative');}
  // 龍生九子：感情レベル2以上なら攻撃ダイス的中時に火傷1を付与する。
  if(A&&die&&die.t==='a'&&hasPasKind(A,'emostack')){const owner=ownerOf(A);if(owner&&owner.lv>=2){const burn=1+pv(A,'ailmentup');B.st.burn=(B.st.burn||0)+burn;L(`　「龍生九子」：${B.name}に火傷+${burn}`)}}
  // 金属の響き：的中した相手へ次ターンの速度・ダイス値低下を付与。
@@ -1013,7 +1044,7 @@ if(!S.turnDamageTeam)S.turnDamageTeam=[false,false];S.turnDamageTeam[pa]=true;co
  if(hasAbn(A,'pale_hand')){if(!A.abnState)A.abnState={};const targetIndex=S.p[pb].chars.indexOf(B);if(A.abnState.paleTargetIndex!==targetIndex){A.abnState.paleTargetIndex=targetIndex;A.abnState.paleHits=0}A.abnState.paleHits=(A.abnState.paleHits||0)+1;if(A.abnState.paleHits>=3){const extra=R(3,10);A.abnState.paleHits=0;B.hp-=extra;S.dm[dk]=(S.dm[dk]||0)+extra;L(`　「青ざめた手」：${B.name}に追加ダメージ${extra}`);if(B.hp<=0){B.hp=0;B.alive=false;L(`　${B.name}は倒れた`)}}}
  // 罪悪感：受けた攻撃ダメージの1/3を攻撃者へ反射（反射自体は再反射しない）
  if(hasAbn(B,'guilt')&&A&&A.alive){const reflected=Math.floor(dmg/3);if(reflected>0){A.hp=Math.max(0,A.hp-reflected);L(`　「罪悪感」：${A.name}に${reflected}反射ダメージ`);if(A.hp<=0){A.alive=false;L(`　${A.name}は倒れた`)}}}
- if(B.hp<=0){B.hp=0;B.alive=false;moodEvent(pa,'positive',2);moodEvent(pb,'negative');L(`　${B.name}は倒れた`);passGiftOnDeath(B,A);coin(pa,2);coin(pb,2);
+ if(B.hp<=0){B.hp=0;B.alive=false;if(pa!==pb){moodEvent(pa,'positive',2);moodEvent(pb,'negative');coin(pa,2);coin(pb,2);}L(`　${B.name}は倒れた`);passGiftOnDeath(B,A);
   // 依頼：自分が指定した依頼対象を倒したとき、最大HPの50%分を回復。
   if(A&&hasAbn(A,'request')&&A.abnState&&B.abnState&&B.abnState.requestMarks&&B.abnState.requestMarks[A.abnState.requestKey]!=null){const old=A.hp;A.hp=Math.min(A.max,A.hp+Math.ceil(A.max*0.5));L(`　「依頼」：${A.name}はHP${A.hp-old}回復`);delete B.abnState.requestMarks[A.abnState.requestKey]}
   // 音楽：このページの所有者側は敵撃破ごとに味方全員がHP15回復。
@@ -1148,6 +1179,15 @@ function resolveIndexFingerCommands(){
   c.abnState.directiveResult=0;
  }));
 }
+function forceDefeat(pa,A,pb,B,reason='強制撃破'){
+ if(!B||!B.alive)return false;
+ const bi=S.p[pb].chars.indexOf(B);B.hp=0;B.alive=false;
+ L(`　${reason}：${B.name}はダメージ0で撃破された`);
+ passGiftOnDeath(B,A);checkPhillipAwakening(pb);
+ if(A&&A.alive)hook('kill',A,B);
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>checkPhillipAwakening(pi)));
+ return true;
+}
 function combat(){
  S.inCombat=true;   // 戦闘処理中（lvbuff が「次のターン」に回すかの判定に使う）
  L('── 戦闘開始 ──');
@@ -1163,16 +1203,46 @@ function combat(){
   if(!c.alive||c.used){setActionSlot(c,0);continue}
   if(c.abnState&&c.abnState.skipThisTurn){c.used=true;L(`　${c.name}は行動不能のため行動をスキップ`);setActionSlot(c,0);continue;}
   S.dm={};
-  let qi=1-a.pi,Q=S.p[qi];
+  let qi=c.tgtPi==null?1-a.pi:c.tgtPi,Q=S.p[qi];
   let t=Q.chars[c.tgt];
   // 女王蜂のHPが25%未満なら、働き蜂は敵ではなく女王蜂本人を攻撃する。
   if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&a.pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen){const qOwn=S.p[a.pi].chars.find(z=>z.name==='女王蜂'&&z.alive);if(qOwn){qi=a.pi;Q=S.p[qi];t=qOwn;}else c.abnState.targetQueen=false;}
   c.used=true;
   if(c.card&&c.card.n==='快刀亂麻'&&hasPasKind(c,'tianTui'))registerSpecialCard(S.p[a.pi],'tianTui');
   if(!c.alive){setActionSlot(c,0);continue}
-  // 広域攻撃は敵側の各キャラクターの最初の行動カードを対象にする。
-  // 合算：敵カードの全ダイス値の合計を上回ればカード全体を不発にし、攻撃。
-  // 個別：敵カード内の各ダイスと比較し、上回ったダイスだけ取り除いて攻撃。
+  if(c.card&&c.card.aoe==='targetAdjust'&&c.card.__specialCardId==='targetAdjustment'){
+   if(!c.abnState)c.abnState={};
+   const stacks=Math.max(0,Number(c.abnState.tornMemory)||0);
+   let firstKilled=false;
+   if(t&&t.alive){
+    const firstDie=c.card.d[0];setActionSlot(c,a.slot);const firstValue=abnormalityRoll(c,firstDie,false,t);
+    if(qi===a.pi&&hasPasKind(t,'contemptAwe')&&(Number(t.st&&t.st.awe)||0)>0){
+     // 畏敬中のジア・ファンはダメージを受けず、撃破効果だけを強制発動する。
+     if(hasPasKind(c,'tornMemory')){c.abnState.tornMemory=(c.abnState.tornMemory||0)+1;L(`　「引き裂かれた追憶」：${c.name}は追憶+1（${c.abnState.tornMemory}）`)}
+     forceDefeat(a.pi,c,qi,t,'「畏敬」');firstKilled=true;
+    }else{
+     L(`【対象調整射撃】${c.name}の第1ダイス[${firstValue}] → ${t.name}（指定対象のみ）`);
+     hit(a.pi,qi,t,firstValue,c,firstDie);firstKilled=!t.alive;
+    }
+    pf([ix(a.pi,c)],[ix(qi,t)],null);if(S.fr.length)S.fr[S.fr.length-1].aoe='targetAdjust';
+   }else L(`【対象調整射撃】第1対象はすでに戦闘不能。第1ダイスは不発`);
+   const enemies=S.p[1-a.pi].chars.map((z,zi)=>({z,zi})).filter(o=>o.z.alive&&!(o.z.abnState&&o.z.abnState.soloUntargetable));
+   const secondTargets=firstKilled?enemies:(enemies.length?[enemies[Math.floor(rnd()*enemies.length)]]:[]);
+   if(secondTargets.length){
+    const secondDie=c.card.d[1];setActionSlot(c,a.slot);const rollTarget=secondTargets[Math.floor(rnd()*secondTargets.length)],secondValue=abnormalityRoll(c,secondDie,false,rollTarget.z);
+    L(`【対象調整射撃】${c.name}の第2ダイス[${secondValue}] → ${firstKilled?'敵全員（第1対象撃破）':rollTarget.z.name+'（ランダム）'}`);
+    secondTargets.forEach(o=>{if(o.z.alive)hit(a.pi,1-a.pi,o.z,secondValue,c,secondDie)});
+    // 第2ダイスは第1対象が受けた被ダメージモーションを再利用する。
+    // 第1対象が撃破済みなら、そのスナップショットは灰色（dead）＋hurtで描画される。
+    const visual=[ix(a.pi,c)];const hurt=[ix(qi,t),...secondTargets.map(o=>ix(1-a.pi,o.z))];
+    pf(visual,hurt,null);if(S.fr.length)S.fr[S.fr.length-1].aoe='targetAdjust';
+   }else L('【対象調整射撃】攻撃可能な敵がいないため第2ダイスは不発');
+   c.abnState.tornMemory=0;delete c.abnState.tornMemoryShotStacks;
+   L(`　「引き裂かれた追憶」：対象調整射撃の使用後、追憶をすべて消耗（${stacks}）`);
+   setActionSlot(c,0);continue;
+  }
+  // 広域攻撃は敵側全員を対象にする。
+  // 合算は相手カードのダイス合計と比較し、個別は保有する全行動枠・保存ダイスと1ダイスずつ比較する。
   if(c.card&&c.card.aoe){
     if(c.card.on)fx(a.pi,c,c.card.on,'発動時',t);
     const mode=c.card.aoe;
@@ -1243,22 +1313,47 @@ function combat(){
         }
         animateArea(hitIds);
       }else{
+        // 個別：各攻撃ダイスを敵全員へ適用し、相手の全行動枠の予定ダイスと保存ダイスを比較する。
+        // 攻撃値が保有ダイスを上回ればそのダイスを除去してダメージ、同値以下ならそのダイスを残して無効化。
+        // すべての攻撃ダイスの処理後、成功した対象を一つのフレームで同時に揺らす。
         const allHitIds=new Set();
         for(let ai=0;ai<areaDice.length;ai++){
-          const hitIds=[];
           for(const item of getEnemies()){
             const target=item.z;if(!target.alive)continue;
-            const states=actionStates(target),defSlot=0;if(states[defSlot]&&states[defSlot].used)continue;const defState=states[defSlot]&&states[defSlot].card?states[defSlot]:null;
             setActionSlot(c,a.slot);const areaDie=areaDice[ai],attackValue=abnormalityRoll(c,areaDie,false,target);if(!c.alive)break;
-            if(!defState||!defState.card){const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御カードなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);continue;}
-            setActionSlot(target,defSlot);const defendingCard=defState.card;
-            if(!defendingCard.d.length){const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（防御ダイスなし）。${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);hitIds.push(item.zi);continue;}
-            let successes=0;
-            for(let di=defendingCard.d.length-1;di>=0;di--){const die=defendingCard.d[di],defValue=abnormalityRoll(target,die,true,c);if(attackValue>defValue){defendingCard.d.splice(di,1);successes++;const before=target.hp;L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] > ${target.name}のダイス[${defValue}]。防御ダイスを削除、${attackValue}ダメージ。`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);if(!hitIds.includes(item.zi))hitIds.push(item.zi);if(!target.alive)break;}}
-            if(!successes)L(`【広域攻撃：個別】${c.name}は${target.name}のダイスを上回れず、ダメージなし。`);
-            if(!defendingCard.d.length)defState.used=true;setActionSlot(target,0);
+            const states=actionStates(target);
+            const held=states.some(st=>(!st.used&&st.card&&st.card.d&&st.card.d.length>0)||(st.stock&&st.stock.length>0));
+            if(!held){
+              L(`【広域攻撃：個別】${c.name}のダイス${ai+1}[${attackValue}] → ${target.name}（保有ダイスなし）。${attackValue}ダメージ。`);
+              hit(a.pi,1-a.pi,target,attackValue,c,areaDie);allHitIds.add(item.zi);continue;
+            }
+            let wins=0,blocked=0;
+            for(let slot=0;slot<states.length&&target.alive;slot++){
+              const st=states[slot];
+              if(!st.used&&st.card&&Array.isArray(st.card.d)){
+                setActionSlot(target,slot);
+                for(let di=st.card.d.length-1;di>=0&&target.alive;di--){
+                  const defenderDie=st.card.d[di],defValue=abnormalityRoll(target,defenderDie,true,c);
+                  if(attackValue>defValue){
+                    st.card.d.splice(di,1);wins++;
+                    L(`【広域攻撃：個別】${c.name}[${attackValue}] > ${target.name}・行動${slot+1}の保有ダイス[${defValue}]。そのダイスを除去して${attackValue}ダメージ`);
+                    hit(a.pi,1-a.pi,target,attackValue,c,areaDie);allHitIds.add(item.zi);
+                  }else{blocked++;L(`【広域攻撃：個別】${target.name}・行動${slot+1}の保有ダイス[${defValue}]が${attackValue}以上。ダメージなし`)}
+                }
+                if(!st.card.d.length)st.used=true;
+              }
+              if(st.stock&&st.stock.length&&target.alive){
+                setActionSlot(target,slot);
+                for(let di=st.stock.length-1;di>=0&&target.alive;di--){
+                  const defenderDie=st.stock[di],defValue=abnormalityRoll(target,defenderDie,true,c);
+                  if(attackValue>defValue){st.stock.splice(di,1);wins++;L(`【広域攻撃：個別】${c.name}[${attackValue}] > ${target.name}の保存ダイス[${defValue}]。ダイスを除去して${attackValue}ダメージ`);hit(a.pi,1-a.pi,target,attackValue,c,areaDie);allHitIds.add(item.zi)}
+                  else{blocked++;L(`【広域攻撃：個別】${target.name}の保存ダイス[${defValue}]が${attackValue}以上。ダメージなし`)}
+                }
+              }
+            }
+            setActionSlot(target,0);
+            if(!wins&&blocked)L(`【広域攻撃：個別】${target.name}はすべての保有ダイスを維持し、ダメージなし`);
           }
-          hitIds.forEach(zi=>allHitIds.add(zi));
         }
         animateArea([...allHitIds]);
       }
@@ -1304,6 +1399,11 @@ function combat(){
  if(typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee')S.p.forEach((p,pi)=>p.chars.forEach(c=>{const v=c.st&&c.st.spore||0;if(!c.alive||v<=0)return;direct(pi,c,v,'spore');c.st.spore=Math.floor(v/2);L(`　胞子：${c.name}の値は${c.st.spore}になった`);pf([],[ix(pi,c)],null)}));
  S.p.forEach((p,pi)=>p.chars.forEach(c=>{if(c.alive&&c.st.burn){direct(pi,c,c.st.burn,'burn');pf([],[ix(pi,c)],null)}}));
  S.p.forEach(p=>p.chars.forEach(c=>{if(c.alive)['burn','bleed','rupt'].forEach(k=>{c.st[k]=decay(c.st[k])})}));
+ S.p.forEach((p,pi)=>p.chars.forEach(c=>{
+  if(!c.alive)return;
+  c.st.contempt=decay(Number(c.st.contempt)||0);c.st.awe=decay(Number(c.st.awe)||0);
+  if((Number(c.st.gaze)||0)>=7){c.st.gaze=0;c.st.contempt=Math.max(1,Number(c.st.contempt)||0);L(`　「視線」：${c.name}の視線が7に到達。視線を除去し、次のターンに軽蔑を付与`);refreshJiasForTarget(pi)}
+ }));
  S.p.forEach((p,pi) => {if(!(typeof SOLO!=='undefined'&&SOLO.active&&pi===1))resolveEmotion(p)});
  pf([],[],null);
  S.p.forEach((p,pi)=>checkPhillipAwakening(pi));
@@ -1338,7 +1438,7 @@ function nextTurn(){
  S.p.forEach(p=>{
   const n=alive(p);
   p.chars.forEach(c=>{
-   actionStates(c).forEach(st=>{if(st.card){if(st.used&&st.card.id==='mimicAwakening'){if(!c.abnState)c.abnState={};c.abnState.mimicAwakeningPending=true}if(st.used&&st.card.id==='daCapoAwakening'){if(!c.abnState)c.abnState={};c.abnState.daCapoAwakeningPending=true}if(st.card.__specialCardId){if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else returnAssignedCard(p,st.card)}else if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else p.disc.push(clearGrantedRayhonAoE(st.card))}st.card=null;st.tgt=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});setActionSlot(c,0);
+   actionStates(c).forEach(st=>{if(st.card){if(st.used&&st.card.id==='mimicAwakening'){if(!c.abnState)c.abnState={};c.abnState.mimicAwakeningPending=true}if(st.used&&st.card.id==='daCapoAwakening'){if(!c.abnState)c.abnState={};c.abnState.daCapoAwakeningPending=true}if(st.card.__specialCardId){if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else returnAssignedCard(p,st.card)}else if(st.card.once&&st.used)p.gone=(p.gone||0)+1;else p.disc.push(clearGrantedRayhonAoE(st.card))}st.card=null;st.tgt=null;st.tgtPi=null;st.tgtPi0=null;st.used=false;st.hitFired=[];st.stock=null;st.redirBy=null;st.tgt0=null;st.effectiveCost=null;st.bulletSpent=0;st.bulletKind=null;st.bulletDieBonus=0;st.bulletCommitted=false});setActionSlot(c,0);
    c.bf=c.nx;c.nx=BF0();   // 「次のターン」のバフが有効になる
    if(c.abnState){c.abnState.surgingActive=false;c.abnState.speedDownNow=0;c.abnState.frostSpeedDown=0;c.abnState.teamDiceBonus=0;c.abnState.skipThisTurn=false;}
   });
@@ -1369,7 +1469,7 @@ function chHTML(pi,ci,view){
  if(fr&&has(fr.lu))cls+=low?' up':' dn';
  if(fr&&has(fr.sh))cls+=' hurt';
  const hd=A?(frameAt(A.i<0?A.hold0:fr&&fr.hold,[])||[]):[],gh=hd.length?`<div class="ghosts ${low?'top':'bot'}">${hd.map(x=>`<span class="die ${x.t} ghost${x.s?' st':''}">${T[x.t]}${x.r[0]}-${x.r[1]}</span>`).join('')}</div>`:'';
- const sn=A?(frameAt(A.i<0?A.st0:fr&&fr.sts,c)||c):c,ST=sn.st,stk=['burn','bleed','rupt','vib','cold','spore'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
+ const sn=A?(frameAt(A.i<0?A.st0:fr&&fr.sts,c)||c):c,ST=sn.st,stk=['burn','bleed','rupt','vib','gaze','contempt','awe','cold','spore'],bk=['dmgup','guard','roll','dmgdn','vuln','rolldn','atk'];
  const evs=fr?fr.ev.filter(e=>e[0]===pi&&e[1]===ci).map(e=>e[2]):[];
  const badge=(k,v,nx)=>`<span class="stt${nx?' nx':''}" style="--c:${STN[k].c}" title="${STN[k].n}${nx?'（次のターンから）':''}：${STN[k].t}">${STN[k].i}${bk.includes(k)?(['guard','dmgdn','rolldn'].includes(k)?'-':'+'):''}${v}${nx?'<small>次</small>':''}</span>`;
  const sts=stk.filter(k=>ST[k]>0).map(k=>badge(k,ST[k])).join('')+bk.filter(k=>sn.bf[k]>0).map(k=>badge(k,sn.bf[k])).join('')+bk.filter(k=>sn.nx[k]>0).map(k=>badge(k,sn.nx[k],1)).join('');
@@ -1397,6 +1497,7 @@ function chHTML(pi,ci,view){
  if(ad.directiveComposure)special.push(specialBadge('directiveComposure','指令沈着'));
  if(ad.mimicBuff)special.push(specialBadge('mimicEgoBuff','E.G.O発現:ミミック'));
  if(ad.daCapoBuff)special.push(specialBadge('daCapoEgoBuff','E.G.O発現:ダ・カーポ'));
+ if((ad.tornMemory||0)>0)special.push(specialBadge('tornMemory','引き裂かれた追憶',ad.tornMemory));
  if((ad.directiveTakenBonus||0)>0)special.push(specialBadge('directiveDamage','被ダメージ',`+${ad.directiveTakenBonus}`));
  if(hasAbn(c,'gaze'))special.push(specialBadge('gazeTaken','与・被ダメージ×2'));
  const globalMusicTaken=globalAbnHolders('music').reduce((n,x)=>n+((x.c.abnState&&x.c.abnState.musicDmgTaken)||0),0);
@@ -1410,14 +1511,13 @@ function chHTML(pi,ci,view){
  const sc=isMine&&S.handMode!=='special'&&S.sel!=null?p.hand[S.sel]:null;
  if(sc&&!isCh(sc)&&sc.req&&!c.at.includes(sc.req))cls+=' dimc';   // 使えないキャラを暗くする
  if(isMine&&c.alive)cls+=' mine'+(S.pend===ci?' pend':'');
- if(decide&&pi!==view&&S.pend!=null&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable))cls+=' tgt';
- const ev=isMine?`onclick="mine(${ci})" ondragover="event.preventDefault()" ondrop="event.preventDefault();assign(${ci},+event.dataTransfer.getData('text/plain'))"`:
-  (cls.includes('tgt')?`onclick="pickTgt(${ci})"`:'');
+ const pendingShooter=decide&&S.pend!=null?S.p[view].chars[S.pend]:null;const canPickTarget=!!(decide&&pendingShooter&&c.alive&&!(c.abnState&&c.abnState.soloUntargetable)&&(pi!==view||(pi===view&&ci!==S.pend&&hasPasKind(pendingShooter,'cruelBullet'))));if(canPickTarget)cls+=' tgt';
+ const ev=canPickTarget?`onclick="pickTgt(${ci},${pi})"`:isMine?`onclick="mine(${ci})" ondragover="event.preventDefault()" ondrop="event.preventDefault();assign(${ci},+event.dataTransfer.getData('text/plain'))"`:'';
  let a='';
  if(isMine||!decide||(NET.on&&pi===view)){
-  a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const tg=st.tgt!=null?` → ${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen?'女王蜂':(S.p[1-pi].chars[st.tgt]?S.p[1-pi].chars[st.tgt].name:'対象')}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
+  a=actionStates(c).map((st,slot)=>{if(!st.card)return '';const targetPi=st.tgtPi==null?1-pi:st.tgtPi;const tg=st.tgt!=null?` → ${typeof SOLO!=='undefined'&&SOLO.active&&SOLO.bossId==='queen_bee'&&pi===1&&c.name==='働き蜂'&&c.abnState&&c.abnState.targetQueen?'女王蜂':(S.p[targetPi]&&S.p[targetPi].chars[st.tgt]?S.p[targetPi].chars[st.tgt].name:'対象')}`:'（対象未設定）';const cancel=isMine&&slot===0?`<button class="x" title="このキャラに割り当てた行動をすべて解除" onclick="unassign(${ci},event)">×</button>`:'';const retarget=isMine&&!NET.on&&st.tgt!=null?`<button class="sub" style="font-size:10px;padding:2px 4px" onclick="chooseTarget(${ci},${slot},event)">対象変更</button>`:'';return `<div class="act">${cancel}<b>${c.actionRights>1?`行動${slot+1}：`:''}${st.card.n}</b>${tg}${retarget}${fxLine(st.card)}<div>${diceHTML(st.card.d)}</div></div>`}).join('');
  }
- const actionRail=c.actionRights>1?`<div class="action-rail ${low?'facing-top':'facing-bottom'}" aria-label="行動権ごとのマッチ表示">${actionStates(c).map((st,slot)=>{const target=st.tgt!=null?`対象：${S.p[1-pi].chars[st.tgt]?.name||'相手'}`:'対象未設定';return `<div id="ch-${pi}-${ci}-slot-${slot}" class="action-rail-slot${st.card?' assigned':''}${st.tgt!=null?' targeted':''}${st.redirBy!=null?' redirected':''}" title="行動${slot+1}：${st.card?st.card.n:'未割当'}／${target}${st.redirBy!=null?'／対象変更':''}"><span>${slot+1}</span>${st.redirBy!=null?'<i>↪</i>':''}</div>`}).join('')}</div>`:'';
+ const actionRail=c.actionRights>1?`<div class="action-rail ${low?'facing-top':'facing-bottom'}" aria-label="行動権ごとのマッチ表示">${actionStates(c).map((st,slot)=>{const targetPi=st.tgtPi==null?1-pi:st.tgtPi;const target=st.tgt!=null?`対象：${S.p[targetPi].chars[st.tgt]?.name||'相手'}`:'対象未設定';return `<div id="ch-${pi}-${ci}-slot-${slot}" class="action-rail-slot${st.card?' assigned':''}${st.tgt!=null?' targeted':''}${st.redirBy!=null?' redirected':''}" title="行動${slot+1}：${st.card?st.card.n:'未割当'}／${target}${st.redirBy!=null?'／対象変更':''}"><span>${slot+1}</span>${st.redirBy!=null?'<i>↪</i>':''}</div>`}).join('')}</div>`:'';
  const showAbn=!!c.showAbn,abnList=c.abn||[];
  const detail=showAbn?(abnList.length?`<ul class="pl abnlist">${abnList.map(x=>`<li>✦ ${x.n}：${x.desc}</li>`).join('')}</ul>`:'<div class="pl">幻想体カードはまだありません</div>'):`<ul class="pl">${c.ps.map(x=>`<li>${x.n}${x.from?'（借）':''}：${pasText(x)}</li>`).join('')}</ul>`;
  const switchBtn=`<button class="sub" style="font-size:11px;padding:3px 6px;margin:3px 0" onclick="toggleCharacterView(${pi},${ci},event)">${showAbn?'パッシブ':'幻想体カード'}</button>`;
@@ -1538,7 +1638,7 @@ function renderRules(){
  <section><h2>2. 準備</h2>
   <ul>
    <li>デッキは <b>${C.DECK}枚</b>。技カードは同じ名前を${C.MAXC}枚まで、キャラカードは1枚ずつ、キャラカードは1枚以上入れます（ホームの「デッキ構築」で作ります）。</li>
-   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、通常の大型キャラは2枠を使います。キャラ名に書いてある枠数に従ってください</li>
+   <li>対戦が始まったら、各プレイヤーがデッキのキャラカードから<b>場に出すキャラ</b>を選びます。場の枠は<b>${C.FIELD}つ</b>で、通常の大型キャラは2枠を使い、「蜜蝋の翼」を得たフィリップも場の枠は1つのままです。</li>
    <li>選ばなかったキャラカードは山札に戻ります（あとで手札に来て、パッシブの帰属に使えます）。</li>
    <li>最初の手札は5枚、コストは${C.COST}です。</li>
   </ul></section>
@@ -1549,19 +1649,18 @@ function renderRules(){
    <li><b>行動の決定</b>：速度の<b>平均が低い</b>プレイヤーから先にカードを割り当て、攻撃対象を決めます。もう一方のプレイヤーは、先に決めた側の割り当てを見たうえで決められます。</li>
    <li><b>戦闘</b>：両者が決め終わると、速度の高いキャラから順に行動します。</li>
    <li><b>ターン終了</b>：火傷などの継続効果を処理し、対象の状態異常値を減衰させます。</li>
-   <li><b>次のターンの準備</b>：使ったカードは山札に混ざります。1枚ドローし、コストは生存人数+1分回復します（上限まで）。</li>
+   <li><b>次のターンの準備</b>：使ったカードは山札に混ざります。生きているキャラ数＋1枚ドローし、コストも同じだけ回復します（上限まで）。</li>
   </ol></section>
 
  <section><h2>4. カードを使う</h2>
   <ul>
-   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して装着し、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、複数の行動権を持つキャラは行動権の分だけ装着できます。</li>
+   <li>手札の技カードを、自分のキャラにドラッグ（またはカードを選んでキャラをクリック）して割り当て、<b>攻撃対象の相手キャラ</b>をクリックします。通常は1キャラにつき1枚ですが、「蜜蝋の翼」を得たフィリップは行動権2となり、最大2枚まで割り当てられます。</li>
    <li>割り当てたカードのコストの合計は、現在のコスト以内にします。割り当てたカードの「×」ボタンで割り当てを外して、付け替えられます。</li>
    <li><b>行動権が複数あるキャラ</b>は、行動権ごとにカード・攻撃対象・マッチ対象の変更を別々に決めます。速度はキャラクター共通で、各行動権に同じ速度を使います。マス側面の分割欄と、そこから伸びる矢印で対応する行動を確認できます。</li>
    <li>カードには<b>ダイス</b>が付いています：${die('a','3-8')}攻撃　${die('d','2-6')}防御　${die('e','4-9')}回避（数字は出目の範囲）。</li>
    <li>ダイスの<b>✧</b>は、そのダイスが当たったときの追加効果（的中時）、カードの「発動時」は使った時点で起きる効果です。</li>
    <li>「使い捨て」のカードは、使うと消滅します。</li>
    <li>属性限定のカードは、その属性を持つキャラだけが使えます（9章）。</li>
-   <li>いくらかのパッシブや幻想体カードには「特殊カード」を追加するものがあります。特殊カードは通常の手札とは違う「特殊カード欄」に保存され、ドロー等のアルゴリズムとは別に扱われます。特殊カード欄は特殊カードを保有しているときにしか表示されません</li>
   </ul></section>
 
  <section><h2>5. 戦闘のしくみ</h2>
@@ -1581,10 +1680,10 @@ function renderRules(){
   <h3>マッチ対象の変更</h3>
   <p>後から決める側は、対象に選んだキャラの行動権のうち、まだ別の相手に向いているカードを個別に変更できます。自分の速度が相手より<b>${C.REDIR}以上高い</b>とき、その行動権の対象を自分に変更してマッチへ持ち込めます（双方のカードが速度無視でないときのみ）。複数行動権でも速度はキャラクター共通ですが、変更判定と結果は行動権ごとに独立します。</p></section>
 
- <section><h2>6. 感情レベルと感情コイン</h2>
+ <section><h2>6. 感情レベルとコイン</h2>
   <ul>
-   <li>感情コインは、ダイスをぶつけ合うたび（双方+1）、ダメージを与えたとき（+1）、キャラが倒れたとき（倒された側のプレイヤーに+2。攻撃で倒した側にも+2）に貯まります。</li>
-   <li>感情コインが<b>${C.COIN}枚</b>たまるたびに<b>感情レベル</b>が1上がります（最大5）。</li>
+   <li>コインは、ダイスをぶつけ合うたび（双方+1）、ダメージを与えたとき（+1）、キャラが倒れたとき（倒された側のプレイヤーに+2。攻撃で倒した側にも+2）に貯まります。</li>
+   <li>コインが<b>${C.COIN}枚</b>たまるたびに<b>感情レベル</b>が1上がります（最大5）。</li>
    <li>感情レベルが上がると、コストの上限が（${C.COST}＋レベル）になり、<b>コストが全回復</b>します。</li>
    <li>攻撃命中・マッチ勝利・撃破を「正の感情」、被弾・マッチ敗北・味方の撃破を「負の感情」として記録します。正負の比率によって、提示される幻想体カードの傾向が変わります。</li>
    <li>感情レベル上昇後、次の自分の行動決定時に候補3枚から1枚を選び、味方キャラ1体に付与します。候補はデッキ構築で選んだ階層のカードから出ます。</li>
