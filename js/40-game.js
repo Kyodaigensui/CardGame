@@ -83,7 +83,7 @@ const ABN_CARDS=[
 ];
 const DEFAULT_ABN_HIERARCHIES=[ABN_HIERARCHIES[0],ABN_HIERARCHIES[0]];
 const validHiers=a=>[0,1].map(i=>ABN_HIERARCHIES.includes(a&&a[i])?a[i]:DEFAULT_ABN_HIERARCHIES[i]);
-const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。最終ダイス以外はバフ・デバフの影響を受けない。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>({...D('a',3,6),__ignoreBuffDebuffs:true})).concat([D('a',5,10)])},furiosoCrescendo:{id:'furiosoCrescendo',n:'Furioso-Crescendo',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。Furioso-Replicaより全ダイスの出目が+1され、バフ・デバフの影響を受ける。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,7)).concat([D('a',6,11)])},xiaoPulao:{id:'xiaoPulao',n:'蒲牢',c:3,once:true,aoe:'individual',desc:'広域攻撃：個別。6〜9の単ダイス。的中した相手に次のターン、ダイス値-1。使用時に消滅する',d:[D('a',6,9,[['rolldn',1]])]},xiaoYazi:{id:'xiaoYazi',n:'睚眦',c:5,once:true,aoe:'individual',desc:'広域攻撃：個別。5〜10、4〜9の2ダイス。的中時に火傷1。使用時、次のターンにダイス値+2。使用時に消滅する',on:[['rollup',2]],d:[D('a',5,10,[['burn',1]]),D('a',4,9,[['burn',1]])]},xiaoTaotie:{id:'xiaoTaotie',n:'饕餮',c:7,once:true,aoe:'sum',desc:'広域攻撃：合算。25〜30の単ダイス。的中時に火傷8。使用時に消滅する',d:[D('a',25,30,[['burn',8]])]},mimicAwakening:{id:'mimicAwakening',at:['RedMist'],n:'E.G.O発現:ミミック',c:5,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト6回復し、強化状態と「ミミクリー」を獲得する',d:[D('d',8,15),D('e',8,15)]},mimicry:{id:'mimicry',at:['RedMist'],n:'ミミクリー',c:5,once:true,desc:'単ダイス19〜35。的中時、与えたダメージ分HP回復し、出血10を付与する',d:[D('a',19,35,[['bleed',10]])]},daCapoAwakening:{id:'daCapoAwakening',at:['RedMist'],n:'E.G.O発現:ダ・カーポ',c:4,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト5回復し、強化状態と「ダ・カーポ」を獲得する',d:[D('d',8,15),D('e',8,15)]},daCapo:{id:'daCapo',at:['RedMist'],n:'ダ・カーポ',c:6,once:true,aoe:'individual',desc:'広域攻撃：個別。4〜8（コスト-2）、4〜9（次ターン速度1固定）、5〜9（このターンダイス値-1）の3ダイス。使用時に消滅する',d:[D('a',4,8),D('a',4,9),D('a',5,9)]},targetAdjustment:{id:'targetAdjustment',n:'対象調整射撃',c:0,req:'ranged',once:true,aoe:'targetAdjust',desc:'広域攻撃：特殊。1ダイス目は指定対象のみ、2ダイス目はランダムな敵1体。1ダイス目で対象を撃破した場合、2ダイス目は敵全員にも命中する。使用後、引き裂かれた追憶をすべて消耗する',d:[D('a',4,9),D('a',10,11)]}};
+const SPECIAL_CARD_DEFS={reload:{id:'reload',n:'再装填',c:0,once:true,trigger:'equip',desc:'装着時発動：虎標弾を消滅させ、猛虎標弾を5得る'},tianTui:{id:'tianTui',n:'超絶猛虎殺撃乱斬',c:9,once:true,aoe:'individual',desc:'広域攻撃：個別。3ダイス。使用時に消滅する',d:(SKILLS.find(x=>x.n==='超絶猛虎殺撃乱斬')||{d:[]}).d},furiosoReplica:{id:'furiosoReplica',n:'Furioso-Replica',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。最終ダイス以外はバフ・デバフの影響を受けない。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>({...D('a',3,6),__ignoreBuffDebuffs:true})).concat([D('a',5,10)])},furiosoCrescendo:{id:'furiosoCrescendo',n:'Furioso-Crescendo',c:0,once:true,aoe:'random',desc:'広域攻撃：乱射。9ダイス。Furioso-Replicaより全ダイスの出目が+1され、バフ・デバフの影響を受ける。各ダイスの対象はランダム。使用時に消滅する',d:Array.from({length:8},()=>D('a',4,7)).concat([D('a',6,11)])},xiaoPulao:{id:'xiaoPulao',n:'蒲牢',c:3,once:true,aoe:'individual',desc:'広域攻撃：個別。6〜9の単ダイス。的中した相手に次のターン、ダイス値-1。使用時に消滅する',d:[D('a',6,9,[['rolldn',1]])]},xiaoYazi:{id:'xiaoYazi',n:'睚眦',c:5,once:true,aoe:'individual',desc:'広域攻撃：個別。5〜10、4〜9の2ダイス。的中時に火傷1。使用時、次のターンにダイス値+2。使用時に消滅する',on:[['rollup',2]],d:[D('a',5,10,[['burn',1]]),D('a',4,9,[['burn',1]])]},xiaoTaotie:{id:'xiaoTaotie',n:'饕餮',c:7,once:true,aoe:'sum',desc:'広域攻撃：合算。25〜30の単ダイス。的中時に火傷8。使用時に消滅する',d:[D('a',25,30,[['burn',8]])]},mimicAwakening:{id:'mimicAwakening',at:['RedMist'],n:'E.G.O発現:ミミック',c:5,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト6回復し、強化状態と「ミミクリー」を獲得する',d:[D('d',8,15),D('e',8,15)]},mimicry:{id:'mimicry',at:['RedMist'],n:'ミミクリー',c:5,once:true,desc:'単ダイス19〜35。的中時、与えたダメージ分HP回復し、出血10を付与する',d:[D('a',19,35,[['bleed',10]])]},daCapoAwakening:{id:'daCapoAwakening',at:['RedMist'],n:'E.G.O発現:ダ・カーポ',c:4,once:true,desc:'防御8〜15・回避8〜15。次のターン、コスト5回復し、強化状態と「ダ・カーポ」を獲得する',d:[D('d',8,15),D('e',8,15)]},daCapo:{id:'daCapo',at:['RedMist'],n:'ダ・カーポ',c:6,once:true,aoe:'individual',desc:'広域攻撃：個別。4〜8（コスト-2）、4〜9（次ターン速度1固定）、5〜9（このターンダイス値-1）の3ダイス。使用時に消滅する',d:[D('a',4,8),D('a',4,9),D('a',5,9)]},targetAdjustment:{id:'targetAdjustment',n:'対象調整射撃',c:0,req:'ranged',once:true,aoe:'targetAdjust',desc:'広域攻撃：特殊。追憶1につき追加ダメージ+20%。1ダイス目は指定対象のみ、2ダイス目はランダムな敵1体。1ダイス目で対象を撃破した場合、2ダイス目は敵全員にも命中する。使用後、引き裂かれた追憶をすべて消耗する',d:[D('a',4,9),D('a',10,11)]}};
 const registerSpecialCard=(p,id)=>{const c=SPECIAL_CARD_DEFS[id];if(!p||!c||!Array.isArray(p.specialHand))return false;if(p.specialHand.some(x=>x.id===id))return false;p.specialHand.push({...c});return true};
 function refreshJiaAwe(jia){if(!S||!jia||!hasPasKind(jia,'contemptAwe'))return;const pi=S.p.findIndex(p=>p.chars.includes(jia));if(pi<0)return;const foes=S.p[1-pi].chars;const gaze=foes.reduce((n,z)=>n+(Number(z.st&&z.st.gaze)||0),0),hasContempt=foes.some(z=>(Number(z.st&&z.st.contempt)||0)>0);if(gaze>=7||hasContempt){if(!jia.st)jia.st={};if(!(jia.st.awe>0)){jia.st.awe=1;L(`　「お前ら全員面白いものを見せてやろう」：${jia.name}は畏敬を得た`)}}}
 function refreshJiasForTarget(targetPi){if(!S)return;S.p[1-targetPi].chars.forEach(refreshJiaAwe)}
@@ -945,8 +945,13 @@ function hit(pa,pb,B,dmg,A,die){
  if(dmg>0&&up){dmg=Math.max(0,dmg+up);L(`　${A.name}の${up>0?'バフ':'弱体'}でダメージ${up>0?'+':''}${up}`)}
  if(dmg>0){
   let mult=1;
-  const memoryStacks=Math.max(0,Number(A&&A.abnState&&A.abnState.tornMemory)||0);
-  if(hasPasKind(A,'tornMemory')&&memoryStacks>0)mult*=1+memoryStacks*0.1;
+  const memoryState=A&&A.abnState;
+  const memoryStacks=Math.max(0,Number(memoryState&&(memoryState.tornMemoryShotStacks!=null?memoryState.tornMemoryShotStacks:memoryState.tornMemory))||0);
+  if(hasPasKind(A,'tornMemory')&&memoryStacks>0){
+   mult*=1+memoryStacks*0.1;
+   // 対象調整射撃は、通常の追憶ボーナスに加えて追憶1につきさらに+20%。
+   if(A.card&&(A.card.__specialCardId==='targetAdjustment'||A.card.id==='targetAdjustment'))mult+=memoryStacks*0.2;
+  }
   if(pa===pb&&hasPasKind(A,'cruelBullet'))mult*=3;
   if(A&&A.st){if(A.st.gaze>0)mult*=1+Math.min(7,A.st.gaze)*0.1;if(A.st.contempt>0)mult*=0.5;if(A.st.awe>0)mult*=0.3}
   if(B.st){if(B.st.gaze>0)mult*=1+Math.min(7,B.st.gaze)*0.1;if(B.st.contempt>0)mult*=0.5;if(B.st.awe>0)mult*=0.3}
@@ -1179,15 +1184,6 @@ function resolveIndexFingerCommands(){
   c.abnState.directiveResult=0;
  }));
 }
-function forceDefeat(pa,A,pb,B,reason='強制撃破'){
- if(!B||!B.alive)return false;
- const bi=S.p[pb].chars.indexOf(B);B.hp=0;B.alive=false;
- L(`　${reason}：${B.name}はダメージ0で撃破された`);
- passGiftOnDeath(B,A);checkPhillipAwakening(pb);
- if(A&&A.alive)hook('kill',A,B);
- S.p.forEach((p,pi)=>p.chars.forEach(c=>checkPhillipAwakening(pi)));
- return true;
-}
 function combat(){
  S.inCombat=true;   // 戦闘処理中（lvbuff が「次のターン」に回すかの判定に使う）
  L('── 戦闘開始 ──');
@@ -1213,16 +1209,21 @@ function combat(){
   if(c.card&&c.card.aoe==='targetAdjust'&&c.card.__specialCardId==='targetAdjustment'){
    if(!c.abnState)c.abnState={};
    const stacks=Math.max(0,Number(c.abnState.tornMemory)||0);
-   let firstKilled=false;
+   // 追憶数はカード使用時点で固定し、射撃中の命中による新規獲得分は今回の威力へ加算しない。
+   c.abnState.tornMemoryShotStacks=stacks;
+   let firstKilled=false,firstKillLabel='第1対象撃破';
    if(t&&t.alive){
     const firstDie=c.card.d[0];setActionSlot(c,a.slot);const firstValue=abnormalityRoll(c,firstDie,false,t);
     if(qi===a.pi&&hasPasKind(t,'contemptAwe')&&(Number(t.st&&t.st.awe)||0)>0){
-     // 畏敬中のジア・ファンはダメージを受けず、撃破効果だけを強制発動する。
+     // 畏敬中のジア・ファンは死亡せず、ダメージ0で「撃破時分岐」だけを発生させる。
+     L(`【対象調整射撃】${c.name}の第1ダイス[${firstValue}] → ${t.name}（畏敬によりダメージ0・撃破されない）`);
      if(hasPasKind(c,'tornMemory')){const gained=R(1,2);c.abnState.tornMemory=(c.abnState.tornMemory||0)+gained;L(`　「引き裂かれた追憶」：${c.name}は追憶+${gained}（${c.abnState.tornMemory}）`)}
-     forceDefeat(a.pi,c,qi,t,'「畏敬」');firstKilled=true;
+     const cruel=c.ps.find(x=>x.k==='cruelBullet');if(cruel)run1('kill',c,cruel,t,true);
+     // 撃破扱いの分岐は有効にするが、対象のHP・生存状態・死亡時効果は変更しない。
+     firstKilled=true;firstKillLabel='畏敬による撃破時効果';
     }else{
      L(`【対象調整射撃】${c.name}の第1ダイス[${firstValue}] → ${t.name}（指定対象のみ）`);
-     hit(a.pi,qi,t,firstValue,c,firstDie);firstKilled=!t.alive;
+     hit(a.pi,qi,t,firstValue,c,firstDie);firstKilled=!t.alive;if(firstKilled)firstKillLabel='第1対象撃破';
     }
     pf([ix(a.pi,c)],[ix(qi,t)],null);if(S.fr.length)S.fr[S.fr.length-1].aoe='targetAdjust';
    }else L(`【対象調整射撃】第1対象はすでに戦闘不能。第1ダイスは不発`);
@@ -1230,7 +1231,7 @@ function combat(){
    const secondTargets=firstKilled?enemies:(enemies.length?[enemies[Math.floor(rnd()*enemies.length)]]:[]);
    if(secondTargets.length){
     const secondDie=c.card.d[1];setActionSlot(c,a.slot);const rollTarget=secondTargets[Math.floor(rnd()*secondTargets.length)],secondValue=abnormalityRoll(c,secondDie,false,rollTarget.z);
-    L(`【対象調整射撃】${c.name}の第2ダイス[${secondValue}] → ${firstKilled?'敵全員（第1対象撃破）':rollTarget.z.name+'（ランダム）'}`);
+    L(`【対象調整射撃】${c.name}の第2ダイス[${secondValue}] → ${firstKilled?`敵全員（${firstKillLabel}）`:rollTarget.z.name+'（ランダム）'}`);
     secondTargets.forEach(o=>{if(o.z.alive)hit(a.pi,1-a.pi,o.z,secondValue,c,secondDie)});
     // 第2ダイスは第1対象が受けた被ダメージモーションを再利用する。
     // 第1対象が撃破済みなら、そのスナップショットは灰色（dead）＋hurtで描画される。
